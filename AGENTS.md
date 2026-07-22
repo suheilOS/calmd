@@ -1,6 +1,6 @@
 ## Project State
 
-This project is currently a non-functional web prototype.
+This project is currently an interactive, in-memory web prototype.
 
 Current stack:
 
@@ -10,7 +10,7 @@ Current stack:
 - Tailwind CSS
 - Base UI
 
-Tauri, Rust, SQLite, filesystem storage, backlinks, and semantic search are not implemented yet.
+Tauri, Rust, SQLite, filesystem storage, backlink discovery, wiki links, and semantic search are not implemented yet. The backlinks popover is a visual placeholder only.
 
 ## Product Goal
 
@@ -26,7 +26,7 @@ Focus only on:
 - Mock search results while typing
 - Creating a note from the composer
 - A minimal full-page note editor
-- Backlinks revealed only when requested
+- A backlinks popover revealed only when requested, with static placeholder content
 
 Use static or mocked data. Do not introduce backend architecture during this phase.
 

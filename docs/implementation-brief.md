@@ -1,6 +1,31 @@
 # Product Implementation Brief
 
-## Experience
+## Current phase: interactive UI prototype
+
+This phase validates the appearance and core interaction model using React state and mock notes. It does not validate persistence, backend architecture, semantic retrieval, wiki links, or backlink discovery.
+
+### Completed
+
+- Blank composer with no collection overview or recent-notes feed
+- Mock title and body retrieval while typing
+- Exact-title matching that opens the existing note instead of creating a duplicate
+- Keyboard and pointer navigation through retrieval results
+- In-memory note creation and editing
+- Debounced in-memory saving while the app remains open
+- Minimal full-page editor with return navigation
+- On-demand backlinks popover with static empty-state content
+- Responsive light and dark presentation using a restrained three-level type scale
+
+### Deferred
+
+- Persistent Markdown and filesystem storage
+- Tauri and Rust integration
+- SQLite, FTS5, embeddings, and combined ranking
+- Inline `[[links]]` and backlink discovery
+- CodeMirror integration and formatting controls
+- Browser-history-backed navigation
+
+## Target experience
 
 The app opens to a single composer.
 
@@ -12,7 +37,7 @@ As the user types, it:
 
 There is no sidebar, file tree, dashboard, graph, note count, or recent-notes feed.
 
-## Navigation
+## Target navigation
 
 Knowledge is accessed through:
 
@@ -23,7 +48,7 @@ Knowledge is accessed through:
 
 The full collection is never shown by default.
 
-## Notes
+## Target note storage
 
 * Stored as plain Markdown files
 * Kept in one vault folder
@@ -31,7 +56,7 @@ The full collection is never shown by default.
 * SQLite stores indexes and system metadata
 * Markdown remains the source of truth
 
-## Search
+## Target search
 
 Use hybrid retrieval:
 
@@ -41,7 +66,7 @@ Use hybrid retrieval:
 
 Results show the title and a short matching excerpt.
 
-## Editor
+## Target editor
 
 * Full-page Markdown editor
 * Automatic saving
@@ -49,7 +74,7 @@ Results show the title and a short matching excerpt.
 * Backlinks hidden until requested
 * No permanent secondary panels
 
-## Technology
+## Target technology
 
 * React + Vite
 * Base UI
@@ -59,15 +84,15 @@ Results show the title and a short matching excerpt.
 * Rust
 * SQLite
 
-## Initial Scope
+## Delivery roadmap
 
-1. Composer prototype with mock notes
-2. Note editor
-3. Title and body search
-4. Note creation and saving
-5. Wiki links and backlinks
-6. Semantic search
-7. Tauri and filesystem integration
+1. **Completed:** Composer prototype with mock notes
+2. **Completed:** Minimal note editor
+3. **Prototype only:** Literal title and body retrieval over mock notes
+4. **Prototype only:** In-memory note creation and saving
+5. **UI placeholder only:** Backlinks popover; wiki links and backlink discovery remain deferred
+6. **Deferred:** Semantic search
+7. **Deferred:** Tauri and filesystem integration
 
 ## Constraint
 
