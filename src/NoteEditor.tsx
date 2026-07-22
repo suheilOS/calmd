@@ -1,15 +1,13 @@
 import { Button } from '@base-ui/react/button'
 import { Input } from '@base-ui/react/input'
 import { BacklinksPopover } from './BacklinksPopover'
-import type { Note, NoteDraft } from './notes'
+import type { NoteDraft } from './notes'
 
 type NoteEditorProps = {
   draft: NoteDraft
-  backlinks: Note[]
   backlinksOpen: boolean
   onDraftChange: (draft: NoteDraft) => void
   onBacklinksOpenChange: (open: boolean) => void
-  onNoteOpen: (note: Note) => void
   onReturn: () => void
 }
 
@@ -23,11 +21,9 @@ function ArrowLeftIcon() {
 
 export function NoteEditor({
   draft,
-  backlinks,
   backlinksOpen,
   onDraftChange,
   onBacklinksOpenChange,
-  onNoteOpen,
   onReturn,
 }: NoteEditorProps) {
   return (
@@ -45,7 +41,7 @@ export function NoteEditor({
         <label className="sr-only" htmlFor="note-title">Note title</label>
         <Input
           aria-label="Note title"
-          className="text-note-title w-full border-0 bg-transparent p-0 text-ink outline-none placeholder:text-placeholder"
+          className="w-full border-0 bg-transparent p-0 text-large text-ink outline-none placeholder:text-placeholder"
           id="note-title"
           onChange={(event) => onDraftChange({ ...draft, title: event.target.value })}
           value={draft.title}
@@ -53,7 +49,7 @@ export function NoteEditor({
         <label className="sr-only" htmlFor="note-body">Note content</label>
         <textarea
           aria-label="Note content"
-          className="text-note-body mt-6 min-h-[58vh] w-full max-w-[65ch] resize-none border-0 bg-transparent p-0 text-body text-pretty outline-none placeholder:text-placeholder sm:mt-8"
+          className="mt-6 min-h-[58vh] w-full max-w-[65ch] resize-none border-0 bg-transparent p-0 text-base text-body text-pretty outline-none placeholder:text-placeholder sm:mt-8"
           id="note-body"
           onChange={(event) => onDraftChange({ ...draft, body: event.target.value })}
           placeholder=""
@@ -62,8 +58,6 @@ export function NoteEditor({
       </article>
 
       <BacklinksPopover
-        backlinks={backlinks}
-        onNoteOpen={onNoteOpen}
         onOpenChange={onBacklinksOpenChange}
         open={backlinksOpen}
       />

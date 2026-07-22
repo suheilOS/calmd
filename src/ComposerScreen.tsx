@@ -15,7 +15,7 @@ type ComposerScreenProps = {
 }
 
 const RESULT_CLASS_NAME =
-  'text-note-result block w-full py-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-faint'
+  'text-base block w-full px-2 py-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-faint'
 
 export function ComposerScreen({
   thought,
@@ -75,7 +75,7 @@ export function ComposerScreen({
             aria-expanded={hasThought}
             aria-label="Begin a thought"
             autoFocus
-            className="text-composer w-full border-0 bg-transparent p-0 text-ink outline-none placeholder:text-placeholder"
+            className="w-full border-0 bg-transparent p-0 text-base text-ink outline-none placeholder:text-placeholder"
             id="thought"
             onChange={(event) => onThoughtChange(event.target.value)}
             onKeyDown={handleKeyDown}
@@ -99,7 +99,7 @@ export function ComposerScreen({
                 type="button"
               >
                 <span className="block">{note.title}</span>
-                {note.body ? <span className="text-note-meta mt-1 block truncate text-faint">{getExcerpt(note.body)}</span> : null}
+                {note.body ? <span className="mt-1 block truncate text-small text-faint">{getExcerpt(note.body)}</span> : null}
               </Button>
             ))}
             {!hasExactMatch ? (

@@ -10,7 +10,7 @@ export const initialNotes: Note[] = [
   {
     id: 'good-systems-disappear',
     title: 'A good system disappears while you use it',
-    body: 'The best tools make room for the work itself. A system should support attention without asking to be maintained. [[Attention is a finite room]]',
+    body: 'The best tools make room for the work itself. A system should support attention without asking to be maintained.',
   },
   {
     id: 'shape-of-useful-thought',
@@ -61,13 +61,6 @@ export function findRetrievalMatches(
     .sort((a, b) => b.score - a.score)
     .slice(0, 3)
     .map(({ note }) => note)
-}
-
-export function findBacklinks(notes: Note[], activeNote: Note, title: string) {
-  const targetLink = `[[${title || activeNote.title}]]`
-  return notes.filter(
-    (note) => note.id !== activeNote.id && note.body.includes(targetLink),
-  )
 }
 
 export function updateNote(notes: Note[], noteId: string, draft: NoteDraft) {

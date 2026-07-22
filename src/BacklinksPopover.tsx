@@ -1,12 +1,8 @@
-import { Button } from '@base-ui/react/button'
 import { Popover } from '@base-ui/react/popover'
-import type { Note } from './notes'
 
 type BacklinksPopoverProps = {
-  backlinks: Note[]
   open: boolean
   onOpenChange: (open: boolean) => void
-  onNoteOpen: (note: Note) => void
 }
 
 function InfoIcon() {
@@ -19,12 +15,7 @@ function InfoIcon() {
   )
 }
 
-export function BacklinksPopover({
-  backlinks,
-  open,
-  onOpenChange,
-  onNoteOpen,
-}: BacklinksPopoverProps) {
+export function BacklinksPopover({ open, onOpenChange }: BacklinksPopoverProps) {
   return (
     <Popover.Root open={open} onOpenChange={onOpenChange}>
       <Popover.Trigger
@@ -35,24 +26,8 @@ export function BacklinksPopover({
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Positioner align="end" positionMethod="fixed" side="top" sideOffset={8}>
-          <Popover.Popup className="backlinks-popover w-64 max-w-[calc(100vw-2.5rem)] rounded-xl border border-border bg-canvas p-4 text-ink shadow-lg outline-none">
-            {backlinks.length > 0 ? (
-              <>
-                <Popover.Title className="mb-3 text-xs font-normal text-faint">Backlinks</Popover.Title>
-                <div className="space-y-2">
-                  {backlinks.map((note) => (
-                    <Button
-                      className="block w-full text-left text-sm text-secondary transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-faint"
-                      key={note.id}
-                      onClick={() => onNoteOpen(note)}
-                      type="button"
-                    >
-                      {note.title}
-                    </Button>
-                  ))}
-                </div>
-              </>
-            ) : <p className="text-sm text-faint">No backlinks</p>}
+          <Popover.Popup className="backlinks-popover w-64 max-w-[calc(100vw-2.5rem)] rounded-lg bg-surface p-4 text-ink shadow-[0_8px_24px_oklch(0_0_0/0.08)] outline-none">
+            <p className="text-small text-faint">No backlinks</p>
           </Popover.Popup>
         </Popover.Positioner>
       </Popover.Portal>

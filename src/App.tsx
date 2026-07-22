@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { ComposerScreen } from './ComposerScreen'
 import { NoteEditor } from './NoteEditor'
 import {
-  findBacklinks,
   findExactNote,
   findRetrievalMatches,
   initialNotes,
@@ -36,14 +35,6 @@ function App() {
       : findRetrievalMatches(notes, normalizedThought),
     [exactNote, notes, normalizedThought],
   )
-  const editorTitle = editorDraft?.title
-  const backlinks = useMemo(
-    () => activeNote && editorTitle !== undefined
-      ? findBacklinks(notes, activeNote, editorTitle)
-      : [],
-    [activeNote, editorTitle, notes],
-  )
-
   useEffect(() => {
     if (!activeNoteId || !editorDraft) return
 
@@ -97,12 +88,10 @@ function App() {
   if (activeNote && editorDraft) {
     return (
       <NoteEditor
-        backlinks={backlinks}
         backlinksOpen={backlinksOpen}
         draft={editorDraft}
         onBacklinksOpenChange={setBacklinksOpen}
         onDraftChange={setEditorDraft}
-        onNoteOpen={openNote}
         onReturn={returnHome}
       />
     )
