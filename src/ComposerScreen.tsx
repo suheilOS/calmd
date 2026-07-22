@@ -1,0 +1,123 @@
+import { Button } from '@base-ui/react/button'
+import { Input } from '@base-ui/react/input'
+import type { FormEvent, KeyboardEvent } from 'react'
+import { getExcerpt, type Note } from './notes'
+
+type ComposerScreenProps = {
+  thought: string
+  results: Note[]
+  hasExactMatch: boolean
+  activeResultIndex: number
+  onThoughtChange: (thought: string) => void
+  onSubmit: () => void
+  onResultSelect: (index: number) => void
+  onActiveResultChange: (index: number) => void
+}
+
+const RESULT_CLASS_NAME =
+  'text-note-result block w-full py-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-faint'
+
+export function ComposerScreen({
+  thought,
+  results,
+  hasExactMatch,
+  activeResultIndex,
+  onThoughtChange,
+  onSubmit,
+  onResultSelect,
+  onActiveResultChange,
+}: ComposerScreenProps) {
+  const hasThought = thought.trim().length > 0
+  const optionCount = results.length + Number(!hasExactMatch)
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    onSubmit()
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (!hasThought || optionCount === 0) return
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      onActiveResultChange(Math.min(activeResultIndex + 1, optionCount - 1))
+      return
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      onActiveResultChange(Math.max(activeResultIndex - 1, -1))
+      return
+    }
+
+    if (event.key === 'Enter' && activeResultIndex >= 0) {
+      event.preventDefault()
+      onResultSelect(activeResultIndex)
+      return
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      onThoughtChange('')
+    }
+  }
+
+  return (
+    <main className="app min-h-screen bg-canvas text-ink">
+      <h1 className="sr-only">Calmd</h1>
+      <section className="mx-auto w-full max-w-[65ch] px-6 pb-24 pt-[25vh] sm:px-8 sm:pt-[28vh]">
+        <form onSubmit={handleSubmit}>
+          <label className="sr-only" htmlFor="thought">Begin a thought</label>
+          <Input
+            aria-activedescendant={activeResultIndex >= 0 ? `search-result-${activeResultIndex}` : undefined}
+            aria-autocomplete="list"
+            aria-controls="search-results"
+            aria-expanded={hasThought}
+            aria-label="Begin a thought"
+            autoFocus
+            className="text-composer w-full border-0 bg-transparent p-0 text-ink outline-none placeholder:text-placeholder"
+            id="thought"
+            onChange={(event) => onThoughtChange(event.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Find a note or start a thought…"
+            role="combobox"
+            value={thought}
+          />
+        </form>
+
+        {hasThought ? (
+          <div aria-live="polite" className="mt-4 border-t border-border pt-1 motion-safe:animate-[result-in_180ms_ease-out]" id="search-results" role="listbox">
+            {results.map((note, index) => (
+              <Button
+                aria-selected={activeResultIndex === index}
+                className={`${RESULT_CLASS_NAME} border-b border-divider hover:text-secondary ${activeResultIndex === index ? 'bg-surface text-ink' : ''}`}
+                id={`search-result-${index}`}
+                key={note.id}
+                onClick={() => onResultSelect(index)}
+                onMouseEnter={() => onActiveResultChange(index)}
+                role="option"
+                type="button"
+              >
+                <span className="block">{note.title}</span>
+                {note.body ? <span className="text-note-meta mt-1 block truncate text-faint">{getExcerpt(note.body)}</span> : null}
+              </Button>
+            ))}
+            {!hasExactMatch ? (
+              <Button
+                aria-selected={activeResultIndex === results.length}
+                className={`${RESULT_CLASS_NAME} text-secondary hover:text-ink ${activeResultIndex === results.length ? 'bg-surface text-ink' : ''}`}
+                id={`search-result-${results.length}`}
+                onClick={() => onResultSelect(results.length)}
+                onMouseEnter={() => onActiveResultChange(results.length)}
+                role="option"
+                type="button"
+              >
+                Create “{thought.trim()}”
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+      </section>
+    </main>
+  )
+}

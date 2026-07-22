@@ -1,5 +1,42 @@
 @import 'tailwindcss';
 
+@theme {
+  --text-composer: clamp(2rem, 5vw, 2.75rem);
+  --text-composer--font-weight: 500;
+  --text-composer--line-height: 1.1;
+  --text-composer--letter-spacing: -0.04em;
+
+  --text-note-title: clamp(2.75rem, 7vw, 4rem);
+  --text-note-title--font-weight: 500;
+  --text-note-title--line-height: 1.1;
+  --text-note-title--letter-spacing: -0.04em;
+
+  --text-note-body: 1rem;
+  --text-note-body--font-weight: 400;
+  --text-note-body--line-height: 1.6;
+
+  --text-note-result: 0.9375rem;
+  --text-note-result--line-height: 1.6;
+
+  --text-note-meta: 0.8125rem;
+  --text-note-meta--line-height: 1.5;
+
+  --color-canvas: oklch(0.976 0.005 95.099);
+  --color-page: oklch(0.970 0.005 95.1);
+  --color-ink: oklch(0.279 0.007 106.855);
+  --color-body: oklch(0.442 0.01 91.592);
+  --color-secondary: oklch(0.559 0.014 91.611);
+  --color-muted: oklch(0.673 0.013 91.574);
+  --color-faint: oklch(0.728 0.013 91.56);
+  --color-placeholder: oklch(0.760 0.013 91.553);
+  --color-border: oklch(0.892 0.011 89.73);
+  --color-divider: oklch(0.934 0.008 91.486);
+  --color-surface: oklch(0.946 0.007 88.644);
+  --color-hover: oklch(0.937 0.008 91.486);
+  --color-selection: oklch(0.909 0.022 130.027);
+  --color-selection-ink: oklch(0.306 0.011 114.708);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -10,7 +47,45 @@ body,
   min-height: 100%;
 }
 
+html {
+  background: var(--color-page);
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-canvas: oklch(0.180 0.005 95.099);
+    --color-page: oklch(0.160 0.005 95.1);
+    --color-ink: oklch(0.920 0.007 106.855);
+    --color-body: oklch(0.760 0.01 91.592);
+    --color-secondary: oklch(0.680 0.014 91.611);
+    --color-muted: oklch(0.620 0.013 91.574);
+    --color-faint: oklch(0.570 0.013 91.56);
+    --color-placeholder: oklch(0.520 0.013 91.553);
+    --color-border: oklch(0.340 0.011 89.73);
+    --color-divider: oklch(0.280 0.008 91.486);
+    --color-surface: oklch(0.240 0.007 88.644);
+    --color-hover: oklch(0.280 0.008 91.486);
+    --color-selection: oklch(0.350 0.022 130.027);
+    --color-selection-ink: oklch(0.940 0.011 114.708);
+  }
+}
+
 body {
   margin: 0;
-  font-family: system-ui, sans-serif;
+  font-family: "JetBrains Mono", "JetBrainsMono Nerd Font", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+::selection {
+  background: var(--color-selection);
+  color: var(--color-selection-ink);
 }

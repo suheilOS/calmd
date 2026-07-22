@@ -1,3 +1,44 @@
 .app {
   min-height: 100svh;
 }
+
+@keyframes result-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.backlinks-popover {
+  transform-origin: var(--transform-origin);
+  transition:
+    opacity 180ms ease-out,
+    transform 180ms ease-out;
+}
+
+.backlinks-popover[data-starting-style],
+.backlinks-popover[data-ending-style] {
+  opacity: 0;
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backlinks-popover {
+    transform: none !important;
+    transition-duration: 120ms !important;
+    transition-property: opacity !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
