@@ -1,7 +1,7 @@
 import { Button } from '@base-ui/react/button'
 import { Input } from '@base-ui/react/input'
 import type { FormEvent, KeyboardEvent } from 'react'
-import { getExcerpt, type Note } from './notes'
+import { getExcerpt, MAX_NOTE_TITLE_LENGTH, type Note } from './notes'
 
 type ComposerScreenProps = {
   thought: string
@@ -15,7 +15,7 @@ type ComposerScreenProps = {
 }
 
 const RESULT_CLASS_NAME =
-  'text-base block w-full px-2 py-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-faint'
+  'text-base block w-full px-2 py-3 text-left transition-[background-color,color,transform] duration-150 ease-out focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-faint active:scale-[0.97]'
 
 export function ComposerScreen({
   thought,
@@ -75,8 +75,11 @@ export function ComposerScreen({
             aria-expanded={hasThought}
             aria-label="Begin a thought"
             autoFocus
-            className="w-full border-0 bg-transparent p-0 text-base text-ink outline-none placeholder:text-placeholder"
+            autoComplete="off"
+            className="w-full border-0 bg-transparent p-0 text-base text-ink outline-none placeholder:text-placeholder focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-faint"
             id="thought"
+            maxLength={MAX_NOTE_TITLE_LENGTH}
+            name="thought"
             onChange={(event) => onThoughtChange(event.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Find a note or start a thought…"
@@ -86,11 +89,11 @@ export function ComposerScreen({
         </form>
 
         {hasThought ? (
-          <div aria-live="polite" className="mt-4 border-t border-border pt-1 motion-safe:animate-[result-in_180ms_ease-out]" id="search-results" role="listbox">
+          <div className="mt-4 border-t border-border motion-safe:animate-[result-in_180ms_ease-out]" id="search-results" role="listbox">
             {results.map((note, index) => (
               <Button
                 aria-selected={activeResultIndex === index}
-                className={`${RESULT_CLASS_NAME} border-b border-divider hover:text-secondary ${activeResultIndex === index ? 'bg-surface text-ink' : ''}`}
+                className={`${RESULT_CLASS_NAME} border-b border-divider ${activeResultIndex === index ? 'bg-surface text-secondary' : 'text-ink'}`}
                 id={`search-result-${index}`}
                 key={note.id}
                 onClick={() => onResultSelect(index)}
@@ -98,14 +101,14 @@ export function ComposerScreen({
                 role="option"
                 type="button"
               >
-                <span className="block">{note.title}</span>
+                <span className="block break-words">{note.title}</span>
                 {note.body ? <span className="mt-1 block truncate text-small text-faint">{getExcerpt(note.body)}</span> : null}
               </Button>
             ))}
             {!hasExactMatch ? (
               <Button
                 aria-selected={activeResultIndex === results.length}
-                className={`${RESULT_CLASS_NAME} text-secondary hover:text-ink ${activeResultIndex === results.length ? 'bg-surface text-ink' : ''}`}
+                className={`${RESULT_CLASS_NAME} ${activeResultIndex === results.length ? 'bg-surface text-ink' : 'text-secondary'}`}
                 id={`search-result-${results.length}`}
                 onClick={() => onResultSelect(results.length)}
                 onMouseEnter={() => onActiveResultChange(results.length)}

@@ -26,6 +26,96 @@
   transform: scale(0.97);
 }
 
+.markdown-editor .cm-heading {
+  color: var(--color-ink);
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.markdown-editor .cm-heading-1 {
+  font-size: var(--text-editor-heading-1);
+  letter-spacing: -0.025em;
+}
+
+.markdown-editor .cm-heading-2 {
+  font-size: var(--text-editor-heading-2);
+  letter-spacing: -0.015em;
+}
+
+.markdown-editor .cm-heading-3 {
+  font-size: var(--text-editor-heading-3);
+}
+
+.markdown-editor .cm-strong {
+  color: var(--color-ink);
+  font-weight: 650;
+}
+
+.markdown-editor .cm-emphasis {
+  font-style: italic;
+}
+
+.markdown-editor .cm-strikethrough {
+  text-decoration: line-through;
+}
+
+.markdown-editor .cm-link,
+.markdown-editor .cm-url {
+  color: var(--color-secondary);
+  text-decoration: underline;
+  text-decoration-skip-ink: auto;
+  text-decoration-thickness: from-font;
+  text-underline-position: from-font;
+}
+
+.markdown-editor .cm-monospace {
+  color: var(--color-ink);
+}
+
+.markdown-editor .cm-quote {
+  color: var(--color-secondary);
+}
+
+.markdown-editor .cm-markup {
+  color: var(--color-syntax);
+}
+
+.markdown-editor .cm-hanging-markdown-prefix,
+.markdown-editor .cm-hanging-markdown-prefix * {
+  font-size: var(--text-base);
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: inherit;
+}
+
+.markdown-editor .cm-quote-marker,
+.markdown-editor .cm-quote-marker * {
+  color: transparent;
+}
+
+.markdown-editor .cm-quote-marker {
+  position: relative;
+}
+
+.markdown-editor .cm-quote-marker::before {
+  color: var(--color-syntax);
+  content: "|";
+  font-weight: 600;
+  inset-inline-start: 0.25ch;
+  position: absolute;
+}
+
+.markdown-editor .cm-line.cm-heading-line {
+  padding-block-start: 0.45em;
+}
+
+@media (max-width: 45rem) {
+  .note-editor-page {
+    padding-inline-start: calc(1.5rem + 5ch);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .backlinks-popover {
     transform: none !important;

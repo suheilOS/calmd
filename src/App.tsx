@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ComposerScreen } from './ComposerScreen'
 import { NoteEditor } from './NoteEditor'
 import {
+  constrainNoteTitle,
   findExactNote,
   findRetrievalMatches,
   initialNotes,
@@ -52,7 +53,7 @@ function App() {
   }
 
   function createNote() {
-    const title = thought.trim().replace(/\s+/g, ' ')
+    const title = constrainNoteTitle(thought.trim().replace(/\s+/g, ' '))
     if (!title) return
 
     if (exactNote) {

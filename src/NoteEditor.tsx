@@ -1,7 +1,16 @@
 import { Button } from '@base-ui/react/button'
-import { Input } from '@base-ui/react/input'
+import { lazy, Suspense } from 'react'
 import { BacklinksPopover } from './BacklinksPopover'
-import type { NoteDraft } from './notes'
+import {
+  constrainNoteTitle,
+  MAX_NOTE_TITLE_LENGTH,
+  type NoteDraft,
+} from './notes'
+
+const MarkdownEditor = lazy(async () => {
+  const module = await import('./MarkdownEditor')
+  return { default: module.MarkdownEditor }
+})
 
 type NoteEditorProps = {
   draft: NoteDraft
@@ -30,31 +39,40 @@ export function NoteEditor({
     <main className="app min-h-screen bg-canvas text-ink">
       <Button
         aria-label="Return to composer"
-        className="fixed left-5 top-5 z-10 inline-flex size-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-faint sm:left-8 sm:top-8"
+        className="fixed left-5 top-5 z-10 inline-flex size-9 items-center justify-center rounded-full text-muted transition-[background-color,color,transform] duration-150 ease-out hover:bg-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-faint active:scale-[0.97] sm:left-8 sm:top-8"
         onClick={onReturn}
         type="button"
       >
         <ArrowLeftIcon />
       </Button>
 
-      <article className="mx-auto w-full max-w-[65ch] px-6 pb-24 pt-[15vh] sm:px-8">
+      <article className="note-editor-page mx-auto w-full max-w-[65ch] px-6 pb-24 pt-[15vh] sm:px-8">
         <label className="sr-only" htmlFor="note-title">Note title</label>
-        <Input
+        <textarea
           aria-label="Note title"
-          className="w-full border-0 bg-transparent p-0 text-large text-ink outline-none placeholder:text-placeholder"
+          autoComplete="off"
+          className="block w-full resize-none overflow-y-auto border-0 bg-transparent p-0 text-large text-ink outline-none break-words placeholder:text-placeholder focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-faint [field-sizing:content]"
           id="note-title"
-          onChange={(event) => onDraftChange({ ...draft, title: event.target.value })}
+          maxLength={MAX_NOTE_TITLE_LENGTH}
+          name="title"
+          onChange={(event) => onDraftChange({
+            ...draft,
+            title: constrainNoteTitle(event.target.value),
+          })}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') event.preventDefault()
+          }}
+          rows={1}
           value={draft.title}
         />
-        <label className="sr-only" htmlFor="note-body">Note content</label>
-        <textarea
-          aria-label="Note content"
-          className="mt-6 min-h-[58vh] w-full max-w-[65ch] resize-none border-0 bg-transparent p-0 text-base text-body text-pretty outline-none placeholder:text-placeholder sm:mt-8"
-          id="note-body"
-          onChange={(event) => onDraftChange({ ...draft, body: event.target.value })}
-          placeholder=""
-          value={draft.body}
-        />
+        <div className="mt-6 sm:mt-8">
+          <Suspense fallback={<div aria-hidden="true" className="min-h-[58vh]" />}>
+            <MarkdownEditor
+              onChange={(body) => onDraftChange({ ...draft, body })}
+              value={draft.body}
+            />
+          </Suspense>
+        </div>
       </article>
 
       <BacklinksPopover
