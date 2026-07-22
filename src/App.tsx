@@ -3,6 +3,7 @@ import { Input } from '@base-ui/react/input'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ComposerScreen } from './ComposerScreen'
 import { NoteEditor } from './NoteEditor'
+import { AppShell } from './TitleBar'
 import {
   canonicalizeTitle,
   findExactNote,
@@ -269,12 +270,17 @@ function App() {
   }
 
   if (vaultReady === null) {
-    return <main aria-label="Opening vault" className="app min-h-screen bg-canvas" />
+    return (
+      <AppShell>
+        <main aria-label="Opening vault" className="app bg-canvas" />
+      </AppShell>
+    )
   }
 
   if (!vaultReady) {
     return (
-      <main className="app flex min-h-screen items-center justify-center bg-canvas px-6 text-ink">
+      <AppShell>
+      <main className="app flex items-center justify-center bg-canvas px-6 text-ink">
         <section className="w-full max-w-sm">
           <h1 className="sr-only">Calmd</h1>
           <form
@@ -318,11 +324,13 @@ function App() {
           ) : null}
         </section>
       </main>
+      </AppShell>
     )
   }
 
   if (editorDraft) {
     return (
+      <AppShell>
       <NoteEditor
         backlinksOpen={backlinksOpen}
         draft={editorDraft}
@@ -335,11 +343,12 @@ function App() {
         onReturn={returnHome}
         saveMessage={storageMessage}
       />
+      </AppShell>
     )
   }
 
   return (
-    <>
+    <AppShell>
       <ComposerScreen
         activeResultIndex={activeResultIndex}
         hasExactMatch={Boolean(exactNote)}
@@ -358,7 +367,7 @@ function App() {
           {storageMessage}
         </p>
       ) : null}
-    </>
+    </AppShell>
   )
 }
 

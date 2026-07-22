@@ -63,7 +63,7 @@ export function ComposerScreen({
   }
 
   return (
-    <main className="app min-h-screen bg-canvas text-ink">
+    <main className="app bg-canvas text-ink">
       <h1 className="sr-only">Calmd</h1>
       <section className="mx-auto w-full max-w-[65ch] px-6 pb-24 pt-[25vh] sm:px-8 sm:pt-[28vh]">
         <form onSubmit={handleSubmit}>

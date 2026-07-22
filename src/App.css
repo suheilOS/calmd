@@ -1,5 +1,5 @@
 .app {
-  min-height: 100svh;
+  min-height: calc(100svh - 2.5rem);
 }
 
 @keyframes result-in {

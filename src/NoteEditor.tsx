@@ -53,10 +53,10 @@ export function NoteEditor({
   }, [draft.title])
 
   return (
-    <main className="app min-h-screen bg-canvas text-ink">
+    <main className="app bg-canvas text-ink">
       <Button
         aria-label="Return to composer"
-        className="fixed left-5 top-5 z-10 inline-flex size-9 items-center justify-center rounded-full text-muted transition-[background-color,color,transform] duration-150 ease-out hover:bg-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-faint active:scale-[0.97] sm:left-8 sm:top-8"
+        className="fixed left-5 top-14 z-10 inline-flex size-9 items-center justify-center rounded-full text-muted transition-[background-color,color,transform] duration-150 ease-out hover:bg-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-faint active:scale-[0.97] sm:left-8 sm:top-16"
         onClick={onReturn}
         type="button"
       >
