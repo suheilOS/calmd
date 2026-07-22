@@ -20,7 +20,7 @@ import {
   markdownKeymap,
 } from '@codemirror/lang-markdown'
 import { highlightSelectionMatches, searchKeymap } from '@codemirror/search'
-import { EditorState, type Range } from '@codemirror/state'
+import { Annotation, EditorState, type Range } from '@codemirror/state'
 import {
   Decoration,
   type DecorationSet,
@@ -43,6 +43,8 @@ type MarkdownEditorProps = {
   value: string
   onChange: (value: string) => void
 }
+
+const externalSync = Annotation.define<boolean>()
 
 const markdownHighlighting = syntaxHighlighting(HighlightStyle.define([
   { tag: tags.heading1, class: 'cm-heading cm-heading-1' },
@@ -262,7 +264,13 @@ export function MarkdownEditor({ value, onChange }: MarkdownEditorProps) {
       extensions: [
         editorExtensions,
         EditorView.updateListener.of((update) => {
-          if (update.docChanged) onChangeRef.current(update.state.doc.toString())
+          const isExternalSync = update.transactions.some((transaction) =>
+            transaction.annotation(externalSync),
+          )
+
+          if (update.docChanged && !isExternalSync) {
+            onChangeRef.current(update.state.doc.toString())
+          }
         }),
       ],
       parent: containerRef.current,
@@ -282,6 +290,7 @@ export function MarkdownEditor({ value, onChange }: MarkdownEditorProps) {
     if (!editor || editor.state.doc.toString() === value) return
 
     editor.dispatch({
+      annotations: externalSync.of(true),
       changes: { from: 0, to: editor.state.doc.length, insert: value },
     })
   }, [value])
