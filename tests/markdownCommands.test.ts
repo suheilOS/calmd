@@ -208,6 +208,23 @@ describe('toggleMarkdown', () => {
     expect(coded.doc).toBe(code)
   })
 
+  test('does not format a selection boundary that cuts through protected syntax', () => {
+    const link = 'Read [this](https://example.com)'
+    const code = 'Before `literal code` after'
+    const linked = runCommand(link, toggleMarkdown('*'), 0, 18)
+    const coded = runCommand(code, toggleMarkdown('**'), 0, 12)
+
+    expect(linked.doc).toBe(link)
+    expect(coded.doc).toBe(code)
+  })
+
+  test.each([
+    ['# Heading', 1],
+    ['- Item', 1],
+  ])('does not insert formatting inside a structural prefix in %s', (source, cursor) => {
+    expect(runCommand(source, toggleMarkdown('**'), cursor, cursor).doc).toBe(source)
+  })
+
   test('formats table cells without consuming table delimiters', () => {
     const source = '| First | Second |\n| --- | --- |\n| Cell | Value |'
     const result = runCommand(source, toggleMarkdown('*'))
@@ -336,6 +353,14 @@ describe('toggleLink', () => {
 
   test('refuses to create a link across paragraphs', () => {
     const source = 'First paragraph\n\nSecond paragraph'
+    const result = runCommand(source, toggleLink)
+
+    expect(result.handled).toBe(false)
+    expect(result.doc).toBe(source)
+  })
+
+  test('refuses to create a link around a selection containing an existing link', () => {
+    const source = 'Read [this](url) now'
     const result = runCommand(source, toggleLink)
 
     expect(result.handled).toBe(false)

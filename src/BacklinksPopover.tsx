@@ -20,7 +20,7 @@ export function BacklinksPopover({ open, onOpenChange }: BacklinksPopoverProps) 
     <Popover.Root open={open} onOpenChange={onOpenChange}>
       <Popover.Trigger
         aria-label="Show backlinks"
-        className="fixed bottom-5 right-5 z-10 inline-flex size-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-faint sm:bottom-8 sm:right-8"
+        className="fixed bottom-5 right-5 z-10 inline-flex size-9 items-center justify-center rounded-full text-muted transition-[background-color,color,transform] duration-150 ease-out hover:bg-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-faint active:scale-[0.97] sm:bottom-8 sm:right-8"
       >
         <InfoIcon />
       </Popover.Trigger>

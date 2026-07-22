@@ -6,6 +6,12 @@ export type Note = {
 
 export type NoteDraft = Pick<Note, 'title' | 'body'>
 
+export const MAX_NOTE_TITLE_LENGTH = 120
+
+export function constrainNoteTitle(value: string) {
+  return value.replace(/[\r\n]+/g, ' ').slice(0, MAX_NOTE_TITLE_LENGTH)
+}
+
 export const initialNotes: Note[] = [
   {
     id: 'good-systems-disappear',

@@ -139,6 +139,22 @@ function headingContent(state: EditorState, from: number, to: number, setext: bo
   }
 }
 
+function inlineContent(
+  state: EditorState,
+  node: { from: number; name: string; to: number },
+) {
+  if (node.name === 'Paragraph' || node.name === 'TableCell') {
+    return { from: node.from, to: node.to }
+  }
+  if (/^ATXHeading[1-6]$/.test(node.name)) {
+    return headingContent(state, node.from, node.to, false)
+  }
+  if (/^SetextHeading[12]$/.test(node.name)) {
+    return headingContent(state, node.from, node.to, true)
+  }
+  return null
+}
+
 function inlineIntervals(state: EditorState, range: { from: number; to: number }) {
   const intervals: InlineInterval[] = []
 
@@ -146,18 +162,7 @@ function inlineIntervals(state: EditorState, range: { from: number; to: number }
     from: range.from,
     to: range.to,
     enter(node) {
-      let content: InlineInterval | null = null
-
-      if (node.name === 'Paragraph') {
-        content = { from: node.from, to: node.to }
-      } else if (node.name === 'TableCell') {
-        content = { from: node.from, to: node.to }
-      } else if (/^ATXHeading[1-6]$/.test(node.name)) {
-        content = headingContent(state, node.from, node.to, false)
-      } else if (/^SetextHeading[12]$/.test(node.name)) {
-        content = headingContent(state, node.from, node.to, true)
-      }
-
+      const content = inlineContent(state, node)
       if (!content) return
 
       const from = Math.max(content.from, range.from)
@@ -169,7 +174,7 @@ function inlineIntervals(state: EditorState, range: { from: number; to: number }
   return intervals.sort((a, b) => a.from - b.from)
 }
 
-function isInsideProtectedSyntax(
+function crossesProtectedSyntax(
   state: EditorState,
   range: { from: number; to: number },
 ) {
@@ -181,7 +186,7 @@ function isInsideProtectedSyntax(
     'CodeBlock',
     'HTMLBlock',
   ])
-  let protectedRange = false
+  let crossesBoundary = false
 
   syntaxTree(state).iterate({
     from: range.from,
@@ -189,16 +194,58 @@ function isInsideProtectedSyntax(
     enter(node) {
       if (
         protectedNodes.has(node.name)
-        && node.from <= range.from
-        && node.to >= range.to
-        && (range.from > node.from || range.to < node.to || node.name === 'URL' || node.name === 'LinkTitle')
+        && (
+          (node.from < range.from && node.to > range.from)
+          || (node.from < range.to && node.to > range.to)
+          || (
+            (node.name === 'URL' || node.name === 'LinkTitle')
+            && node.from <= range.from
+            && node.to >= range.to
+          )
+        )
       ) {
-        protectedRange = true
+        crossesBoundary = true
       }
     },
   })
 
-  return protectedRange
+  return crossesBoundary
+}
+
+function overlapsLink(state: EditorState, range: { from: number; to: number }) {
+  let overlaps = false
+
+  syntaxTree(state).iterate({
+    from: range.from,
+    to: range.to,
+    enter(node) {
+      if (node.name === 'Link' && node.from < range.to && node.to > range.from) {
+        overlaps = true
+      }
+    },
+  })
+
+  return overlaps
+}
+
+function isInlinePosition(state: EditorState, position: number) {
+  if (state.doc.length === 0) return true
+
+  let inline = false
+
+  syntaxTree(state).iterate({
+    from: Math.max(0, position - 1),
+    to: Math.min(state.doc.length, position + 1),
+    enter(node) {
+      const content = inlineContent(state, node)
+
+      if (content && content.from <= position && content.to >= position) {
+        inline = true
+      }
+    },
+  })
+
+  return inline
 }
 
 function linkAt(state: EditorState, range: { from: number; to: number }) {
@@ -387,6 +434,8 @@ export function toggleMarkdown(delimiter: MarkdownDelimiter): StateCommand {
           }
         }
 
+        if (!isInlinePosition(state, range.from)) return { range }
+
         const markers = delimitersFor('', delimiter)
         const insert = markers.before + markers.after
         return {
@@ -399,7 +448,7 @@ export function toggleMarkdown(delimiter: MarkdownDelimiter): StateCommand {
         return removeFormatAcrossRange(state, range, delimiter)
       }
 
-      if (isInsideProtectedSyntax(state, range)) {
+      if (crossesProtectedSyntax(state, range)) {
         return { range }
       }
 
@@ -460,7 +509,8 @@ export const toggleLink: StateCommand = ({ state, dispatch }) => {
   const invalidRange = state.selection.ranges.some((range, index) => {
     if (links[index] || range.empty) return false
     const intervals = inlineIntervals(state, range)
-    return intervals.length !== 1
+    return overlapsLink(state, range)
+      || intervals.length !== 1
       || intervals[0].from > range.from
       || intervals[0].to < range.to
   })
