@@ -4,13 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ComposerScreen } from './ComposerScreen'
 import { NoteEditor } from './NoteEditor'
 import {
-  constrainNoteTitle,
+  canonicalizeTitle,
   findExactNote,
   findRetrievalMatches,
   normalizeTitle,
   type Note,
   type NoteDraft,
 } from './notes'
+import { draftsMatch, reconcileSavedDraft } from './saveState'
 import {
   createStoredNote,
   getStorageError,
@@ -29,10 +30,6 @@ type EditorSession = {
   savedDraft: NoteDraft
 }
 
-function draftsMatch(left: NoteDraft, right: NoteDraft) {
-  return left.title === right.title && left.body === right.body
-}
-
 function App() {
   const [notes, setNotes] = useState<Note[]>([])
   const [vaultReady, setVaultReady] = useState<boolean | null>(null)
@@ -44,7 +41,9 @@ function App() {
   const [backlinksOpen, setBacklinksOpen] = useState(false)
   const [activeResultIndex, setActiveResultIndex] = useState(-1)
   const [storageMessage, setStorageMessage] = useState<string | null>(null)
+  const [hasConflict, setHasConflict] = useState(false)
   const editorDraftRef = useRef<NoteDraft | null>(null)
+  const conflictRef = useRef(false)
   const sessionRef = useRef<EditorSession | null>(null)
   const nextSessionIdRef = useRef(0)
   const saveChainRef = useRef<Promise<void>>(Promise.resolve())
@@ -104,17 +103,34 @@ function App() {
     let didSave = true
     const operation = saveChainRef.current.then(async () => {
       const session = sessionRef.current
-      if (!session || draftsMatch(draft, session.savedDraft)) return
+      if (!session || conflictRef.current) {
+        didSave = !conflictRef.current
+        return
+      }
+
+      const requestDraft = { ...draft, title: canonicalizeTitle(draft.title) }
+      if (draftsMatch(requestDraft, session.savedDraft)) {
+        if (draftsMatch(editorDraftRef.current ?? draft, draft)) {
+          editorDraftRef.current = requestDraft
+          setEditorDraft(requestDraft)
+        }
+        setSavedDraft(session.savedDraft)
+        return
+      }
 
       setStorageMessage(null)
       try {
-        const note = draft.title !== session.savedDraft.title
-          ? await renameStoredNote(session.key, draft, session.revision)
-          : await saveStoredNote(session.key, draft, session.revision)
+        const note = requestDraft.title !== session.savedDraft.title
+          ? await renameStoredNote(session.key, requestDraft, session.revision)
+          : await saveStoredNote(session.key, requestDraft, session.revision)
 
         if (sessionRef.current?.id !== session.id) return
         const previousKey = session.key
-        const nextSavedDraft = { title: note.title, body: note.body }
+        const currentDraft = editorDraftRef.current ?? draft
+        const {
+          canonicalDraft: nextSavedDraft,
+          editorDraft: nextEditorDraft,
+        } = reconcileSavedDraft(currentDraft, draft, note)
         sessionRef.current = {
           ...session,
           key: note.key,
@@ -122,10 +138,19 @@ function App() {
           savedDraft: nextSavedDraft,
         }
         setSavedDraft(nextSavedDraft)
+        if (nextEditorDraft !== currentDraft) {
+          editorDraftRef.current = nextEditorDraft
+          setEditorDraft(nextEditorDraft)
+        }
         replaceStoredNote(note, previousKey)
       } catch (error) {
         didSave = false
-        setStorageMessage(getStorageError(error).message)
+        const storageError = getStorageError(error)
+        if (storageError.code === 'conflict' && sessionRef.current?.id === session.id) {
+          conflictRef.current = true
+          setHasConflict(true)
+        }
+        setStorageMessage(storageError.message)
       }
     })
 
@@ -134,14 +159,19 @@ function App() {
   }, [replaceStoredNote])
 
   useEffect(() => {
-    if (!editorDraft || !savedDraft || draftsMatch(editorDraft, savedDraft)) return
+    if (
+      !editorDraft
+      || !savedDraft
+      || hasConflict
+      || draftsMatch(editorDraft, savedDraft)
+    ) return
 
     const saveTimer = window.setTimeout(() => {
       void persistDraft(editorDraft)
     }, 450)
 
     return () => window.clearTimeout(saveTimer)
-  }, [editorDraft, persistDraft, savedDraft])
+  }, [editorDraft, hasConflict, persistDraft, savedDraft])
 
   function beginEditing(note: Note) {
     const draft = { title: note.title, body: note.body }
@@ -156,6 +186,8 @@ function App() {
     setEditorDraft(draft)
     setSavedDraft(draft)
     setBacklinksOpen(false)
+    conflictRef.current = false
+    setHasConflict(false)
     setStorageMessage(null)
   }
 
@@ -169,7 +201,7 @@ function App() {
   }
 
   async function createNote() {
-    const title = constrainNoteTitle(thought.trim().replace(/\s+/g, ' '))
+    const title = canonicalizeTitle(thought)
     if (!title) return
 
     if (exactNote) {
@@ -194,6 +226,18 @@ function App() {
     }
 
     if (!exactNote && index === searchResults.length) void createNote()
+  }
+
+  async function reloadConflictedNote() {
+    const session = sessionRef.current
+    if (!session) return
+
+    try {
+      beginEditing(await readStoredNote(session.key))
+      await refreshVault()
+    } catch (error) {
+      setStorageMessage(getStorageError(error).message)
+    }
   }
 
   async function returnHome() {
@@ -287,6 +331,7 @@ function App() {
           editorDraftRef.current = draft
           setEditorDraft(draft)
         }}
+        onConflictReload={hasConflict ? reloadConflictedNote : null}
         onReturn={returnHome}
         saveMessage={storageMessage}
       />

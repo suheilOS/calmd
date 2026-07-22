@@ -1,5 +1,5 @@
 import { Button } from '@base-ui/react/button'
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useLayoutEffect, useRef } from 'react'
 import { BacklinksPopover } from './BacklinksPopover'
 import {
   constrainNoteTitle,
@@ -17,6 +17,7 @@ type NoteEditorProps = {
   backlinksOpen: boolean
   onDraftChange: (draft: NoteDraft) => void
   onBacklinksOpenChange: (open: boolean) => void
+  onConflictReload: (() => void) | null
   onReturn: () => void
   saveMessage: string | null
 }
@@ -34,9 +35,23 @@ export function NoteEditor({
   backlinksOpen,
   onDraftChange,
   onBacklinksOpenChange,
+  onConflictReload,
   onReturn,
   saveMessage,
 }: NoteEditorProps) {
+  const titleRef = useRef<HTMLTextAreaElement>(null)
+  const titleSelectionRef = useRef({ start: 0, end: 0 })
+
+  useLayoutEffect(() => {
+    const title = titleRef.current
+    if (!title || document.activeElement !== title) return
+    const { start, end } = titleSelectionRef.current
+    title.setSelectionRange(
+      Math.min(start, draft.title.length),
+      Math.min(end, draft.title.length),
+    )
+  }, [draft.title])
+
   return (
     <main className="app min-h-screen bg-canvas text-ink">
       <Button
@@ -57,13 +72,26 @@ export function NoteEditor({
           id="note-title"
           maxLength={MAX_NOTE_TITLE_LENGTH}
           name="title"
-          onChange={(event) => onDraftChange({
-            ...draft,
-            title: constrainNoteTitle(event.target.value),
-          })}
+          onChange={(event) => {
+            titleSelectionRef.current = {
+              start: event.target.selectionStart,
+              end: event.target.selectionEnd,
+            }
+            onDraftChange({
+              ...draft,
+              title: constrainNoteTitle(event.target.value),
+            })
+          }}
           onKeyDown={(event) => {
             if (event.key === 'Enter') event.preventDefault()
           }}
+          onSelect={(event) => {
+            titleSelectionRef.current = {
+              start: event.currentTarget.selectionStart,
+              end: event.currentTarget.selectionEnd,
+            }
+          }}
+          ref={titleRef}
           rows={1}
           value={draft.title}
         />
@@ -83,9 +111,18 @@ export function NoteEditor({
       />
 
       {saveMessage ? (
-        <p className="fixed inset-x-16 bottom-6 text-center text-small text-secondary" role="alert">
-          {saveMessage}
-        </p>
+        <div className="fixed inset-x-16 bottom-6 flex items-center justify-center gap-3 text-small text-secondary" role="alert">
+          <span>{saveMessage}</span>
+          {onConflictReload ? (
+            <Button
+              className="min-h-10 rounded-lg px-3 text-ink underline decoration-border underline-offset-4 transition-[background-color,transform] duration-150 ease-out hover:bg-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-faint active:scale-[0.96]"
+              onClick={onConflictReload}
+              type="button"
+            >
+              Reload from disk
+            </Button>
+          ) : null}
+        </div>
       ) : null}
     </main>
   )

@@ -13,8 +13,12 @@ export function constrainNoteTitle(value: string) {
   return value.replace(/[\r\n]+/g, ' ').slice(0, MAX_NOTE_TITLE_LENGTH)
 }
 
+export function canonicalizeTitle(value: string) {
+  return constrainNoteTitle(value).trim().replace(/\s+/gu, ' ')
+}
+
 export function normalizeTitle(value: string) {
-  return value.trim().replace(/\s+/g, ' ').toLocaleLowerCase()
+  return canonicalizeTitle(value).toLocaleLowerCase()
 }
 
 export function findExactNote(notes: Note[], normalizedTitle: string) {

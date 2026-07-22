@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { Note, NoteDraft } from './notes'
+import { canonicalizeTitle, type Note, type NoteDraft } from './notes'
 
 export type StorageError = {
   code: string
@@ -33,7 +33,7 @@ export function selectVault(name: string) {
 }
 
 export function createStoredNote(title: string) {
-  return invoke<Note>('create_note', { title })
+  return invoke<Note>('create_note', { title: canonicalizeTitle(title) })
 }
 
 export function readStoredNote(key: string) {
@@ -47,7 +47,7 @@ export function saveStoredNote(
 ) {
   return invoke<Note>('save_note', {
     key,
-    title: draft.title,
+    title: canonicalizeTitle(draft.title),
     body: draft.body,
     expectedRevision,
   })
@@ -60,7 +60,7 @@ export function renameStoredNote(
 ) {
   return invoke<Note>('rename_note', {
     key,
-    title: draft.title,
+    title: canonicalizeTitle(draft.title),
     body: draft.body,
     expectedRevision,
   })

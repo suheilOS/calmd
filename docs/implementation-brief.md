@@ -12,13 +12,22 @@ The interface now reads and writes top-level Markdown notes in one user-selected
 - Keyboard and pointer navigation through retrieval results
 - Named vault creation inside a user-selected parent directory, with the canonicalized child path persisted
 - Rust create, read, save, and rename commands using relative note keys
-- Canonical `# Title` Markdown serialization and tolerant external-file parsing
+- Canonical `# Title` Markdown serialization and content-preserving external-file parsing
 - Portable filename derivation with case-insensitive collision handling
-- Atomic writes and content-hash conflict detection
+- Atomic saves, staged transactional renames, and content-hash conflict detection
+- Minimal conflict recovery by reloading the external version from disk
 - Launch and window-focus vault rescans without a filesystem watcher
 - Minimal full-page editor with return navigation
 - On-demand backlinks popover with static empty-state content
 - Responsive light and dark presentation using a restrained three-level type scale
+
+### Storage behavior
+
+Calmd recognizes a note title only when a non-empty `# Title` is the first nonblank line, optionally preceded by a UTF-8 BOM. If that leading title is absent, the filename stem is shown as the title and the complete file remains the editable body. Calmd writes canonical files as `# Title\n\nBody` and canonicalizes edited titles by trimming surrounding whitespace and collapsing repeated internal whitespace.
+
+Renames stage and sync the complete new file in the vault, verify the original revision and collision policy before mutation, hard-link the original to a temporary backup, and install the staged file without overwriting an existing destination. An installation failure restores the original path and removes the staged file. Case-only renames use the same path through a distinct temporary backup.
+
+A filesystem cannot provide one portable atomic operation that simultaneously replaces file content and changes its name. There is therefore a brief interval between unlinking the original path and installing the new path. Calmd restores the original after ordinary errors, but a process or machine failure in that interval can leave the complete original in a `.calmd-backup-*.tmp` file. The strategy also requires same-filesystem hard-link support inside the vault. As with atomic save replacement, an external process can still race the final revision check. Cleanup failures are logged rather than reported as failed saves after the new note has already been committed.
 
 ### Deferred
 

@@ -4,10 +4,13 @@ use sha2::{Digest, Sha256};
 use std::{
     collections::HashSet,
     ffi::OsStr,
-    fs,
+    fs::{self, OpenOptions},
     io::Write,
     path::{Component, Path, PathBuf},
-    sync::Mutex,
+    sync::{
+        Mutex,
+        atomic::{AtomicU64, Ordering},
+    },
 };
 use tauri::{AppHandle, State};
 use tauri_plugin_dialog::{DialogExt, FilePath};
@@ -16,6 +19,8 @@ use tauri_plugin_store::StoreExt;
 const SETTINGS_FILE: &str = "settings.json";
 const VAULT_PATH_KEY: &str = "vault_path";
 const MAX_FILENAME_BYTES: usize = 180;
+const TEMP_FILE_PREFIX: &str = ".calmd-";
+static NEXT_TEMP_FILE: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Default)]
 pub struct VaultState(Mutex<Option<PathBuf>>);
@@ -129,7 +134,6 @@ pub fn open_vault(state: State<'_, VaultState>) -> CommandResult<Option<Vec<Note
 
 #[tauri::command]
 pub fn create_note(title: String, state: State<'_, VaultState>) -> CommandResult<Note> {
-    validate_title(&title)?;
     let guard = state
         .0
         .lock()
@@ -156,7 +160,6 @@ pub fn save_note(
     expected_revision: String,
     state: State<'_, VaultState>,
 ) -> CommandResult<Note> {
-    validate_title(&title)?;
     let guard = state
         .0
         .lock()
@@ -173,7 +176,6 @@ pub fn rename_note(
     expected_revision: String,
     state: State<'_, VaultState>,
 ) -> CommandResult<Note> {
-    validate_title(&title)?;
     let guard = state
         .0
         .lock()
@@ -306,9 +308,10 @@ fn scan_vault(root: &Path) -> CommandResult<Vec<Note>> {
 }
 
 fn create_note_in(root: &Path, title: &str) -> CommandResult<Note> {
-    let key = available_filename(root, title, None)?;
+    let title = canonicalize_title(title)?;
+    let key = available_filename(root, &title, None)?;
     let path = root.join(&key);
-    let content = serialize_markdown(title, "");
+    let content = serialize_markdown(&title, "");
     write_atomic(&path, &content)?;
     note_from_content(key, content)
 }
@@ -328,7 +331,8 @@ fn save_note_in(
     expected_revision: &str,
 ) -> CommandResult<Note> {
     let path = validated_note_path(root, key)?;
-    let content = serialize_markdown(title, body);
+    let title = canonicalize_title(title)?;
+    let content = serialize_markdown(&title, body);
     write_atomic_checked(&path, &content, expected_revision)?;
     note_from_content(key.to_owned(), content)
 }
@@ -340,24 +344,85 @@ fn rename_note_in(
     body: &str,
     expected_revision: &str,
 ) -> CommandResult<Note> {
+    let title = canonicalize_title(title)?;
+    rename_note_in_with(root, key, &title, body, expected_revision, |from, to| {
+        fs::hard_link(from, to)
+    })
+}
+
+fn rename_note_in_with<F>(
+    root: &Path,
+    key: &str,
+    title: &str,
+    body: &str,
+    expected_revision: &str,
+    install: F,
+) -> CommandResult<Note>
+where
+    F: FnOnce(&Path, &Path) -> std::io::Result<()>,
+{
     let old_path = validated_note_path(root, key)?;
     let new_key = available_filename(root, title, Some(key))?;
     let content = serialize_markdown(title, body);
 
-    // Save the complete new content at the old path first. If the process stops
-    // here, the note remains intact and can be reconciled on the next scan.
-    write_atomic_checked(&old_path, &content, expected_revision)?;
+    ensure_revision(&old_path, expected_revision)?;
+    if new_key == key {
+        write_atomic_checked(&old_path, &content, expected_revision)?;
+        return note_from_content(new_key, content);
+    }
 
-    if new_key != key {
-        let new_path = root.join(&new_key);
-        if new_path.exists() {
-            return Err(CommandError::new(
-                "collision",
-                "Another file took the note's new filename. Try saving again.",
-            ));
+    let new_path = root.join(&new_key);
+    let case_only_rename = key.eq_ignore_ascii_case(&new_key);
+    if new_path.exists() && !case_only_rename {
+        return Err(CommandError::new(
+            "collision",
+            "Another file took the note's new filename. Try saving again.",
+        ));
+    }
+
+    let staged_path = write_staged_file(root, &content)?;
+    if let Err(error) = ensure_revision(&old_path, expected_revision) {
+        remove_temp_file(&staged_path);
+        return Err(error);
+    }
+    if new_path.exists() && !case_only_rename {
+        remove_temp_file(&staged_path);
+        return Err(CommandError::new(
+            "collision",
+            "Another file took the note's new filename. Try saving again.",
+        ));
+    }
+
+    let backup_path = match stage_original_file(root, &old_path) {
+        Ok(path) => path,
+        Err(error) => {
+            remove_temp_file(&staged_path);
+            return Err(error);
         }
-        fs::rename(&old_path, &new_path)
-            .map_err(|error| CommandError::io("Could not rename the note", error))?;
+    };
+
+    if let Err(error) = install(&staged_path, &new_path) {
+        let restore_result =
+            fs::hard_link(&backup_path, &old_path).and_then(|()| fs::remove_file(&backup_path));
+        remove_temp_file(&staged_path);
+        return match restore_result {
+            Ok(()) => Err(CommandError::io("Could not rename the note", error)),
+            Err(restore_error) => Err(CommandError::new(
+                "io",
+                format!(
+                    "Could not rename the note ({error}) or restore its original filename ({restore_error}). The complete original remains at {}.",
+                    backup_path.display()
+                ),
+            )),
+        };
+    }
+
+    remove_temp_file(&staged_path);
+    if let Err(error) = fs::remove_file(&backup_path) {
+        log::warn!(
+            "The note was renamed, but temporary backup {} could not be removed: {error}",
+            backup_path.display()
+        );
     }
 
     note_from_content(new_key, content)
@@ -432,15 +497,19 @@ fn note_from_content(key: String, content: String) -> CommandResult<Note> {
 }
 
 fn parse_markdown(content: &str, fallback_title: &str) -> (String, String) {
-    let mut offset = 0;
-    for line in content.split_inclusive('\n') {
-        let heading = line
-            .trim_end_matches('\n')
-            .trim_end_matches('\r')
-            .trim_start_matches('\u{feff}');
-        if let Some(title) = heading.strip_prefix("# ").map(str::trim) {
+    let document = content.strip_prefix('\u{feff}').unwrap_or(content);
+    let mut heading_offset = 0;
+
+    for line in document.split_inclusive('\n') {
+        let line_text = line.trim_end_matches(['\r', '\n']);
+        if line_text.is_empty() {
+            heading_offset += line.len();
+            continue;
+        }
+
+        if let Some(title) = line_text.strip_prefix("# ").map(str::trim) {
             if !title.is_empty() {
-                let remainder = &content[offset + line.len()..];
+                let remainder = &document[heading_offset + line.len()..];
                 let body = remainder
                     .strip_prefix("\r\n")
                     .or_else(|| remainder.strip_prefix('\n'))
@@ -448,7 +517,7 @@ fn parse_markdown(content: &str, fallback_title: &str) -> (String, String) {
                 return (title.to_owned(), body.to_owned());
             }
         }
-        offset += line.len();
+        break;
     }
 
     (fallback_title.to_owned(), content.to_owned())
@@ -458,14 +527,21 @@ fn serialize_markdown(title: &str, body: &str) -> String {
     format!("# {title}\n\n{body}")
 }
 
-fn validate_title(title: &str) -> CommandResult<()> {
-    if title.trim().is_empty() || title.contains(['\r', '\n']) {
+fn canonicalize_title(title: &str) -> CommandResult<String> {
+    if title.contains(['\r', '\n']) {
         return Err(CommandError::new(
             "invalid_title",
             "A note title must contain text on one line.",
         ));
     }
-    Ok(())
+    let canonical = title.split_whitespace().collect::<Vec<_>>().join(" ");
+    if canonical.is_empty() {
+        return Err(CommandError::new(
+            "invalid_title",
+            "A note title must contain text on one line.",
+        ));
+    }
+    Ok(canonical)
 }
 
 fn available_filename(
@@ -477,7 +553,7 @@ fn available_filename(
         .map_err(|error| CommandError::io("Could not inspect filename collisions", error))?
         .filter_map(Result::ok)
         .filter_map(|entry| entry.file_name().to_str().map(str::to_owned))
-        .filter(|name| current_key != Some(name.as_str()))
+        .filter(|name| !current_key.is_some_and(|current| name.eq_ignore_ascii_case(current)))
         .map(|name| name.to_lowercase())
         .collect::<HashSet<_>>();
 
@@ -552,6 +628,72 @@ fn truncate_utf8(value: &str, max_bytes: usize) -> &str {
     &value[..boundary]
 }
 
+fn unique_temp_path(root: &Path, purpose: &str) -> PathBuf {
+    let number = NEXT_TEMP_FILE.fetch_add(1, Ordering::Relaxed);
+    root.join(format!(
+        "{TEMP_FILE_PREFIX}{purpose}-{}-{number}.tmp",
+        std::process::id()
+    ))
+}
+
+fn stage_original_file(root: &Path, original: &Path) -> CommandResult<PathBuf> {
+    for _ in 0..100 {
+        let backup = unique_temp_path(root, "backup");
+        match fs::hard_link(original, &backup) {
+            Ok(()) => {
+                if let Err(error) = fs::remove_file(original) {
+                    remove_temp_file(&backup);
+                    return Err(CommandError::io("Could not stage the original note", error));
+                }
+                return Ok(backup);
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(CommandError::io("Could not stage the original note", error)),
+        }
+    }
+    Err(CommandError::new(
+        "io",
+        "Could not allocate a temporary backup for the original note.",
+    ))
+}
+
+fn write_staged_file(root: &Path, content: &str) -> CommandResult<PathBuf> {
+    for _ in 0..100 {
+        let path = unique_temp_path(root, "stage");
+        match OpenOptions::new().write(true).create_new(true).open(&path) {
+            Ok(mut file) => {
+                if let Err(error) = file
+                    .write_all(content.as_bytes())
+                    .and_then(|()| file.sync_all())
+                {
+                    remove_temp_file(&path);
+                    return Err(CommandError::io("Could not stage the renamed note", error));
+                }
+                return Ok(path);
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => {
+                return Err(CommandError::io("Could not stage the renamed note", error));
+            }
+        }
+    }
+    Err(CommandError::new(
+        "io",
+        "Could not allocate a temporary file for the renamed note.",
+    ))
+}
+
+fn remove_temp_file(path: &Path) {
+    if let Err(error) = fs::remove_file(path) {
+        if error.kind() != std::io::ErrorKind::NotFound {
+            log::warn!(
+                "Could not remove temporary file {}: {error}",
+                path.display()
+            );
+        }
+    }
+}
+
 fn revision(content: &[u8]) -> String {
     format!("{:x}", Sha256::digest(content))
 }
@@ -585,21 +727,52 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
-    fn parses_canonical_and_external_markdown() {
+    fn parses_canonical_markdown() {
         assert_eq!(
             parse_markdown("# Purification\n\nThe body", "fallback"),
             ("Purification".to_owned(), "The body".to_owned())
         );
+    }
+
+    #[test]
+    fn parses_a_leading_title_after_a_bom_or_blank_lines() {
         assert_eq!(
-            parse_markdown("An external note without a heading", "External"),
-            (
-                "External".to_owned(),
-                "An external note without a heading".to_owned()
-            )
+            parse_markdown("\u{feff}# BOM title\n\nBody", "fallback"),
+            ("BOM title".to_owned(), "Body".to_owned())
         );
         assert_eq!(
-            parse_markdown("Preface\n# عنوان عربي\nBody", "fallback"),
-            ("عنوان عربي".to_owned(), "Body".to_owned())
+            parse_markdown("\n\r\n# Blank title\n\nBody", "fallback"),
+            ("Blank title".to_owned(), "Body".to_owned())
+        );
+    }
+
+    #[test]
+    fn preserves_external_content_when_an_h1_is_not_leading() {
+        let content = "Preface\n# Later title\nBody";
+        assert_eq!(
+            parse_markdown(content, "External"),
+            ("External".to_owned(), content.to_owned())
+        );
+    }
+
+    #[test]
+    fn preserves_files_without_an_h1() {
+        let content = "An external note without a heading";
+        assert_eq!(
+            parse_markdown(content, "External"),
+            ("External".to_owned(), content.to_owned())
+        );
+    }
+
+    #[test]
+    fn parses_crlf_and_unicode_titles() {
+        assert_eq!(
+            parse_markdown("# عنوان عربي\r\n\r\nالمحتوى", "fallback"),
+            ("عنوان عربي".to_owned(), "المحتوى".to_owned())
+        );
+        assert_eq!(
+            parse_markdown("# 静かな考え\n\n本文", "fallback"),
+            ("静かな考え".to_owned(), "本文".to_owned())
         );
     }
 
@@ -682,6 +855,119 @@ mod tests {
         assert_eq!(
             read_note_in(vault.path(), "تنقية.md").unwrap().title,
             "تنقية"
+        );
+    }
+
+    #[test]
+    fn rename_uses_a_collision_suffix_without_overwriting() {
+        let vault = tempdir().unwrap();
+        let note = create_note_in(vault.path(), "First").unwrap();
+        fs::write(vault.path().join("Taken.md"), "unrelated").unwrap();
+
+        let renamed =
+            rename_note_in(vault.path(), &note.key, "Taken", "updated", &note.revision).unwrap();
+
+        assert_eq!(renamed.key, "Taken (2).md");
+        assert_eq!(
+            fs::read_to_string(vault.path().join("Taken.md")).unwrap(),
+            "unrelated"
+        );
+        assert_no_temporary_files(vault.path());
+    }
+
+    #[test]
+    fn handles_case_only_renames() {
+        let vault = tempdir().unwrap();
+        let note = create_note_in(vault.path(), "Case").unwrap();
+        let renamed =
+            rename_note_in(vault.path(), &note.key, "case", &note.body, &note.revision).unwrap();
+
+        assert_eq!(renamed.key, "case.md");
+        assert_eq!(renamed.title, "case");
+        assert_no_temporary_files(vault.path());
+    }
+
+    #[test]
+    fn rename_conflict_leaves_the_original_unchanged() {
+        let vault = tempdir().unwrap();
+        let note = create_note_in(vault.path(), "Original").unwrap();
+        let original_path = vault.path().join(&note.key);
+        fs::write(&original_path, "# Original\n\nExternal edit").unwrap();
+
+        let error = rename_note_in(
+            vault.path(),
+            &note.key,
+            "Renamed",
+            "Calmd edit",
+            &note.revision,
+        )
+        .unwrap_err();
+
+        assert_eq!(error.code, "conflict");
+        assert_eq!(
+            fs::read_to_string(original_path).unwrap(),
+            "# Original\n\nExternal edit"
+        );
+        assert!(!vault.path().join("Renamed.md").exists());
+        assert_no_temporary_files(vault.path());
+    }
+
+    #[test]
+    fn failed_destination_install_restores_the_original() {
+        let vault = tempdir().unwrap();
+        let note = create_note_in(vault.path(), "Original").unwrap();
+        let original_path = vault.path().join(&note.key);
+        let original_content = fs::read_to_string(&original_path).unwrap();
+
+        let error = rename_note_in_with(
+            vault.path(),
+            &note.key,
+            "Renamed",
+            "updated",
+            &note.revision,
+            |_, _| Err(std::io::Error::other("injected destination failure")),
+        )
+        .unwrap_err();
+
+        assert_eq!(error.code, "io");
+        assert_eq!(fs::read_to_string(original_path).unwrap(), original_content);
+        assert!(!vault.path().join("Renamed.md").exists());
+        assert_no_temporary_files(vault.path());
+    }
+
+    #[test]
+    fn renames_unicode_filenames_and_returns_complete_canonical_note() {
+        let vault = tempdir().unwrap();
+        let note = create_note_in(vault.path(), "Original").unwrap();
+        let renamed = rename_note_in(
+            vault.path(),
+            &note.key,
+            "  تنقية   هادئة  ",
+            "المحتوى",
+            &note.revision,
+        )
+        .unwrap();
+
+        assert_eq!(renamed.key, "تنقية هادئة.md");
+        assert_eq!(renamed.title, "تنقية هادئة");
+        assert_eq!(renamed.body, "المحتوى");
+        assert_eq!(
+            renamed.revision,
+            revision("# تنقية هادئة\n\nالمحتوى".as_bytes())
+        );
+        assert_no_temporary_files(vault.path());
+    }
+
+    fn assert_no_temporary_files(root: &Path) {
+        let temporary_files = fs::read_dir(root)
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter_map(|entry| entry.file_name().to_str().map(str::to_owned))
+            .filter(|name| name.starts_with(TEMP_FILE_PREFIX))
+            .collect::<Vec<_>>();
+        assert!(
+            temporary_files.is_empty(),
+            "temporary files: {temporary_files:?}"
         );
     }
 
