@@ -10,7 +10,7 @@ Current stack:
 - Tailwind CSS
 - Base UI
 
-The Tauri 2 desktop shell is connected, but Rust commands, SQLite, filesystem storage, backlink discovery, wiki links, and semantic search are not implemented yet. The backlinks popover is a visual placeholder only.
+The Tauri 2 desktop shell stores notes as top-level Markdown files in one user-selected vault. Rust owns filesystem access through dedicated commands, vault selection is persisted, and writes use revision checks plus atomic replacement. SQLite, backlink discovery, wiki links, and semantic search are not implemented yet. The backlinks popover is a visual placeholder only.
 
 ## Product Goal
 
@@ -23,12 +23,12 @@ The interface should feel like starting a thought, not managing a vault.
 Focus only on:
 
 - A plain composer-style home screen
-- Mock search results while typing
-- Creating a note from the composer
-- A minimal full-page note editor
+- Literal retrieval over notes scanned from the selected vault
+- Creating and renaming portable Markdown notes through Rust
+- A minimal full-page note editor with conflict-safe saving
 - A backlinks popover revealed only when requested, with static placeholder content
 
-Use static or mocked data. Do not introduce backend architecture during this phase.
+Keep backlinks static or mocked. Do not introduce databases, indexing, or other backend architecture during this phase.
 
 ## Constraints
 

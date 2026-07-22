@@ -18,6 +18,7 @@ type NoteEditorProps = {
   onDraftChange: (draft: NoteDraft) => void
   onBacklinksOpenChange: (open: boolean) => void
   onReturn: () => void
+  saveMessage: string | null
 }
 
 function ArrowLeftIcon() {
@@ -34,6 +35,7 @@ export function NoteEditor({
   onDraftChange,
   onBacklinksOpenChange,
   onReturn,
+  saveMessage,
 }: NoteEditorProps) {
   return (
     <main className="app min-h-screen bg-canvas text-ink">
@@ -79,6 +81,12 @@ export function NoteEditor({
         onOpenChange={onBacklinksOpenChange}
         open={backlinksOpen}
       />
+
+      {saveMessage ? (
+        <p className="fixed inset-x-16 bottom-6 text-center text-small text-secondary" role="alert">
+          {saveMessage}
+        </p>
+      ) : null}
     </main>
   )
 }

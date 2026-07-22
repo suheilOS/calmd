@@ -95,7 +95,7 @@ export function ComposerScreen({
                 aria-selected={activeResultIndex === index}
                 className={`${RESULT_CLASS_NAME} border-b border-divider ${activeResultIndex === index ? 'bg-surface text-secondary' : 'text-ink'}`}
                 id={`search-result-${index}`}
-                key={note.id}
+                key={note.key}
                 onClick={() => onResultSelect(index)}
                 onMouseEnter={() => onActiveResultChange(index)}
                 role="option"

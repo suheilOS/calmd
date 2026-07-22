@@ -1,28 +1,30 @@
 # Product Implementation Brief
 
-## Current phase: interactive UI prototype with Tauri shell
+## Current phase: portable Markdown vault foundation
 
-This phase validates the appearance and core interaction model using React state and mock notes, with the UI runnable inside a Tauri 2 desktop shell. It does not validate persistence, backend architecture, semantic retrieval, wiki links, or backlink discovery.
+The interface now reads and writes top-level Markdown notes in one user-selected vault through dedicated Rust commands. Markdown is the source of truth; there is no database or derived index yet.
 
 ### Completed
 
 - Blank composer with no collection overview or recent-notes feed
-- Mock title and body retrieval while typing
+- Literal title and body retrieval over scanned Markdown notes
 - Exact-title matching that opens the existing note instead of creating a duplicate
 - Keyboard and pointer navigation through retrieval results
-- In-memory note creation and editing
-- Debounced in-memory saving while the app remains open
+- Named vault creation inside a user-selected parent directory, with the canonicalized child path persisted
+- Rust create, read, save, and rename commands using relative note keys
+- Canonical `# Title` Markdown serialization and tolerant external-file parsing
+- Portable filename derivation with case-insensitive collision handling
+- Atomic writes and content-hash conflict detection
+- Launch and window-focus vault rescans without a filesystem watcher
 - Minimal full-page editor with return navigation
 - On-demand backlinks popover with static empty-state content
 - Responsive light and dark presentation using a restrained three-level type scale
 
 ### Deferred
 
-- Persistent Markdown and filesystem storage
-- Rust commands and application integration
 - SQLite, FTS5, embeddings, and combined ranking
 - Inline `[[links]]` and backlink discovery
-- CodeMirror integration and formatting controls
+- Filesystem watching, deletion, nested folders, and multiple vaults
 - Browser-history-backed navigation
 
 ## Target experience
@@ -91,8 +93,8 @@ Results show the title and a short matching excerpt.
 3. **Prototype only:** Literal title and body retrieval over mock notes
 4. **Prototype only:** In-memory note creation and saving
 5. **UI placeholder only:** Backlinks popover; wiki links and backlink discovery remain deferred
-6. **Deferred:** Semantic search
-7. **Deferred:** Tauri and filesystem integration
+6. **Completed:** Tauri Markdown vault integration with atomic, conflict-safe saving
+7. **Deferred:** SQLite-derived indexing and semantic search
 
 ## Constraint
 

@@ -1,12 +1,12 @@
 [package]
-name = "app"
+name = "calmd"
 version = "0.0.0"
-description = "A calm notes app"
-authors = ["you"]
-license = ""
-repository = ""
-edition = "2021"
-rust-version = "1.77.2"
+description = "A calm markdown editor"
+authors = ["Suheil"]
+license = "MIT"
+repository = "https://github.com/suheilOS/calmd"
+edition = "2024"
+rust-version = "1.85"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -22,4 +22,11 @@ serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
 tauri = { version = "2.11.5", features = [] }
+tauri-plugin-dialog = "2"
 tauri-plugin-log = "2"
+tauri-plugin-store = "2"
+atomic-write-file = "0.2"
+sha2 = "0.10"
+
+[dev-dependencies]
+tempfile = "3"
