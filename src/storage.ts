@@ -1,5 +1,10 @@
 import { invoke } from '@tauri-apps/api/core'
-import { canonicalizeTitle, type Note, type NoteDraft } from './notes'
+import {
+  canonicalizeTitle,
+  type Note,
+  type NoteDraft,
+  type SearchResponse,
+} from './notes'
 
 export type StorageError = {
   code: string
@@ -25,11 +30,15 @@ export function getStorageError(error: unknown): StorageError {
 }
 
 export function openVault() {
-  return invoke<Note[] | null>('open_vault')
+  return invoke<boolean>('open_vault')
 }
 
 export function selectVault(name: string) {
-  return invoke<Note[] | null>('select_vault', { name })
+  return invoke<boolean>('select_vault', { name })
+}
+
+export function searchStoredNotes(query: string) {
+  return invoke<SearchResponse>('search_notes', { query })
 }
 
 export function createStoredNote(title: string) {

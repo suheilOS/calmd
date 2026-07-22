@@ -1,11 +1,11 @@
 import { Button } from '@base-ui/react/button'
 import { Input } from '@base-ui/react/input'
 import type { FormEvent, KeyboardEvent } from 'react'
-import { getExcerpt, MAX_NOTE_TITLE_LENGTH, type Note } from './notes'
+import { MAX_NOTE_TITLE_LENGTH, type SearchHit } from './notes'
 
 type ComposerScreenProps = {
   thought: string
-  results: Note[]
+  results: SearchHit[]
   hasExactMatch: boolean
   activeResultIndex: number
   onThoughtChange: (thought: string) => void
@@ -102,7 +102,7 @@ export function ComposerScreen({
                 type="button"
               >
                 <span className="block break-words">{note.title}</span>
-                {note.body ? <span className="mt-1 block truncate text-small text-faint">{getExcerpt(note.body)}</span> : null}
+                {note.excerpt ? <span className="mt-1 block truncate text-small text-faint">{note.excerpt}</span> : null}
               </Button>
             ))}
             {!hasExactMatch ? (

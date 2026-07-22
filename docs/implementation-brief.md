@@ -1,13 +1,14 @@
 # Product Implementation Brief
 
-## Current phase: portable Markdown vault foundation
+## Current phase: derived literal search index
 
-The interface now reads and writes top-level Markdown notes in one user-selected vault through dedicated Rust commands. Markdown is the source of truth; there is no database or derived index yet.
+The interface reads and writes top-level Markdown notes in one user-selected vault through dedicated Rust commands. Markdown remains the sole source of truth. A disposable SQLite/FTS5 database in Tauri app data provides ranked literal retrieval without placing system metadata in the vault.
 
 ### Completed
 
 - Blank composer with no collection overview or recent-notes feed
-- Literal title and body retrieval over scanned Markdown notes
+- Ranked title and body retrieval through a rebuildable SQLite/FTS5 trigram index
+- Concise matching excerpts returned by Rust without loading the vault into frontend memory
 - Exact-title matching that opens the existing note instead of creating a duplicate
 - Keyboard and pointer navigation through retrieval results
 - Named vault creation inside a user-selected parent directory, with the canonicalized child path persisted
@@ -16,7 +17,9 @@ The interface now reads and writes top-level Markdown notes in one user-selected
 - Portable filename derivation with case-insensitive collision handling
 - Atomic saves, staged transactional renames, and content-hash conflict detection
 - Minimal conflict recovery by reloading the external version from disk
-- Launch and window-focus vault rescans without a filesystem watcher
+- Transactional launch and window-focus reconciliation without a filesystem watcher
+- Best-effort index updates after create, save, and rename, with Markdown-write success independent of index availability
+- Automatic recreation of missing, incompatible, or corrupt derived databases
 - Minimal full-page editor with return navigation
 - On-demand backlinks popover with static empty-state content
 - Responsive light and dark presentation using a restrained three-level type scale
@@ -29,9 +32,11 @@ Renames stage and sync the complete new file in the vault, verify the original r
 
 A filesystem cannot provide one portable atomic operation that simultaneously replaces file content and changes its name. There is therefore a brief interval between unlinking the original path and installing the new path. Calmd restores the original after ordinary errors, but a process or machine failure in that interval can leave the complete original in a `.calmd-backup-*.tmp` file. The strategy also requires same-filesystem hard-link support inside the vault. As with atomic save replacement, an external process can still race the final revision check. Cleanup failures are logged rather than reported as failed saves after the new note has already been committed.
 
+The search database stores note keys, titles, bodies, revisions, and filesystem modification times under Tauri app data. FTS5 indexes titles and bodies with title-weighted BM25 ranking and trigram substring matching. Launch and focus scans reconcile the complete top-level Markdown snapshot transactionally. Missing, incompatible, and corrupt databases are discarded and rebuilt; index failures never roll back a successful Markdown write.
+
 ### Deferred
 
-- SQLite, FTS5, embeddings, and combined ranking
+- Embeddings, semantic retrieval, and combined ranking
 - Inline `[[links]]` and backlink discovery
 - Filesystem watching, deletion, nested folders, and multiple vaults
 - Browser-history-backed navigation
@@ -103,7 +108,8 @@ Results show the title and a short matching excerpt.
 4. **Prototype only:** In-memory note creation and saving
 5. **UI placeholder only:** Backlinks popover; wiki links and backlink discovery remain deferred
 6. **Completed:** Tauri Markdown vault integration with atomic, conflict-safe saving
-7. **Deferred:** SQLite-derived indexing and semantic search
+7. **Completed:** Rebuildable SQLite/FTS5 literal search with ranked excerpts
+8. **Deferred:** Embeddings, semantic retrieval, and combined ranking
 
 ## Constraint
 
