@@ -1,8 +1,8 @@
 # Product Implementation Brief
 
-## Current phase: interactive UI prototype
+## Current phase: interactive UI prototype with Tauri shell
 
-This phase validates the appearance and core interaction model using React state and mock notes. It does not validate persistence, backend architecture, semantic retrieval, wiki links, or backlink discovery.
+This phase validates the appearance and core interaction model using React state and mock notes, with the UI runnable inside a Tauri 2 desktop shell. It does not validate persistence, backend architecture, semantic retrieval, wiki links, or backlink discovery.
 
 ### Completed
 
@@ -19,7 +19,7 @@ This phase validates the appearance and core interaction model using React state
 ### Deferred
 
 - Persistent Markdown and filesystem storage
-- Tauri and Rust integration
+- Rust commands and application integration
 - SQLite, FTS5, embeddings, and combined ranking
 - Inline `[[links]]` and backlink discovery
 - CodeMirror integration and formatting controls
@@ -78,9 +78,9 @@ Results show the title and a short matching excerpt.
 
 * React + Vite
 * Base UI
+* Tauri 2 desktop shell
 * Tailwind CSS
 * CodeMirror
-* Tauri
 * Rust
 * SQLite
 

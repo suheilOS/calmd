@@ -10,7 +10,7 @@ Current stack:
 - Tailwind CSS
 - Base UI
 
-Tauri, Rust, SQLite, filesystem storage, backlink discovery, wiki links, and semantic search are not implemented yet. The backlinks popover is a visual placeholder only.
+The Tauri 2 desktop shell is connected, but Rust commands, SQLite, filesystem storage, backlink discovery, wiki links, and semantic search are not implemented yet. The backlinks popover is a visual placeholder only.
 
 ## Product Goal
 

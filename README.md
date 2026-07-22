@@ -4,7 +4,7 @@ A calm notes interface for developing or retrieving the current thought without 
 
 ## Current prototype
 
-The project is an interactive React prototype backed by in-memory mock data. It includes:
+The project is an interactive React prototype backed by in-memory mock data and packaged with a Tauri 2 desktop shell. It includes:
 
 - A blank composer that retrieves mock notes while typing
 - Exact-title handling and in-memory note creation
@@ -13,13 +13,19 @@ The project is an interactive React prototype backed by in-memory mock data. It 
 - A hidden backlinks popover with static placeholder content
 - Responsive light and dark styling
 
-Persistence, filesystem storage, backlink discovery, wiki links, semantic search, SQLite, Rust, and Tauri are not implemented.
+Persistence, filesystem storage, backlink discovery, wiki links, semantic search, SQLite, and Rust-backed functionality are not implemented.
 
 ## Development
 
 ```sh
 bun install
 bun run dev
+```
+
+To run the desktop shell:
+
+```sh
+bun run tauri:dev
 ```
 
 ## Checks

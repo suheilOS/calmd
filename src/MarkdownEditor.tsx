@@ -146,9 +146,7 @@ const editorTheme = EditorView.theme({
     minHeight: '58vh',
   },
   '&.cm-focused': {
-    borderRadius: '0.25rem',
-    outline: '2px solid var(--color-faint)',
-    outlineOffset: '0.5rem',
+    outline: 'none',
   },
   '.cm-scroller': {
     fontFamily: 'inherit',
