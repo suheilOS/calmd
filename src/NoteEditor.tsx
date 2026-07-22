@@ -1,7 +1,13 @@
 import { Button } from '@base-ui/react/button'
 import { Input } from '@base-ui/react/input'
+import { lazy, Suspense } from 'react'
 import { BacklinksPopover } from './BacklinksPopover'
 import type { NoteDraft } from './notes'
+
+const MarkdownEditor = lazy(async () => {
+  const module = await import('./MarkdownEditor')
+  return { default: module.MarkdownEditor }
+})
 
 type NoteEditorProps = {
   draft: NoteDraft
@@ -37,7 +43,7 @@ export function NoteEditor({
         <ArrowLeftIcon />
       </Button>
 
-      <article className="mx-auto w-full max-w-[65ch] px-6 pb-24 pt-[15vh] sm:px-8">
+      <article className="note-editor-page mx-auto w-full max-w-[65ch] px-6 pb-24 pt-[15vh] sm:px-8">
         <label className="sr-only" htmlFor="note-title">Note title</label>
         <Input
           aria-label="Note title"
@@ -46,15 +52,14 @@ export function NoteEditor({
           onChange={(event) => onDraftChange({ ...draft, title: event.target.value })}
           value={draft.title}
         />
-        <label className="sr-only" htmlFor="note-body">Note content</label>
-        <textarea
-          aria-label="Note content"
-          className="mt-6 min-h-[58vh] w-full max-w-[65ch] resize-none border-0 bg-transparent p-0 text-base text-body text-pretty outline-none placeholder:text-placeholder sm:mt-8"
-          id="note-body"
-          onChange={(event) => onDraftChange({ ...draft, body: event.target.value })}
-          placeholder=""
-          value={draft.body}
-        />
+        <div className="mt-6 sm:mt-8">
+          <Suspense fallback={<div aria-hidden="true" className="min-h-[58vh]" />}>
+            <MarkdownEditor
+              onChange={(body) => onDraftChange({ ...draft, body })}
+              value={draft.body}
+            />
+          </Suspense>
+        </div>
       </article>
 
       <BacklinksPopover

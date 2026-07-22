@@ -86,7 +86,7 @@ export function ComposerScreen({
         </form>
 
         {hasThought ? (
-          <div aria-live="polite" className="mt-4 border-t border-border pt-1 motion-safe:animate-[result-in_180ms_ease-out]" id="search-results" role="listbox">
+          <div aria-live="polite" className="mt-4 border-t border-border motion-safe:animate-[result-in_180ms_ease-out]" id="search-results" role="listbox">
             {results.map((note, index) => (
               <Button
                 aria-selected={activeResultIndex === index}
