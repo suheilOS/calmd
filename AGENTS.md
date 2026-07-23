@@ -1,6 +1,6 @@
 ## Project State
 
-Calmd is currently a Tauri 2 desktop application backed by top-level Markdown files in one user-selected, portable vault. Rust owns filesystem access through dedicated commands, vault selection is persisted, and writes use revision checks plus atomic replacement. A rebuildable SQLite/FTS5 index under Tauri app data provides ranked literal search and excerpts; Markdown remains the sole source of truth. Backlinks, wiki-link behavior, embeddings, and semantic retrieval remain deferred. The backlinks popover is a visual placeholder only.
+Calmd is currently a Tauri 2 desktop application backed by top-level Markdown files in one user-selected, portable vault. Rust owns filesystem access through dedicated commands; a framework-independent Note persistence module owns Markdown parsing, filename policy, revisions, and atomic create/read/save/rename behavior. Vault selection is persisted separately. A rebuildable SQLite/FTS5 index under Tauri app data provides ranked literal search and excerpts; Markdown remains the sole source of truth. Frontend Note editing is a framework-neutral session module with autosave, save sequencing, and conflict handling behind a local-substitutable persistence seam. Backlinks, wiki-link behavior, embeddings, and semantic retrieval remain deferred. The backlinks popover is a visual placeholder only.
 
 Current UI stack:
 
