@@ -258,6 +258,7 @@ dependencies = [
  "atomic-write-file",
  "log",
  "rusqlite",
+ "same-file",
  "serde",
  "serde_json",
  "sha2",

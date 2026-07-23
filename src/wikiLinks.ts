@@ -45,3 +45,14 @@ export function parseWikiLinkText(text: string) {
 export function canonicalWikiLink(target: string, display?: string) {
   return display && display !== target ? `[[${target}|${display}]]` : `[[${target}]]`
 }
+
+export function canonicalResolvedWikiLink(
+  target: string,
+  resolvedTitle: string,
+  originalDisplay?: string,
+) {
+  const display = originalDisplay ?? (
+    resolvedTitle === target ? undefined : resolvedTitle
+  )
+  return canonicalWikiLink(target, display)
+}

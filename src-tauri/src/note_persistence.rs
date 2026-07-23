@@ -1,4 +1,4 @@
-use crate::links::{key_stem, rewrite_target};
+use crate::links::{key_stem, normalize_key, rewrite_target};
 use atomic_write_file::AtomicWriteFile;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -150,15 +150,22 @@ impl<'a> NotePersistence<'a> {
             return Err(PersistenceError::conflict());
         }
         let new_key = available_filename(self.root, &title, Some(key))?;
-        if new_key == key {
-            return self.save(key, &title, body, expected_revision);
-        }
         let old_stem = key_stem(key);
         let new_stem = key_stem(&new_key);
+        let notes = self.scan()?;
+        let old_identity_is_unambiguous = notes
+            .iter()
+            .filter(|note| normalize_key(&note.key) == normalize_key(key))
+            .count()
+            == 1;
         let mut changes = Vec::new();
-        for note in self.scan()? {
+        for note in notes {
             let source_body = if note.key == key { body } else { &note.body };
-            let rewritten = rewrite_target(source_body, old_stem, new_stem, &current.title, &title);
+            let rewritten = if old_identity_is_unambiguous {
+                rewrite_target(source_body, old_stem, new_stem, &current.title, &title)
+            } else {
+                source_body.to_owned()
+            };
             if note.key == key || rewritten != note.body {
                 changes.push(PendingChange {
                     original: note.key.clone(),
@@ -300,6 +307,8 @@ struct JournalFile {
     destination: String,
     staged: String,
     backup: String,
+    #[serde(default)]
+    installed: bool,
 }
 
 fn install_coordinated(root: &Path, changes: &[PendingChange]) -> PersistenceResult<()> {
@@ -322,6 +331,7 @@ fn install_coordinated(root: &Path, changes: &[PendingChange]) -> PersistenceRes
             destination: change.destination.clone(),
             staged: staged.file_name().unwrap().to_string_lossy().into_owned(),
             backup: backup.file_name().unwrap().to_string_lossy().into_owned(),
+            installed: false,
         });
     }
     for change in changes {
@@ -366,10 +376,13 @@ fn install_journaled(root: &Path, mut journal: Journal) -> PersistenceResult<()>
         fs::remove_file(root.join(&file.original))
             .map_err(|error| PersistenceError::io("Could not stage a linked rename", error))?;
     }
-    for file in &journal.files {
+    for index in 0..journal.files.len() {
+        let file = &journal.files[index];
         fs::hard_link(root.join(&file.staged), root.join(&file.destination))
             .map_err(|error| PersistenceError::io("Could not install a linked rename", error))?;
-        fs::remove_file(root.join(&file.staged))
+        journal.files[index].installed = true;
+        write_journal(root, &journal)?;
+        fs::remove_file(root.join(&journal.files[index].staged))
             .map_err(|error| PersistenceError::io("Could not finish a linked rename", error))?;
     }
     sync_directory(root)?;
@@ -401,15 +414,12 @@ fn cleanup_unjournaled(root: &Path, files: &[JournalFile]) {
 fn write_journal(root: &Path, journal: &Journal) -> PersistenceResult<()> {
     let content = serde_json::to_string(journal)
         .map_err(|error| PersistenceError::io("Could not encode rename recovery data", error))?;
-    let mut file = OpenOptions::new()
-        .create(true)
-        .truncate(true)
-        .write(true)
-        .open(root.join(OPERATION_JOURNAL))
-        .map_err(|error| PersistenceError::io("Could not write rename recovery data", error))?;
+    let mut file = AtomicWriteFile::open(root.join(OPERATION_JOURNAL))
+        .map_err(|error| PersistenceError::io("Could not prepare rename recovery data", error))?;
     file.write_all(content.as_bytes())
-        .and_then(|()| file.sync_all())
-        .map_err(|error| PersistenceError::io("Could not sync rename recovery data", error))?;
+        .map_err(|error| PersistenceError::io("Could not write rename recovery data", error))?;
+    file.commit()
+        .map_err(|error| PersistenceError::io("Could not install rename recovery data", error))?;
     sync_directory(root)
 }
 
@@ -494,8 +504,21 @@ pub fn recover_operation(root: &Path) -> PersistenceResult<()> {
             let backup = root.join(&file.backup);
             if backup.exists() {
                 let staged = root.join(&file.staged);
-                if file.destination == file.original || !staged.exists() {
-                    remove_temp_file(&root.join(&file.destination));
+                let destination = root.join(&file.destination);
+                let destination_is_owned = if !destination.exists() {
+                    false
+                } else if staged.exists() {
+                    same_file::is_same_file(&staged, &destination).map_err(|error| {
+                        PersistenceError::io(
+                            "Could not verify an interrupted rename destination",
+                            error,
+                        )
+                    })?
+                } else {
+                    file.installed
+                };
+                if file.destination == file.original || destination_is_owned {
+                    remove_temp_file(&destination);
                 }
                 remove_temp_file(&root.join(&file.original));
                 fs::rename(&backup, root.join(&file.original)).map_err(|error| {

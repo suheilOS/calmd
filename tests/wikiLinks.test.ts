@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'bun:test'
-import { canonicalWikiLink, parseWikiLinkText } from '../src/wikiLinks'
+import {
+  canonicalResolvedWikiLink,
+  canonicalWikiLink,
+  parseWikiLinkText,
+} from '../src/wikiLinks'
 
 describe('wiki-link contract', () => {
   test('parses basic, aliased, Unicode, and optional extension targets', () => {
@@ -12,5 +16,11 @@ describe('wiki-link contract', () => {
     expect(canonicalWikiLink('Target')).toBe('[[Target]]')
     expect(canonicalWikiLink('Target', 'Target')).toBe('[[Target]]')
     expect(canonicalWikiLink('Safe target', 'Visible title')).toBe('[[Safe target|Visible title]]')
+  })
+
+  test('preserves the resolved title when filename policy changes the stem', () => {
+    expect(canonicalResolvedWikiLink('CON note', 'CON')).toBe('[[CON note|CON]]')
+    expect(canonicalResolvedWikiLink('A-B- C-', 'A/B: C?')).toBe('[[A-B- C-|A/B: C?]]')
+    expect(canonicalResolvedWikiLink('Target (2)', 'Target', 'Custom')).toBe('[[Target (2)|Custom]]')
   })
 })

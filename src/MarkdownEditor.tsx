@@ -39,11 +39,16 @@ import { useEffect, useLayoutEffect, useRef } from 'react'
 import { insertNewlineContinueBlockquote } from './markdownBlockquote'
 import { markdownHighlight } from './markdownHighlight'
 import { toggleLink, toggleMarkdown } from './markdownCommands'
-import { canonicalWikiLink, parseWikiLinkText, wikiLinkMarkdown } from './wikiLinks'
+import {
+  canonicalResolvedWikiLink,
+  parseWikiLinkText,
+  wikiLinkMarkdown,
+} from './wikiLinks'
 
 export type WikiLinkActivation = {
   target: string
-  applyCanonical: (canonicalTarget: string) => string | null
+  validateCurrentOccurrence: () => boolean
+  applyCanonical: (canonicalTarget: string, resolvedTitle: string) => string | null
 }
 
 type MarkdownEditorProps = {
@@ -307,13 +312,26 @@ function wikiLinkInteraction(onActivate: (activation: WikiLinkActivation) => voi
       if (!parsed) return false
       event.preventDefault()
       this.pending = { from: node.from, to: node.to, original, target: parsed.target }
+      const validateCurrentOccurrence = () => {
+        const pending = this.pending
+        return Boolean(
+          pending
+          && pending.target === parsed.target
+          && view.state.sliceDoc(pending.from, pending.to) === pending.original,
+        )
+      }
       onActivate({
         target: parsed.target,
-        applyCanonical: (canonicalTarget) => {
+        validateCurrentOccurrence,
+        applyCanonical: (canonicalTarget, resolvedTitle) => {
           const pending = this.pending
+          if (!validateCurrentOccurrence() || !pending) return null
           this.pending = null
-          if (!pending || pending.target !== parsed.target || view.state.sliceDoc(pending.from, pending.to) !== pending.original) return null
-          const replacement = canonicalWikiLink(canonicalTarget, parsed.display)
+          const replacement = canonicalResolvedWikiLink(
+            canonicalTarget,
+            resolvedTitle,
+            parsed.display,
+          )
           if (replacement !== pending.original) view.dispatch({ changes: { from: pending.from, to: pending.to, insert: replacement } })
           return view.state.doc.toString()
         },

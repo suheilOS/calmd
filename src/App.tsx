@@ -199,9 +199,13 @@ function App() {
     if (generation === null) return
     try {
       if (!(await noteEditing.flush()) || !navigationRef.current.isCurrent(generation)) return
+      if (!activation.validateCurrentOccurrence()) return
       const resolved = await openStoredNoteLink(activation.target)
       if (!navigationRef.current.isCurrent(generation)) return
-      const rewrittenBody = activation.applyCanonical(resolved.canonicalTarget)
+      const rewrittenBody = activation.applyCanonical(
+        resolved.canonicalTarget,
+        resolved.note.title,
+      )
       if (rewrittenBody === null) return
       noteEditing.updateBody(rewrittenBody)
       if (!(await noteEditing.flush()) || !navigationRef.current.isCurrent(generation)) return

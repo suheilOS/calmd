@@ -60,6 +60,230 @@ fn coordinated_rename_updates_incoming_custom_and_self_links() {
 }
 
 #[test]
+fn title_only_rename_updates_matching_aliases_without_changing_the_key() {
+    let vault = tempdir().unwrap();
+    let store = persistence(vault.path());
+    let target = store.create("A:B").unwrap();
+    let source = store.create("Source").unwrap();
+    store
+        .save(
+            &source.key,
+            &source.title,
+            "[[A-B|A:B]] [[A-B|Custom]]",
+            &source.revision,
+        )
+        .unwrap();
+
+    let renamed = store
+        .rename_with_links(&target.key, "A?B", &target.body, &target.revision)
+        .unwrap();
+
+    assert_eq!(renamed.key, "A-B.md");
+    assert_eq!(renamed.title, "A?B");
+    assert_eq!(
+        store.read("Source.md").unwrap().body,
+        "[[A-B|A?B]] [[A-B|Custom]]"
+    );
+}
+
+#[test]
+fn ambiguous_links_are_not_reassigned_during_rename() {
+    let vault = tempdir().unwrap();
+    fs::write(vault.path().join("Foo.md"), "# Foo\n\n").unwrap();
+    fs::write(vault.path().join("foo.MD"), "# Other foo\n\n").unwrap();
+    fs::write(vault.path().join("Source.md"), "# Source\n\n[[Foo]]").unwrap();
+    let store = persistence(vault.path());
+    let target = store.read("Foo.md").unwrap();
+
+    store
+        .rename_with_links(&target.key, "Bar", &target.body, &target.revision)
+        .unwrap();
+
+    assert_eq!(store.read("Source.md").unwrap().body, "[[Foo]]");
+}
+
+#[test]
+fn precommit_recovery_removes_an_installed_hard_link_before_restoring() {
+    let vault = tempdir().unwrap();
+    let root = vault.path();
+    fs::write(root.join("staged.tmp"), "replacement").unwrap();
+    fs::write(root.join("backup.tmp"), "original").unwrap();
+    fs::hard_link(root.join("staged.tmp"), root.join("New.md")).unwrap();
+    fs::write(
+        root.join(OPERATION_JOURNAL),
+        r#"{"committed":false,"files":[{"original":"Old.md","destination":"New.md","staged":".calmd-stage-1-1.tmp","backup":".calmd-journal-backup-1-2.tmp","installed":false}]}"#,
+    )
+    .unwrap();
+    fs::rename(root.join("staged.tmp"), root.join(".calmd-stage-1-1.tmp")).unwrap();
+    fs::rename(
+        root.join("backup.tmp"),
+        root.join(".calmd-journal-backup-1-2.tmp"),
+    )
+    .unwrap();
+
+    recover_operation(root).unwrap();
+
+    assert_eq!(fs::read_to_string(root.join("Old.md")).unwrap(), "original");
+    assert!(!root.join("New.md").exists());
+    assert_no_temporary_files(root);
+}
+
+#[test]
+fn precommit_recovery_preserves_an_unrelated_destination() {
+    let vault = tempdir().unwrap();
+    let root = vault.path();
+    let staged = ".calmd-stage-1-1.tmp";
+    let backup = ".calmd-journal-backup-1-2.tmp";
+    fs::write(root.join(staged), "replacement").unwrap();
+    fs::write(root.join(backup), "original").unwrap();
+    fs::write(root.join("New.md"), "external").unwrap();
+    write_journal(
+        root,
+        &Journal {
+            committed: false,
+            files: vec![JournalFile {
+                original: "Old.md".to_owned(),
+                destination: "New.md".to_owned(),
+                staged: staged.to_owned(),
+                backup: backup.to_owned(),
+                installed: false,
+            }],
+        },
+    )
+    .unwrap();
+
+    recover_operation(root).unwrap();
+
+    assert_eq!(fs::read_to_string(root.join("Old.md")).unwrap(), "original");
+    assert_eq!(fs::read_to_string(root.join("New.md")).unwrap(), "external");
+}
+
+#[test]
+fn recovery_handles_every_coordinated_install_checkpoint() {
+    #[derive(Clone, Copy)]
+    enum Checkpoint {
+        Journaled,
+        BackedUp,
+        OriginalsRemoved,
+        DestinationLinked,
+        InstallationRecorded,
+        StagedRemoved,
+        Committed,
+    }
+
+    for (index, checkpoint) in [
+        Checkpoint::Journaled,
+        Checkpoint::BackedUp,
+        Checkpoint::OriginalsRemoved,
+        Checkpoint::DestinationLinked,
+        Checkpoint::InstallationRecorded,
+        Checkpoint::StagedRemoved,
+        Checkpoint::Committed,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let vault = tempdir().unwrap();
+        let root = vault.path();
+        let staged = format!(".calmd-stage-{index}-1.tmp");
+        let backup = format!(".calmd-journal-backup-{index}-2.tmp");
+        fs::write(root.join("Old.md"), "original").unwrap();
+        fs::write(root.join(&staged), "replacement").unwrap();
+        let backed_up = !matches!(checkpoint, Checkpoint::Journaled);
+        let originals_removed = matches!(
+            checkpoint,
+            Checkpoint::OriginalsRemoved
+                | Checkpoint::DestinationLinked
+                | Checkpoint::InstallationRecorded
+                | Checkpoint::StagedRemoved
+                | Checkpoint::Committed
+        );
+        let destination_linked = matches!(
+            checkpoint,
+            Checkpoint::DestinationLinked
+                | Checkpoint::InstallationRecorded
+                | Checkpoint::StagedRemoved
+                | Checkpoint::Committed
+        );
+        let installed = matches!(
+            checkpoint,
+            Checkpoint::InstallationRecorded | Checkpoint::StagedRemoved | Checkpoint::Committed
+        );
+        let staged_removed = matches!(
+            checkpoint,
+            Checkpoint::StagedRemoved | Checkpoint::Committed
+        );
+        let committed = matches!(checkpoint, Checkpoint::Committed);
+
+        if backed_up {
+            fs::hard_link(root.join("Old.md"), root.join(&backup)).unwrap();
+        }
+        if originals_removed {
+            fs::remove_file(root.join("Old.md")).unwrap();
+        }
+        if destination_linked {
+            fs::hard_link(root.join(&staged), root.join("New.md")).unwrap();
+        }
+        if staged_removed {
+            fs::remove_file(root.join(&staged)).unwrap();
+        }
+        write_journal(
+            root,
+            &Journal {
+                committed,
+                files: vec![JournalFile {
+                    original: "Old.md".to_owned(),
+                    destination: "New.md".to_owned(),
+                    staged: staged.clone(),
+                    backup: backup.clone(),
+                    installed,
+                }],
+            },
+        )
+        .unwrap();
+
+        recover_operation(root).unwrap();
+
+        if committed {
+            assert!(!root.join("Old.md").exists());
+            assert_eq!(
+                fs::read_to_string(root.join("New.md")).unwrap(),
+                "replacement"
+            );
+        } else {
+            assert_eq!(fs::read_to_string(root.join("Old.md")).unwrap(), "original");
+            assert!(!root.join("New.md").exists());
+        }
+        assert_no_temporary_files(root);
+    }
+}
+
+#[test]
+fn journal_phase_updates_replace_complete_json_atomically() {
+    let vault = tempdir().unwrap();
+    let mut journal = Journal {
+        committed: false,
+        files: vec![JournalFile {
+            original: "Old.md".to_owned(),
+            destination: "New.md".to_owned(),
+            staged: ".calmd-stage-1-1.tmp".to_owned(),
+            backup: ".calmd-journal-backup-1-2.tmp".to_owned(),
+            installed: false,
+        }],
+    };
+    write_journal(vault.path(), &journal).unwrap();
+    assert!(!read_journal(vault.path()).unwrap().committed);
+
+    journal.files[0].installed = true;
+    journal.committed = true;
+    write_journal(vault.path(), &journal).unwrap();
+
+    let persisted = read_journal(vault.path()).unwrap();
+    assert!(persisted.committed);
+    assert!(persisted.files[0].installed);
+}
+
+#[test]
 fn recovery_rejects_paths_outside_the_vault() {
     let parent = tempdir().unwrap();
     let vault = parent.path().join("vault");
