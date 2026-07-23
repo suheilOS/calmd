@@ -13,6 +13,8 @@ The interface reads and writes top-level Markdown notes in one user-selected vau
 - Keyboard and pointer navigation through retrieval results
 - Named vault creation inside a user-selected parent directory, with the canonicalized child path persisted
 - Rust create, read, save, and rename commands using relative note keys
+- Framework-independent Note persistence behind the Tauri commands, with filesystem behavior tested through its interface
+- Framework-neutral Note editing sessions that own autosave sequencing, canonical save reconciliation, conflict state, and flush-before-return behavior
 - Canonical `# Title` Markdown serialization and content-preserving external-file parsing
 - Portable filename derivation with case-insensitive collision handling
 - Atomic saves, staged transactional renames, and content-hash conflict detection

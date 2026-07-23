@@ -5,6 +5,7 @@ import {
   type NoteDraft,
   type SearchResponse,
 } from './notes'
+import type { NotePersistenceAdapter } from './noteEditing'
 
 export type StorageError = {
   code: string
@@ -49,7 +50,7 @@ export function readStoredNote(key: string) {
   return invoke<Note>('read_note', { key })
 }
 
-export function saveStoredNote(
+function saveStoredNote(
   key: string,
   draft: NoteDraft,
   expectedRevision: string,
@@ -62,7 +63,7 @@ export function saveStoredNote(
   })
 }
 
-export function renameStoredNote(
+function renameStoredNote(
   key: string,
   draft: NoteDraft,
   expectedRevision: string,
@@ -73,4 +74,10 @@ export function renameStoredNote(
     body: draft.body,
     expectedRevision,
   })
+}
+
+export const tauriNotePersistence: NotePersistenceAdapter = {
+  read: readStoredNote,
+  save: saveStoredNote,
+  rename: renameStoredNote,
 }

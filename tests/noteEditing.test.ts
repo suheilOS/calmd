@@ -1,0 +1,181 @@
+import { describe, expect, test } from 'bun:test'
+import {
+  NoteEditingSession,
+  type NoteEditingScheduler,
+  type NotePersistenceAdapter,
+} from '../src/noteEditing'
+import type { Note, NoteDraft } from '../src/notes'
+
+const original: Note = {
+  key: 'Patient thought.md',
+  title: 'Patient thought',
+  body: 'Original',
+  revision: 'one',
+}
+
+function adapter(overrides: Partial<NotePersistenceAdapter> = {}): NotePersistenceAdapter {
+  return {
+    read: async () => original,
+    save: async (key, draft) => ({ ...draft, key, revision: 'next' }),
+    rename: async (_key, draft) => ({
+      ...draft,
+      key: `${draft.title}.md`,
+      revision: 'next',
+    }),
+    ...overrides,
+  }
+}
+
+function scheduler() {
+  let callback: (() => void) | null = null
+  const value: NoteEditingScheduler = {
+    set(next) {
+      callback = next
+      return 1 as ReturnType<typeof setTimeout>
+    },
+    clear() {
+      callback = null
+    },
+  }
+  return {
+    value,
+    run() {
+      const next = callback
+      callback = null
+      next?.()
+    },
+  }
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((next) => { resolve = next })
+  return { promise, resolve }
+}
+
+describe('NoteEditingSession', () => {
+  test('autosaves an edited body through the persistence seam', async () => {
+    const saves: NoteDraft[] = []
+    const clock = scheduler()
+    const session = new NoteEditingSession(adapter({
+      save: async (key, draft) => {
+        saves.push(draft)
+        return { ...draft, key, revision: 'two' }
+      },
+    }), original, () => {}, 450, clock.value)
+
+    session.updateDraft({ ...session.current().draft, body: 'Edited' })
+    clock.run()
+    await session.flush()
+
+    expect(saves).toEqual([{ title: 'Patient thought', body: 'Edited' }])
+    expect(session.current().savedDraft.body).toBe('Edited')
+  })
+
+  test('uses rename when the canonical title changes', async () => {
+    const renames: NoteDraft[] = []
+    const session = new NoteEditingSession(adapter({
+      rename: async (_key, draft) => {
+        renames.push(draft)
+        return { ...draft, key: 'New title.md', revision: 'two' }
+      },
+    }), original, () => {})
+
+    session.updateDraft({ title: '  New   title ', body: 'Original' })
+    await session.flush()
+
+    expect(renames[0].title).toBe('New title')
+    expect(session.current().key).toBe('New title.md')
+    expect(session.current().draft.title).toBe('New title')
+  })
+
+  test('preserves newer edits while an older save is pending', async () => {
+    const pending = deferred<Note>()
+    const session = new NoteEditingSession(adapter({
+      save: () => pending.promise,
+    }), original, () => {})
+
+    session.updateDraft({ title: original.title, body: 'First edit' })
+    const save = session.save()
+    await Promise.resolve()
+    session.updateDraft({ title: original.title, body: 'Newer edit' })
+    pending.resolve({
+      key: original.key,
+      title: original.title,
+      body: 'First edit',
+      revision: 'two',
+    })
+    await save
+
+    expect(session.current().savedDraft.body).toBe('First edit')
+    expect(session.current().draft.body).toBe('Newer edit')
+  })
+
+  test('serializes a newer flush behind an in-flight save', async () => {
+    const first = deferred<Note>()
+    const savedBodies: string[] = []
+    const session = new NoteEditingSession(adapter({
+      save: async (key, draft) => {
+        savedBodies.push(draft.body)
+        if (savedBodies.length === 1) return first.promise
+        return { ...draft, key, revision: 'three' }
+      },
+    }), original, () => {})
+
+    session.updateDraft({ title: original.title, body: 'First edit' })
+    const firstSave = session.save()
+    await Promise.resolve()
+    session.updateDraft({ title: original.title, body: 'Newer edit' })
+    const flush = session.flush()
+    await Promise.resolve()
+    expect(savedBodies).toEqual(['First edit'])
+
+    first.resolve({
+      key: original.key,
+      title: original.title,
+      body: 'First edit',
+      revision: 'two',
+    })
+    await firstSave
+
+    expect(await flush).toBe(true)
+    expect(savedBodies).toEqual(['First edit', 'Newer edit'])
+    expect(session.current().savedDraft.body).toBe('Newer edit')
+  })
+
+  test('stops autosaving and preserves the draft after a conflict', async () => {
+    let saves = 0
+    const session = new NoteEditingSession(adapter({
+      save: async () => {
+        saves += 1
+        throw { code: 'conflict', message: 'External change' }
+      },
+    }), original, () => {})
+
+    session.updateDraft({ title: original.title, body: 'Local edit' })
+    expect(await session.flush()).toBe(false)
+    session.updateDraft({ title: original.title, body: 'Another edit' })
+    await session.save()
+
+    expect(saves).toBe(1)
+    expect(session.current().conflict).toBe(true)
+    expect(session.current().draft.body).toBe('Another edit')
+  })
+
+  test('reload explicitly replaces a conflicted draft', async () => {
+    const external = { ...original, body: 'External edit', revision: 'external' }
+    const session = new NoteEditingSession(adapter({
+      read: async () => external,
+      save: async () => {
+        throw { code: 'conflict', message: 'External change' }
+      },
+    }), original, () => {})
+
+    session.updateDraft({ title: original.title, body: 'Local edit' })
+    await session.flush()
+    expect(await session.reload()).toBe(true)
+
+    expect(session.current().conflict).toBe(false)
+    expect(session.current().draft.body).toBe('External edit')
+  })
+})

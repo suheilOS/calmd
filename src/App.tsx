@@ -7,29 +7,20 @@ import { AppShell } from './TitleBar'
 import {
   canonicalizeTitle,
   type Note,
-  type NoteDraft,
   type SearchHit,
   type SearchResponse,
 } from './notes'
-import { draftsMatch, reconcileSavedDraft } from './saveState'
 import {
   createStoredNote,
   getStorageError,
   openVault,
   readStoredNote,
-  renameStoredNote,
-  saveStoredNote,
   searchStoredNotes,
   selectVault,
+  tauriNotePersistence,
 } from './storage'
+import { useNoteEditing } from './useNoteEditing'
 import './App.css'
-
-type EditorSession = {
-  id: number
-  key: string
-  revision: string
-  savedDraft: NoteDraft
-}
 
 type SearchView = SearchResponse & {
   query: string
@@ -46,20 +37,14 @@ function App() {
   const [selectingVault, setSelectingVault] = useState(false)
   const [vaultName, setVaultName] = useState('')
   const [thought, setThought] = useState('')
-  const [editorDraft, setEditorDraft] = useState<NoteDraft | null>(null)
-  const [savedDraft, setSavedDraft] = useState<NoteDraft | null>(null)
   const [backlinksOpen, setBacklinksOpen] = useState(false)
   const [activeResultIndex, setActiveResultIndex] = useState(-1)
   const [storageMessage, setStorageMessage] = useState<string | null>(null)
-  const [hasConflict, setHasConflict] = useState(false)
   const [searchView, setSearchView] = useState<SearchView>(EMPTY_SEARCH_VIEW)
   const [searchGeneration, setSearchGeneration] = useState(0)
-  const editorDraftRef = useRef<NoteDraft | null>(null)
-  const conflictRef = useRef(false)
-  const sessionRef = useRef<EditorSession | null>(null)
-  const nextSessionIdRef = useRef(0)
-  const saveChainRef = useRef<Promise<void>>(Promise.resolve())
   const searchRequestRef = useRef(0)
+  const noteEditing = useNoteEditing(tauriNotePersistence)
+  const editorDraft = noteEditing.snapshot?.draft ?? null
 
   const searchQuery = canonicalizeTitle(thought)
   const isEditing = editorDraft !== null
@@ -122,93 +107,9 @@ function App() {
     return () => window.clearTimeout(searchTimer)
   }, [isEditing, searchGeneration, searchQuery, vaultReady])
 
-  const persistDraft = useCallback((draft: NoteDraft) => {
-    let didSave = true
-    const operation = saveChainRef.current.then(async () => {
-      const session = sessionRef.current
-      if (!session || conflictRef.current) {
-        didSave = !conflictRef.current
-        return
-      }
-
-      const requestDraft = { ...draft, title: canonicalizeTitle(draft.title) }
-      if (draftsMatch(requestDraft, session.savedDraft)) {
-        if (draftsMatch(editorDraftRef.current ?? draft, draft)) {
-          editorDraftRef.current = requestDraft
-          setEditorDraft(requestDraft)
-        }
-        setSavedDraft(session.savedDraft)
-        return
-      }
-
-      setStorageMessage(null)
-      try {
-        const note = requestDraft.title !== session.savedDraft.title
-          ? await renameStoredNote(session.key, requestDraft, session.revision)
-          : await saveStoredNote(session.key, requestDraft, session.revision)
-
-        if (sessionRef.current?.id !== session.id) return
-        const currentDraft = editorDraftRef.current ?? draft
-        const {
-          canonicalDraft: nextSavedDraft,
-          editorDraft: nextEditorDraft,
-        } = reconcileSavedDraft(currentDraft, draft, note)
-        sessionRef.current = {
-          ...session,
-          key: note.key,
-          revision: note.revision,
-          savedDraft: nextSavedDraft,
-        }
-        setSavedDraft(nextSavedDraft)
-        if (nextEditorDraft !== currentDraft) {
-          editorDraftRef.current = nextEditorDraft
-          setEditorDraft(nextEditorDraft)
-        }
-      } catch (error) {
-        didSave = false
-        const storageError = getStorageError(error)
-        if (storageError.code === 'conflict' && sessionRef.current?.id === session.id) {
-          conflictRef.current = true
-          setHasConflict(true)
-        }
-        setStorageMessage(storageError.message)
-      }
-    })
-
-    saveChainRef.current = operation.then(() => undefined, () => undefined)
-    return operation.then(() => didSave)
-  }, [])
-
-  useEffect(() => {
-    if (
-      !editorDraft
-      || !savedDraft
-      || hasConflict
-      || draftsMatch(editorDraft, savedDraft)
-    ) return
-
-    const saveTimer = window.setTimeout(() => {
-      void persistDraft(editorDraft)
-    }, 450)
-
-    return () => window.clearTimeout(saveTimer)
-  }, [editorDraft, hasConflict, persistDraft, savedDraft])
-
   function beginEditing(note: Note) {
-    const draft = { title: note.title, body: note.body }
-    const session: EditorSession = {
-      id: ++nextSessionIdRef.current,
-      key: note.key,
-      revision: note.revision,
-      savedDraft: draft,
-    }
-    sessionRef.current = session
-    editorDraftRef.current = draft
-    setEditorDraft(draft)
-    setSavedDraft(draft)
+    noteEditing.begin(note)
     setBacklinksOpen(false)
-    conflictRef.current = false
-    setHasConflict(false)
     setStorageMessage(null)
   }
 
@@ -248,25 +149,11 @@ function App() {
   }
 
   async function reloadConflictedNote() {
-    const session = sessionRef.current
-    if (!session) return
-
-    try {
-      beginEditing(await readStoredNote(session.key))
-      await refreshVault()
-    } catch (error) {
-      setStorageMessage(getStorageError(error).message)
-    }
+    if (await noteEditing.reload()) await refreshVault()
   }
 
   async function returnHome() {
-    const draft = editorDraftRef.current
-    if (draft && !(await persistDraft(draft))) return
-
-    sessionRef.current = null
-    editorDraftRef.current = null
-    setEditorDraft(null)
-    setSavedDraft(null)
+    if (!(await noteEditing.flushAndClose())) return
     setThought('')
   }
 
@@ -353,13 +240,10 @@ function App() {
         backlinksOpen={backlinksOpen}
         draft={editorDraft}
         onBacklinksOpenChange={setBacklinksOpen}
-        onDraftChange={(draft) => {
-          editorDraftRef.current = draft
-          setEditorDraft(draft)
-        }}
-        onConflictReload={hasConflict ? reloadConflictedNote : null}
+        onDraftChange={noteEditing.updateDraft}
+        onConflictReload={noteEditing.snapshot?.conflict ? reloadConflictedNote : null}
         onReturn={returnHome}
-        saveMessage={storageMessage}
+        saveMessage={noteEditing.snapshot?.failure?.message ?? storageMessage}
       />
       </AppShell>
     )

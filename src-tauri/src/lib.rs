@@ -1,3 +1,4 @@
+mod note_persistence;
 mod search;
 mod storage;
 
