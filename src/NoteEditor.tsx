@@ -1,5 +1,5 @@
 import { Button } from '@base-ui/react/button'
-import { lazy, Suspense, useLayoutEffect, useRef } from 'react'
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef } from 'react'
 import { BacklinksPopover } from './BacklinksPopover'
 import {
   constrainNoteTitle,
@@ -51,6 +51,23 @@ export function NoteEditor({
       Math.min(end, draft.title.length),
     )
   }, [draft.title])
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (
+        event.key !== '['
+        || event.shiftKey
+        || event.altKey
+        || (!event.metaKey && !event.ctrlKey)
+      ) return
+
+      event.preventDefault()
+      void onReturn()
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onReturn])
 
   return (
     <main className="app bg-canvas text-ink">
