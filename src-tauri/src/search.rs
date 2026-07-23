@@ -1,3 +1,4 @@
+use crate::links::{Backlink, extract_links, normalize_key};
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::Serialize;
 use std::{
@@ -10,7 +11,7 @@ use std::{
 };
 
 const DATABASE_FILE: &str = "search-index.sqlite3";
-const SCHEMA_VERSION: i64 = 1;
+const SCHEMA_VERSION: i64 = 2;
 const APPLICATION_ID: i64 = 0x4341_4c4d;
 const MAX_QUERY_CHARACTERS: usize = 120;
 const MAX_EXCERPT_CHARACTERS: usize = 240;
@@ -19,15 +20,17 @@ const RESULT_LIMIT: i64 = 3;
 
 const UPSERT_NOTE: &str = "
     INSERT INTO notes (
-        key, title, normalized_title, body, revision, modified_at_ms
-    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+        key, normalized_key, title, normalized_title, body, revision, modified_at_ms
+    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
     ON CONFLICT(key) DO UPDATE SET
+        normalized_key = excluded.normalized_key,
         title = excluded.title,
         normalized_title = excluded.normalized_title,
         body = excluded.body,
         revision = excluded.revision,
         modified_at_ms = excluded.modified_at_ms
-    WHERE notes.title <> excluded.title
+    WHERE notes.normalized_key <> excluded.normalized_key
+       OR notes.title <> excluded.title
        OR notes.normalized_title <> excluded.normalized_title
        OR notes.body <> excluded.body
        OR notes.revision <> excluded.revision
@@ -229,6 +232,26 @@ impl SearchState {
         result
     }
 
+    pub fn backlinks(&self, key: &str) -> Result<Vec<Backlink>, SearchError> {
+        let path = self.database_path()?;
+        let mut inner = self.lock_inner()?;
+        ensure_connection(path, &mut inner)?;
+        let result = backlinks_connection(
+            inner
+                .connection
+                .as_ref()
+                .expect("connection was initialized"),
+            key,
+        );
+        if let Err(error) = &result {
+            inner.dirty = true;
+            if error.is_recoverable() {
+                inner.connection.take();
+            }
+        }
+        result
+    }
+
     pub fn search(&self, query: &str) -> Result<SearchResponse, SearchError> {
         let canonical_query = canonicalize_query(query)?;
         if canonical_query.is_empty() {
@@ -319,6 +342,9 @@ fn open_connection(path: &Path) -> Result<Connection, SearchError> {
     let connection = Connection::open(path)
         .map_err(|error| SearchError::sqlite("Could not open the search index", error))?;
     connection
+        .execute_batch("PRAGMA foreign_keys = ON;")
+        .map_err(|error| SearchError::sqlite("Could not enable index foreign keys", error))?;
+    connection
         .busy_timeout(Duration::from_secs(2))
         .map_err(|error| SearchError::sqlite("Could not configure the search index", error))?;
     Ok(connection)
@@ -340,6 +366,7 @@ fn initialize_schema(connection: &Connection) -> Result<(), SearchError> {
             CREATE TABLE notes (
                 id INTEGER PRIMARY KEY,
                 key TEXT NOT NULL UNIQUE,
+                normalized_key TEXT NOT NULL,
                 title TEXT NOT NULL,
                 normalized_title TEXT NOT NULL,
                 body TEXT NOT NULL,
@@ -349,6 +376,20 @@ fn initialize_schema(connection: &Connection) -> Result<(), SearchError> {
 
             CREATE INDEX notes_normalized_title
             ON notes(normalized_title);
+
+            CREATE INDEX notes_normalized_key
+            ON notes(normalized_key);
+
+            CREATE TABLE note_links (
+                source_key TEXT NOT NULL,
+                position INTEGER NOT NULL,
+                target_normalized_key TEXT NOT NULL,
+                PRIMARY KEY (source_key, position),
+                FOREIGN KEY (source_key) REFERENCES notes(key) ON DELETE CASCADE
+            );
+
+            CREATE INDEX note_links_target
+            ON note_links(target_normalized_key);
 
             CREATE VIRTUAL TABLE note_fts USING fts5(
                 title,
@@ -375,7 +416,7 @@ fn initialize_schema(connection: &Connection) -> Result<(), SearchError> {
                 VALUES (new.id, new.title, new.body);
             END;
 
-            PRAGMA user_version = 1;
+            PRAGMA user_version = 2;
             ",
         )
         .map_err(|error| SearchError::sqlite("Could not initialize the search index", error))
@@ -399,6 +440,9 @@ fn validate_schema(connection: &Connection) -> Result<(), SearchError> {
         "metadata",
         "notes",
         "notes_normalized_title",
+        "notes_normalized_key",
+        "note_links",
+        "note_links_target",
         "note_fts",
         "notes_ai",
         "notes_ad",
@@ -417,6 +461,16 @@ fn validate_schema(connection: &Connection) -> Result<(), SearchError> {
                 "The search index schema is incomplete.",
             ));
         }
+    }
+
+    let foreign_keys: i64 = connection
+        .query_row("PRAGMA foreign_keys", [], |row| row.get(0))
+        .map_err(|error| SearchError::sqlite("Could not inspect index foreign keys", error))?;
+    if foreign_keys != 1 {
+        return Err(SearchError::new(
+            SearchErrorKind::InvalidSchema,
+            "Foreign keys are disabled.",
+        ));
     }
 
     let quick_check: String = connection
@@ -572,6 +626,7 @@ fn upsert_note(connection: &Connection, note: &IndexedNote) -> Result<(), Search
             UPSERT_NOTE,
             params![
                 note.key,
+                normalize_key(&note.key),
                 note.title,
                 normalize_title(&note.title),
                 note.body,
@@ -580,7 +635,48 @@ fn upsert_note(connection: &Connection, note: &IndexedNote) -> Result<(), Search
             ],
         )
         .map_err(|error| SearchError::sqlite("Could not index a note", error))?;
+    connection
+        .execute("DELETE FROM note_links WHERE source_key = ?1", [&note.key])
+        .map_err(|error| SearchError::sqlite("Could not replace outgoing links", error))?;
+    for link in extract_links(&note.body) {
+        connection.execute(
+            "INSERT INTO note_links(source_key, position, target_normalized_key) VALUES (?1, ?2, ?3)",
+            params![note.key, link.from as i64, normalize_key(&link.target)],
+        ).map_err(|error| SearchError::sqlite("Could not index an outgoing link", error))?;
+    }
     Ok(())
+}
+
+fn backlinks_connection(connection: &Connection, key: &str) -> Result<Vec<Backlink>, SearchError> {
+    let normalized = normalize_key(key);
+    let target_count: i64 = connection
+        .query_row(
+            "SELECT count(*) FROM notes WHERE normalized_key = ?1",
+            [&normalized],
+            |row| row.get(0),
+        )
+        .map_err(|error| SearchError::sqlite("Could not resolve backlink target", error))?;
+    if target_count != 1 {
+        return Ok(Vec::new());
+    }
+    let mut statement = connection
+        .prepare(
+            "SELECT DISTINCT notes.key, notes.title FROM note_links
+         JOIN notes ON notes.key = note_links.source_key
+         WHERE note_links.target_normalized_key = ?1
+         ORDER BY notes.normalized_title, notes.key",
+        )
+        .map_err(|error| SearchError::sqlite("Could not prepare backlinks", error))?;
+    let rows = statement
+        .query_map([normalized], |row| {
+            Ok(Backlink {
+                key: row.get(0)?,
+                title: row.get(1)?,
+            })
+        })
+        .map_err(|error| SearchError::sqlite("Could not query backlinks", error))?;
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|error| SearchError::sqlite("Could not read backlinks", error))
 }
 
 fn search_connection(
@@ -701,215 +797,5 @@ fn clean_excerpt(excerpt: &str) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs;
-    use tempfile::tempdir;
-
-    fn note(key: &str, title: &str, body: &str, revision: &str) -> IndexedNote {
-        IndexedNote {
-            key: key.to_owned(),
-            title: title.to_owned(),
-            body: body.to_owned(),
-            revision: revision.to_owned(),
-            modified_at_ms: 1,
-        }
-    }
-
-    fn state(root: &Path) -> SearchState {
-        SearchState::available(root.to_path_buf())
-    }
-
-    #[test]
-    fn reconciles_searches_updates_and_removes_notes() {
-        let data = tempdir().unwrap();
-        let vault = tempdir().unwrap();
-        let search = state(data.path());
-        let original = note(
-            "Water.md",
-            "Pure Water",
-            "A quiet purification process",
-            "one",
-        );
-        let body_match = note(
-            "Other.md",
-            "Field notes",
-            "Pure water appears in this body",
-            "two",
-        );
-        search
-            .reconcile(vault.path(), &[original.clone(), body_match])
-            .unwrap();
-
-        let response = search.search("pure wat").unwrap();
-        assert_eq!(response.results[0].key, "Water.md");
-        assert!(!response.has_exact_match);
-        let body_search = search.search("purification").unwrap();
-        assert!(body_search.results[0].excerpt.starts_with("A quiet"));
-        assert!(body_search.results[0].excerpt.contains("purification"));
-        let modified_at_ms: i64 = search
-            .inner
-            .lock()
-            .unwrap()
-            .connection
-            .as_ref()
-            .unwrap()
-            .query_row(
-                "SELECT modified_at_ms FROM notes WHERE key = 'Water.md'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(modified_at_ms, 1);
-
-        let updated = note("Water.md", "Pure Water", "Entirely revised", "three");
-        search.reconcile(vault.path(), &[updated]).unwrap();
-        assert!(search.search("purification").unwrap().results.is_empty());
-        assert!(search.search("field notes").unwrap().results.is_empty());
-    }
-
-    #[test]
-    fn body_excerpt_is_match_specific_concise_and_cleans_wiki_brackets() {
-        let data = tempdir().unwrap();
-        let vault = tempdir().unwrap();
-        let search = state(data.path());
-        let opening = "unrelated opening material ".repeat(80);
-        let body =
-            format!("{opening}transition text [[distinctive phrase]] with useful nearby context");
-        search
-            .reconcile(vault.path(), &[note("Long.md", "Long note", &body, "one")])
-            .unwrap();
-
-        let response = search.search("distinctive phrase").unwrap();
-        let excerpt = &response.results[0].excerpt;
-
-        assert!(excerpt.contains("distinctive phrase"));
-        assert!(excerpt.contains("useful nearby context"));
-        assert!(!excerpt.starts_with("unrelated opening material"));
-        assert!(excerpt.chars().count() <= MAX_EXCERPT_CHARACTERS);
-        assert!(!excerpt.contains("[["));
-        assert!(!excerpt.contains("]]"));
-    }
-
-    #[test]
-    fn title_matches_rank_above_equivalent_body_only_matches() {
-        let data = tempdir().unwrap();
-        let vault = tempdir().unwrap();
-        let search = state(data.path());
-        search
-            .reconcile(
-                vault.path(),
-                &[
-                    note("Body.md", "Field notes", "quiet signal", "one"),
-                    note("Title.md", "Quiet signal", "unrelated body", "two"),
-                ],
-            )
-            .unwrap();
-
-        let response = search.search("quiet sig").unwrap();
-        assert_eq!(response.results[0].key, "Title.md");
-    }
-
-    #[test]
-    fn exact_titles_bypass_fts_minimum_and_return_one_bounded_result() {
-        let data = tempdir().unwrap();
-        let vault = tempdir().unwrap();
-        let search = state(data.path());
-        search
-            .reconcile(
-                vault.path(),
-                &[
-                    note("Go.md", "Go", &"opening text ".repeat(100), "one"),
-                    note("Other.md", "Other", "Go appears in the body", "two"),
-                ],
-            )
-            .unwrap();
-
-        let response = search.search("  GO ").unwrap();
-        assert!(response.has_exact_match);
-        assert_eq!(response.results.len(), 1);
-        assert_eq!(response.results[0].key, "Go.md");
-        assert!(response.results[0].excerpt.chars().count() <= MAX_EXCERPT_CHARACTERS);
-    }
-
-    #[test]
-    fn trigram_search_handles_unicode_diacritics_and_metacharacters() {
-        let data = tempdir().unwrap();
-        let vault = tempdir().unwrap();
-        let search = state(data.path());
-        search
-            .reconcile(
-                vault.path(),
-                &[
-                    note("Japanese.md", "静かな考え", "検索できる本文", "one"),
-                    note("Cafe.md", "Café notes", "C++ and quoted \"text\"", "two"),
-                ],
-            )
-            .unwrap();
-
-        assert_eq!(
-            search.search("かな考").unwrap().results[0].key,
-            "Japanese.md"
-        );
-        assert_eq!(search.search("cafe").unwrap().results[0].key, "Cafe.md");
-        assert_eq!(search.search("C++").unwrap().results[0].key, "Cafe.md");
-        assert_eq!(
-            search.search("quoted \"text\"").unwrap().results[0].key,
-            "Cafe.md"
-        );
-        assert!(search.search("\"").is_ok());
-    }
-
-    #[test]
-    fn recreate_missing_or_invalid_database_without_touching_vault() {
-        let data = tempdir().unwrap();
-        let vault = tempdir().unwrap();
-        let markdown = vault.path().join("Knowledge.md");
-        fs::write(&markdown, "# Knowledge\n\nIntact").unwrap();
-        let indexed = note("Knowledge.md", "Knowledge", "Intact", "one");
-
-        {
-            let search = state(data.path());
-            search
-                .reconcile(vault.path(), std::slice::from_ref(&indexed))
-                .unwrap();
-        }
-        fs::remove_file(data.path().join(DATABASE_FILE)).unwrap();
-        {
-            let search = state(data.path());
-            search
-                .reconcile(vault.path(), std::slice::from_ref(&indexed))
-                .unwrap();
-            assert_eq!(search.search("Knowledge").unwrap().results.len(), 1);
-        }
-        fs::write(data.path().join(DATABASE_FILE), b"not a database").unwrap();
-        {
-            let search = state(data.path());
-            search.reconcile(vault.path(), &[indexed]).unwrap();
-            assert_eq!(search.search("Intact").unwrap().results.len(), 1);
-        }
-        assert_eq!(
-            fs::read_to_string(markdown).unwrap(),
-            "# Knowledge\n\nIntact"
-        );
-        assert!(!vault.path().join(DATABASE_FILE).exists());
-    }
-
-    #[test]
-    fn replace_removes_a_renamed_key_transactionally() {
-        let data = tempdir().unwrap();
-        let vault = tempdir().unwrap();
-        let search = state(data.path());
-        let original = note("Old.md", "Old", "Original body", "one");
-        search.reconcile(vault.path(), &[original]).unwrap();
-
-        let renamed = note("New.md", "New", "Replacement body", "two");
-        search.replace(Some("Old.md"), &renamed).unwrap();
-
-        assert!(search.search("Original").unwrap().results.is_empty());
-        assert_eq!(
-            search.search("Replacement").unwrap().results[0].key,
-            "New.md"
-        );
-    }
-}
+#[path = "search_tests.rs"]
+mod tests;

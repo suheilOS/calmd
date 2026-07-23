@@ -1,5 +1,6 @@
 use crate::{
-    note_persistence::{Note, NotePersistence, PersistenceError},
+    links::{Backlink, key_stem, normalize_key},
+    note_persistence::{Note, NotePersistence, PersistenceError, recover_operation},
     search::{IndexedNote, SearchResponse, SearchState},
 };
 use serde::Serialize;
@@ -19,6 +20,13 @@ const MAX_FILENAME_BYTES: usize = 180;
 
 #[derive(Default)]
 pub struct VaultState(Mutex<Option<PathBuf>>);
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenNoteLinkResponse {
+    note: Note,
+    canonical_target: String,
+}
 
 #[derive(Debug, Serialize)]
 pub struct CommandError {
@@ -124,6 +132,7 @@ fn open_vault_in(app: &AppHandle) -> CommandResult<bool> {
         return Ok(false);
     };
     let root = vault_root(&guard)?;
+    recover_operation(&root)?;
     let notes = scan_indexed_vault(&root)?;
     search.reconcile_best_effort(&root, &notes);
     Ok(true)
@@ -182,6 +191,83 @@ pub fn create_note(
 }
 
 #[tauri::command]
+pub fn open_note_link(
+    target: String,
+    state: State<'_, VaultState>,
+    search: State<'_, SearchState>,
+) -> CommandResult<OpenNoteLinkResponse> {
+    let target = validate_link_target(&target)?;
+    let guard = state
+        .0
+        .lock()
+        .map_err(|_| CommandError::new("state", "Vault state is unavailable."))?;
+    let root = vault_root(&guard)?;
+    let persistence = NotePersistence::new(&root);
+    let normalized = normalize_key(&target);
+    let matches = persistence
+        .scan()?
+        .into_iter()
+        .filter(|note| normalize_key(&note.key) == normalized)
+        .collect::<Vec<_>>();
+    let note = match matches.len() {
+        0 => persistence.create(&target)?,
+        1 => matches.into_iter().next().unwrap(),
+        _ => {
+            return Err(CommandError::new(
+                "ambiguous_link",
+                "More than one note matches this link.",
+            ));
+        }
+    };
+    best_effort_index(&search, &root, None, &note);
+    Ok(OpenNoteLinkResponse {
+        canonical_target: key_stem(&note.key).to_owned(),
+        note,
+    })
+}
+
+#[tauri::command]
+pub async fn get_backlinks(key: String, app: AppHandle) -> CommandResult<Vec<Backlink>> {
+    tauri::async_runtime::spawn_blocking(move || get_backlinks_in(&app, &key))
+        .await
+        .map_err(|error| {
+            CommandError::new("search", format!("Could not load backlinks: {error}"))
+        })?
+}
+
+fn get_backlinks_in(app: &AppHandle, key: &str) -> CommandResult<Vec<Backlink>> {
+    let state = app.state::<VaultState>();
+    let search = app.state::<SearchState>();
+    let guard = state
+        .0
+        .lock()
+        .map_err(|_| CommandError::new("state", "Vault state is unavailable."))?;
+    let root = vault_root(&guard)?;
+    if search.needs_reconciliation() {
+        let notes = scan_indexed_vault(&root)?;
+        search
+            .reconcile(&root, &notes)
+            .map_err(search_command_error)?;
+    }
+    search.backlinks(key).map_err(search_command_error)
+}
+
+fn validate_link_target(target: &str) -> CommandResult<String> {
+    let target = key_stem(target.trim());
+    if target.is_empty()
+        || target.contains(['\r', '\n', '/', '\\', '|', '#', '^'])
+        || target.contains("[[")
+        || target.contains("]]")
+    {
+        return Err(CommandError::new(
+            "invalid_link",
+            "This internal link target is invalid.",
+        ));
+    }
+    Ok(target.to_owned())
+}
+
+#[tauri::command]
 pub fn read_note(key: String, state: State<'_, VaultState>) -> CommandResult<Note> {
     let guard = state
         .0
@@ -224,8 +310,18 @@ pub fn rename_note(
         .lock()
         .map_err(|_| CommandError::new("state", "Vault state is unavailable."))?;
     let root = vault_root(&guard)?;
-    let note = NotePersistence::new(&root).rename(&key, &title, &body, &expected_revision)?;
-    best_effort_index(&search, &root, Some(&key), &note);
+    let note =
+        NotePersistence::new(&root).rename_with_links(&key, &title, &body, &expected_revision)?;
+    match scan_indexed_vault(&root) {
+        Ok(notes) => search.reconcile_best_effort(&root, &notes),
+        Err(error) => {
+            search.mark_dirty();
+            log::warn!(
+                "The rename succeeded, but its derived index is stale: {}",
+                error.message
+            );
+        }
+    }
     Ok(note)
 }
 

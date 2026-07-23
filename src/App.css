@@ -75,6 +75,17 @@
   text-underline-position: from-font;
 }
 
+.markdown-editor .cm-wiki-link {
+  color: var(--color-secondary);
+  text-decoration: underline;
+  text-decoration-color: var(--color-border);
+  text-underline-offset: 0.16em;
+}
+
+.markdown-editor .cm-wiki-link:hover {
+  color: var(--color-ink);
+}
+
 .markdown-editor .cm-monospace {
   color: var(--color-ink);
 }

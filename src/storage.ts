@@ -2,7 +2,9 @@ import { invoke } from '@tauri-apps/api/core'
 import {
   canonicalizeTitle,
   type Note,
+  type Backlink,
   type NoteDraft,
+  type OpenNoteLinkResponse,
   type SearchResponse,
 } from './notes'
 import type { NotePersistenceAdapter } from './noteEditing'
@@ -44,6 +46,14 @@ export function searchStoredNotes(query: string) {
 
 export function createStoredNote(title: string) {
   return invoke<Note>('create_note', { title: canonicalizeTitle(title) })
+}
+
+export function openStoredNoteLink(target: string) {
+  return invoke<OpenNoteLinkResponse>('open_note_link', { target })
+}
+
+export function getStoredBacklinks(key: string) {
+  return invoke<Backlink[]>('get_backlinks', { key })
 }
 
 export function readStoredNote(key: string) {

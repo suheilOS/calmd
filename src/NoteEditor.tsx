@@ -1,6 +1,7 @@
 import { Button } from '@base-ui/react/button'
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef } from 'react'
 import { BacklinksPopover } from './BacklinksPopover'
+import type { WikiLinkActivation } from './MarkdownEditor'
 import {
   constrainNoteTitle,
   MAX_NOTE_TITLE_LENGTH,
@@ -14,11 +15,14 @@ const MarkdownEditor = lazy(async () => {
 
 type NoteEditorProps = {
   draft: NoteDraft
+  noteKey: string
   backlinksOpen: boolean
   onDraftChange: (draft: NoteDraft) => void
   onBacklinksOpenChange: (open: boolean) => void
   onConflictReload: (() => void) | null
   onReturn: () => void
+  onWikiLinkActivate: (activation: WikiLinkActivation) => void
+  onBacklinkSelect: (key: string) => void
   saveMessage: string | null
 }
 
@@ -32,11 +36,14 @@ function ArrowLeftIcon() {
 
 export function NoteEditor({
   draft,
+  noteKey,
   backlinksOpen,
   onDraftChange,
   onBacklinksOpenChange,
   onConflictReload,
   onReturn,
+  onWikiLinkActivate,
+  onBacklinkSelect,
   saveMessage,
 }: NoteEditorProps) {
   const titleRef = useRef<HTMLTextAreaElement>(null)
@@ -116,6 +123,7 @@ export function NoteEditor({
           <Suspense fallback={<div aria-hidden="true" className="min-h-[58vh]" />}>
             <MarkdownEditor
               onChange={(body) => onDraftChange({ ...draft, body })}
+              onWikiLinkActivate={onWikiLinkActivate}
               value={draft.body}
             />
           </Suspense>
@@ -123,7 +131,9 @@ export function NoteEditor({
       </article>
 
       <BacklinksPopover
+        noteKey={noteKey}
         onOpenChange={onBacklinksOpenChange}
+        onSelect={onBacklinkSelect}
         open={backlinksOpen}
       />
 

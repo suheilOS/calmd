@@ -39,10 +39,17 @@ import { useEffect, useLayoutEffect, useRef } from 'react'
 import { insertNewlineContinueBlockquote } from './markdownBlockquote'
 import { markdownHighlight } from './markdownHighlight'
 import { toggleLink, toggleMarkdown } from './markdownCommands'
+import { canonicalWikiLink, parseWikiLinkText, wikiLinkMarkdown } from './wikiLinks'
+
+export type WikiLinkActivation = {
+  target: string
+  applyCanonical: (canonicalTarget: string) => string | null
+}
 
 type MarkdownEditorProps = {
   value: string
   onChange: (value: string) => void
+  onWikiLinkActivate: (activation: WikiLinkActivation) => void
 }
 
 const externalSync = Annotation.define<boolean>()
@@ -153,6 +160,11 @@ function inlineMarkdownDecorations(view: EditorView) {
 
   syntaxTree(view.state).iterate({
     enter: (node) => {
+      if (node.name === 'WikiLink') {
+        decorations.push(Decoration.mark({ class: 'cm-wiki-link' }).range(node.from, node.to))
+        return
+      }
+
       if (node.name === 'EmphasisMark') {
         const format = node.node.parent
         if (format && !selectionTouchesRange(view, format)) {
@@ -273,6 +285,48 @@ const editorTheme = EditorView.theme({
   },
 })
 
+function wikiLinkInteraction(onActivate: (activation: WikiLinkActivation) => void) {
+  return ViewPlugin.fromClass(class {
+    pending: { from: number; to: number; original: string; target: string } | null = null
+
+    update(update: ViewUpdate) {
+      if (this.pending && update.docChanged) {
+        this.pending.from = update.changes.mapPos(this.pending.from, 1)
+        this.pending.to = update.changes.mapPos(this.pending.to, -1)
+      }
+    }
+
+    activate(view: EditorView, event: MouseEvent) {
+      if (event.button !== 0 || event.shiftKey || event.altKey || event.metaKey === event.ctrlKey) return false
+      const position = view.posAtDOM(event.target as Node)
+      let node = syntaxTree(view.state).resolveInner(position, -1)
+      while (node && node.name !== 'WikiLink') node = node.parent!
+      if (!node) return false
+      const original = view.state.sliceDoc(node.from, node.to)
+      const parsed = parseWikiLinkText(original)
+      if (!parsed) return false
+      event.preventDefault()
+      this.pending = { from: node.from, to: node.to, original, target: parsed.target }
+      onActivate({
+        target: parsed.target,
+        applyCanonical: (canonicalTarget) => {
+          const pending = this.pending
+          this.pending = null
+          if (!pending || pending.target !== parsed.target || view.state.sliceDoc(pending.from, pending.to) !== pending.original) return null
+          const replacement = canonicalWikiLink(canonicalTarget, parsed.display)
+          if (replacement !== pending.original) view.dispatch({ changes: { from: pending.from, to: pending.to, insert: replacement } })
+          return view.state.doc.toString()
+        },
+      })
+      return true
+    }
+  }, {
+    eventHandlers: {
+      mousedown(event, view) { return this.activate(view, event) },
+    },
+  })
+}
+
 const editorExtensions = [
   highlightSpecialChars(),
   history(),
@@ -291,7 +345,7 @@ const editorExtensions = [
     addKeymap: false,
     base: commonmarkLanguage,
     codeLanguages: languages,
-    extensions: [GFM, markdownHighlight],
+    extensions: [GFM, markdownHighlight, wikiLinkMarkdown],
   }),
   keymap.of([
     { key: 'Enter', run: insertNewlineContinueBlockquote },
@@ -318,15 +372,17 @@ const editorExtensions = [
   editorTheme,
 ]
 
-export function MarkdownEditor({ value, onChange }: MarkdownEditorProps) {
+export function MarkdownEditor({ value, onChange, onWikiLinkActivate }: MarkdownEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<EditorView>(null)
   const initialValueRef = useRef(value)
   const onChangeRef = useRef(onChange)
+  const onWikiLinkActivateRef = useRef(onWikiLinkActivate)
 
   useEffect(() => {
     onChangeRef.current = onChange
-  }, [onChange])
+    onWikiLinkActivateRef.current = onWikiLinkActivate
+  }, [onChange, onWikiLinkActivate])
 
   useLayoutEffect(() => {
     if (!containerRef.current) return
@@ -336,6 +392,7 @@ export function MarkdownEditor({ value, onChange }: MarkdownEditorProps) {
       selection: { anchor: initialValueRef.current.length },
       extensions: [
         editorExtensions,
+        wikiLinkInteraction((activation) => onWikiLinkActivateRef.current(activation)),
         EditorView.updateListener.of((update) => {
           const isExternalSync = update.transactions.some((transaction) =>
             transaction.annotation(externalSync),

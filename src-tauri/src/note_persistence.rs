@@ -1,5 +1,6 @@
+use crate::links::{key_stem, rewrite_target};
 use atomic_write_file::AtomicWriteFile;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
     collections::HashSet,
@@ -12,6 +13,7 @@ use std::{
 
 const MAX_FILENAME_BYTES: usize = 180;
 const TEMP_FILE_PREFIX: &str = ".calmd-";
+const OPERATION_JOURNAL: &str = ".calmd-operation.json";
 static NEXT_TEMP_FILE: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Clone, Debug, Serialize)]
@@ -135,6 +137,56 @@ impl<'a> NotePersistence<'a> {
         note_from_content(key.to_owned(), content)
     }
 
+    pub fn rename_with_links(
+        &self,
+        key: &str,
+        title: &str,
+        body: &str,
+        expected_revision: &str,
+    ) -> PersistenceResult<Note> {
+        let title = canonicalize_title(title)?;
+        let current = self.read(key)?;
+        if current.revision != expected_revision {
+            return Err(PersistenceError::conflict());
+        }
+        let new_key = available_filename(self.root, &title, Some(key))?;
+        if new_key == key {
+            return self.save(key, &title, body, expected_revision);
+        }
+        let old_stem = key_stem(key);
+        let new_stem = key_stem(&new_key);
+        let mut changes = Vec::new();
+        for note in self.scan()? {
+            let source_body = if note.key == key { body } else { &note.body };
+            let rewritten = rewrite_target(source_body, old_stem, new_stem, &current.title, &title);
+            if note.key == key || rewritten != note.body {
+                changes.push(PendingChange {
+                    original: note.key.clone(),
+                    destination: if note.key == key {
+                        new_key.clone()
+                    } else {
+                        note.key.clone()
+                    },
+                    content: serialize_markdown(
+                        if note.key == key { &title } else { &note.title },
+                        &rewritten,
+                    ),
+                    revision: note.revision,
+                });
+            }
+        }
+        install_coordinated(self.root, &changes)?;
+        note_from_content(
+            new_key,
+            changes
+                .into_iter()
+                .find(|change| change.original == key)
+                .unwrap()
+                .content,
+        )
+    }
+
+    #[cfg(test)]
     pub fn rename(
         &self,
         key: &str,
@@ -148,6 +200,7 @@ impl<'a> NotePersistence<'a> {
         })
     }
 
+    #[cfg(test)]
     fn rename_with<F>(
         &self,
         key: &str,
@@ -225,6 +278,236 @@ impl<'a> NotePersistence<'a> {
 
         note_from_content(new_key, content)
     }
+}
+
+#[derive(Clone)]
+struct PendingChange {
+    original: String,
+    destination: String,
+    content: String,
+    revision: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct Journal {
+    committed: bool,
+    files: Vec<JournalFile>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct JournalFile {
+    original: String,
+    destination: String,
+    staged: String,
+    backup: String,
+}
+
+fn install_coordinated(root: &Path, changes: &[PendingChange]) -> PersistenceResult<()> {
+    for change in changes {
+        ensure_revision(&root.join(&change.original), &change.revision)?;
+        ensure_destination_available(root, change)?;
+    }
+    let mut files = Vec::new();
+    for change in changes {
+        let staged = match write_staged_file(root, &change.content) {
+            Ok(staged) => staged,
+            Err(error) => {
+                cleanup_unjournaled(root, &files);
+                return Err(error);
+            }
+        };
+        let backup = unique_temp_path(root, "journal-backup");
+        files.push(JournalFile {
+            original: change.original.clone(),
+            destination: change.destination.clone(),
+            staged: staged.file_name().unwrap().to_string_lossy().into_owned(),
+            backup: backup.file_name().unwrap().to_string_lossy().into_owned(),
+        });
+    }
+    for change in changes {
+        if let Err(error) = ensure_revision(&root.join(&change.original), &change.revision)
+            .and_then(|()| ensure_destination_available(root, change))
+        {
+            cleanup_unjournaled(root, &files);
+            return Err(error);
+        }
+    }
+    let journal = Journal {
+        committed: false,
+        files,
+    };
+    if let Err(error) = write_journal(root, &journal) {
+        cleanup_unjournaled(root, &journal.files);
+        return Err(error);
+    }
+    let result = install_journaled(root, journal);
+    if let Err(operation_error) = result {
+        return match recover_operation(root) {
+            Ok(()) => Err(operation_error),
+            Err(recovery_error) => Err(PersistenceError::new(
+                "recovery",
+                format!(
+                    "{} Recovery also failed: {}",
+                    operation_error.message, recovery_error.message
+                ),
+            )),
+        };
+    }
+    Ok(())
+}
+
+fn install_journaled(root: &Path, mut journal: Journal) -> PersistenceResult<()> {
+    for file in &journal.files {
+        fs::hard_link(root.join(&file.original), root.join(&file.backup))
+            .map_err(|error| PersistenceError::io("Could not back up a linked rename", error))?;
+    }
+    sync_directory(root)?;
+    for file in &journal.files {
+        fs::remove_file(root.join(&file.original))
+            .map_err(|error| PersistenceError::io("Could not stage a linked rename", error))?;
+    }
+    for file in &journal.files {
+        fs::hard_link(root.join(&file.staged), root.join(&file.destination))
+            .map_err(|error| PersistenceError::io("Could not install a linked rename", error))?;
+        fs::remove_file(root.join(&file.staged))
+            .map_err(|error| PersistenceError::io("Could not finish a linked rename", error))?;
+    }
+    sync_directory(root)?;
+    journal.committed = true;
+    write_journal(root, &journal)?;
+    sync_directory(root)?;
+    recover_operation(root)
+}
+
+fn ensure_destination_available(root: &Path, change: &PendingChange) -> PersistenceResult<()> {
+    if !change.destination.eq_ignore_ascii_case(&change.original)
+        && root.join(&change.destination).exists()
+    {
+        return Err(PersistenceError::new(
+            "collision",
+            "Another file took the note's new filename. Try saving again.",
+        ));
+    }
+    Ok(())
+}
+
+fn cleanup_unjournaled(root: &Path, files: &[JournalFile]) {
+    for file in files {
+        remove_temp_file(&root.join(&file.staged));
+        remove_temp_file(&root.join(&file.backup));
+    }
+}
+
+fn write_journal(root: &Path, journal: &Journal) -> PersistenceResult<()> {
+    let content = serde_json::to_string(journal)
+        .map_err(|error| PersistenceError::io("Could not encode rename recovery data", error))?;
+    let mut file = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open(root.join(OPERATION_JOURNAL))
+        .map_err(|error| PersistenceError::io("Could not write rename recovery data", error))?;
+    file.write_all(content.as_bytes())
+        .and_then(|()| file.sync_all())
+        .map_err(|error| PersistenceError::io("Could not sync rename recovery data", error))?;
+    sync_directory(root)
+}
+
+fn read_journal(root: &Path) -> PersistenceResult<Journal> {
+    let content = fs::read_to_string(root.join(OPERATION_JOURNAL))
+        .map_err(|error| PersistenceError::io("Could not read rename recovery data", error))?;
+    let journal: Journal = serde_json::from_str(&content).map_err(|_| recovery_data_error())?;
+    validate_journal(&journal)?;
+    Ok(journal)
+}
+
+fn validate_journal(journal: &Journal) -> PersistenceResult<()> {
+    let mut paths = HashSet::new();
+    if journal.files.is_empty() {
+        return Err(recovery_data_error());
+    }
+    for file in &journal.files {
+        if !is_note_key(&file.original)
+            || !is_note_key(&file.destination)
+            || !is_owned_artifact(&file.staged, "stage")
+            || !is_owned_artifact(&file.backup, "journal-backup")
+            || !paths.insert(&file.original)
+            || (file.destination != file.original && !paths.insert(&file.destination))
+            || !paths.insert(&file.staged)
+            || !paths.insert(&file.backup)
+        {
+            return Err(recovery_data_error());
+        }
+    }
+    Ok(())
+}
+
+fn is_note_key(value: &str) -> bool {
+    let path = Path::new(value);
+    let mut components = path.components();
+    matches!(components.next(), Some(Component::Normal(_)))
+        && components.next().is_none()
+        && !value.contains(['/', '\\'])
+        && has_markdown_extension(path)
+}
+
+fn is_owned_artifact(value: &str, purpose: &str) -> bool {
+    let path = Path::new(value);
+    let mut components = path.components();
+    matches!(components.next(), Some(Component::Normal(_)))
+        && components.next().is_none()
+        && value.starts_with(&format!("{TEMP_FILE_PREFIX}{purpose}-"))
+        && value.ends_with(".tmp")
+}
+
+fn recovery_data_error() -> PersistenceError {
+    PersistenceError::new(
+        "recovery",
+        "The vault has malformed rename recovery data. No files were changed.",
+    )
+}
+
+#[cfg(unix)]
+fn sync_directory(root: &Path) -> PersistenceResult<()> {
+    fs::File::open(root)
+        .and_then(|directory| directory.sync_all())
+        .map_err(|error| PersistenceError::io("Could not sync the vault directory", error))
+}
+
+#[cfg(not(unix))]
+fn sync_directory(_root: &Path) -> PersistenceResult<()> {
+    Ok(())
+}
+
+pub fn recover_operation(root: &Path) -> PersistenceResult<()> {
+    if !root.join(OPERATION_JOURNAL).exists() {
+        return Ok(());
+    }
+    let journal = read_journal(root)?;
+    if journal.committed {
+        for file in &journal.files {
+            remove_temp_file(&root.join(&file.backup));
+            remove_temp_file(&root.join(&file.staged));
+        }
+    } else {
+        for file in &journal.files {
+            let backup = root.join(&file.backup);
+            if backup.exists() {
+                let staged = root.join(&file.staged);
+                if file.destination == file.original || !staged.exists() {
+                    remove_temp_file(&root.join(&file.destination));
+                }
+                remove_temp_file(&root.join(&file.original));
+                fs::rename(&backup, root.join(&file.original)).map_err(|error| {
+                    PersistenceError::io("Could not recover an interrupted rename", error)
+                })?;
+            }
+            remove_temp_file(&root.join(&file.staged));
+        }
+    }
+    fs::remove_file(root.join(OPERATION_JOURNAL))
+        .map_err(|error| PersistenceError::io("Could not finish rename recovery", error))?;
+    sync_directory(root)
 }
 
 fn ensure_revision(path: &Path, expected_revision: &str) -> PersistenceResult<()> {
@@ -438,6 +721,7 @@ fn unique_temp_path(root: &Path, purpose: &str) -> PathBuf {
     ))
 }
 
+#[cfg(test)]
 fn stage_original_file(root: &Path, original: &Path) -> PersistenceResult<PathBuf> {
     for _ in 0..100 {
         let backup = unique_temp_path(root, "backup");

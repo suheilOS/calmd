@@ -3,6 +3,8 @@ import { Input } from '@base-ui/react/input'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ComposerScreen } from './ComposerScreen'
 import { NoteEditor } from './NoteEditor'
+import type { WikiLinkActivation } from './MarkdownEditor'
+import { NoteNavigation } from './noteNavigation'
 import { AppShell } from './TitleBar'
 import {
   canonicalizeTitle,
@@ -14,6 +16,7 @@ import {
   createStoredNote,
   getStorageError,
   openVault,
+  openStoredNoteLink,
   readStoredNote,
   searchStoredNotes,
   selectVault,
@@ -43,7 +46,10 @@ function App() {
   const [searchView, setSearchView] = useState<SearchView>(EMPTY_SEARCH_VIEW)
   const [searchGeneration, setSearchGeneration] = useState(0)
   const searchRequestRef = useRef(0)
-  const noteEditing = useNoteEditing(tauriNotePersistence)
+  const navigationRef = useRef(new NoteNavigation())
+  const noteEditing = useNoteEditing(tauriNotePersistence, (oldKey, newKey) => {
+    navigationRef.current.rename(oldKey, newKey)
+  })
   const editorDraft = noteEditing.snapshot?.draft ?? null
 
   const searchQuery = canonicalizeTitle(thought)
@@ -107,18 +113,27 @@ function App() {
     return () => window.clearTimeout(searchTimer)
   }, [isEditing, searchGeneration, searchQuery, vaultReady])
 
-  function beginEditing(note: Note) {
+  function beginEditing(note: Note, pushHistory = true) {
+    navigationRef.current.beginNote(note.key, pushHistory)
     noteEditing.begin(note)
     setBacklinksOpen(false)
     setStorageMessage(null)
   }
 
   async function openNote(note: Pick<Note, 'key'>) {
+    const generation = navigationRef.current.startTransition()
+    if (generation === null) return
     try {
-      beginEditing(await readStoredNote(note.key))
+      if (isEditing && !(await noteEditing.flush())) return
+      if (!navigationRef.current.isCurrent(generation) || noteEditing.snapshot?.key === note.key) return
+      const destination = await readStoredNote(note.key)
+      if (!navigationRef.current.isCurrent(generation)) return
+      beginEditing(destination)
     } catch (error) {
       setStorageMessage(getStorageError(error).message)
       await refreshVault()
+    } finally {
+      navigationRef.current.finishTransition()
     }
   }
 
@@ -152,9 +167,52 @@ function App() {
     if (await noteEditing.reload()) await refreshVault()
   }
 
-  async function returnHome() {
-    if (!(await noteEditing.flushAndClose())) return
-    setThought('')
+  async function navigateBack() {
+    const generation = navigationRef.current.startTransition()
+    if (generation === null) return
+    try {
+      if (!(await noteEditing.flush()) || !navigationRef.current.isCurrent(generation)) return
+      const destination = navigationRef.current.previous()
+      if (!destination) return
+      if (destination.type === 'note') {
+        const note = await readStoredNote(destination.key)
+        if (!navigationRef.current.isCurrent(generation)) return
+        navigationRef.current.commitBack()
+        beginEditing(note, false)
+      } else {
+        navigationRef.current.commitBack()
+        navigationRef.current.leaveNote()
+        noteEditing.close()
+        setThought(destination.thought)
+        setBacklinksOpen(false)
+      }
+    } catch (error) {
+      setStorageMessage(getStorageError(error).message)
+      await refreshVault()
+    } finally {
+      navigationRef.current.finishTransition()
+    }
+  }
+
+  async function activateWikiLink(activation: WikiLinkActivation) {
+    const generation = navigationRef.current.startTransition()
+    if (generation === null) return
+    try {
+      if (!(await noteEditing.flush()) || !navigationRef.current.isCurrent(generation)) return
+      const resolved = await openStoredNoteLink(activation.target)
+      if (!navigationRef.current.isCurrent(generation)) return
+      const rewrittenBody = activation.applyCanonical(resolved.canonicalTarget)
+      if (rewrittenBody === null) return
+      noteEditing.updateBody(rewrittenBody)
+      if (!(await noteEditing.flush()) || !navigationRef.current.isCurrent(generation)) return
+      if (noteEditing.snapshot?.key === resolved.note.key) return
+      beginEditing(resolved.note)
+    } catch (error) {
+      setStorageMessage(getStorageError(error).message)
+      await refreshVault()
+    } finally {
+      navigationRef.current.finishTransition()
+    }
   }
 
   async function chooseVault() {
@@ -239,10 +297,13 @@ function App() {
       <NoteEditor
         backlinksOpen={backlinksOpen}
         draft={editorDraft}
+        noteKey={noteEditing.snapshot!.key}
         onBacklinksOpenChange={setBacklinksOpen}
         onDraftChange={noteEditing.updateDraft}
         onConflictReload={noteEditing.snapshot?.conflict ? reloadConflictedNote : null}
-        onReturn={returnHome}
+        onReturn={() => void navigateBack()}
+        onWikiLinkActivate={(activation) => void activateWikiLink(activation)}
+        onBacklinkSelect={(key) => void openNote({ key })}
         saveMessage={noteEditing.snapshot?.failure?.message ?? storageMessage}
       />
       </AppShell>
@@ -259,6 +320,7 @@ function App() {
         onSubmit={() => void createNote()}
         onThoughtChange={(nextThought) => {
           setThought(nextThought)
+          navigationRef.current.updateComposerThought(nextThought)
           setActiveResultIndex(-1)
         }}
         results={searchResults}

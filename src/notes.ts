@@ -11,6 +11,13 @@ export type SearchHit = Pick<Note, 'key' | 'title'> & {
   excerpt: string
 }
 
+export type Backlink = Pick<Note, 'key' | 'title'>
+
+export type OpenNoteLinkResponse = {
+  note: Note
+  canonicalTarget: string
+}
+
 export type SearchResponse = {
   results: SearchHit[]
   hasExactMatch: boolean

@@ -72,6 +72,7 @@ export class NoteEditingSession {
   private readonly publish: (snapshot: NoteEditingSnapshot) => void
   private readonly saveDelay: number
   private readonly scheduler: NoteEditingScheduler
+  private readonly onRename: (oldKey: string, newKey: string) => void
 
   constructor(
     persistence: NotePersistenceAdapter,
@@ -79,11 +80,13 @@ export class NoteEditingSession {
     publish: (snapshot: NoteEditingSnapshot) => void,
     saveDelay = 450,
     scheduler: NoteEditingScheduler = defaultScheduler,
+    onRename: (oldKey: string, newKey: string) => void = () => {},
   ) {
     this.persistence = persistence
     this.publish = publish
     this.saveDelay = saveDelay
     this.scheduler = scheduler
+    this.onRename = onRename
     const draft = draftFrom(note)
     this.snapshot = {
       draft,
@@ -97,6 +100,10 @@ export class NoteEditingSession {
 
   current() {
     return this.snapshot
+  }
+
+  updateBody(body: string) {
+    this.updateDraft({ ...this.snapshot.draft, body })
   }
 
   updateDraft(draft: NoteDraft) {
@@ -200,6 +207,7 @@ export class NoteEditingSession {
       if (this.disposed) return false
 
       const canonicalDraft = draftFrom(note)
+      if (note.key !== key) this.onRename(key, note.key)
       const currentDraft = this.snapshot.draft
       this.setSnapshot({
         ...this.snapshot,

@@ -29,6 +29,80 @@ fn reads_canonical_and_external_markdown_through_the_interface() {
 }
 
 #[test]
+fn coordinated_rename_updates_incoming_custom_and_self_links() {
+    let vault = tempdir().unwrap();
+    let store = persistence(vault.path());
+    let target = store.create("Old").unwrap();
+    let target = store
+        .save(&target.key, &target.title, "Self [[Old]]", &target.revision)
+        .unwrap();
+    let source = store.create("Source").unwrap();
+    store
+        .save(
+            &source.key,
+            &source.title,
+            "[[Old]] [[Old|Old]] [[Old|History]]",
+            &source.revision,
+        )
+        .unwrap();
+
+    let renamed = store
+        .rename_with_links(&target.key, "New title", &target.body, &target.revision)
+        .unwrap();
+
+    assert_eq!(renamed.key, "New title.md");
+    assert_eq!(renamed.body, "Self [[New title]]");
+    assert_eq!(
+        store.read("Source.md").unwrap().body,
+        "[[New title]] [[New title]] [[New title|History]]"
+    );
+    assert!(!vault.path().join(OPERATION_JOURNAL).exists());
+}
+
+#[test]
+fn recovery_rejects_paths_outside_the_vault() {
+    let parent = tempdir().unwrap();
+    let vault = parent.path().join("vault");
+    fs::create_dir(&vault).unwrap();
+    let outside = parent.path().join("outside.md");
+    fs::write(&outside, "intact").unwrap();
+    fs::write(
+        vault.join(OPERATION_JOURNAL),
+        r#"{"committed":false,"files":[{"original":"../outside.md","destination":"Safe.md","staged":".calmd-stage-1-1.tmp","backup":".calmd-journal-backup-1-2.tmp"}]}"#,
+    ).unwrap();
+
+    let error = recover_operation(&vault).unwrap_err();
+
+    assert_eq!(error.code, "recovery");
+    assert_eq!(fs::read_to_string(outside).unwrap(), "intact");
+}
+
+#[test]
+fn coordinated_install_refuses_a_destination_created_after_allocation() {
+    let vault = tempdir().unwrap();
+    fs::write(vault.path().join("Old.md"), "old").unwrap();
+    fs::write(vault.path().join("New.md"), "external").unwrap();
+    let change = PendingChange {
+        original: "Old.md".to_owned(),
+        destination: "New.md".to_owned(),
+        content: "replacement".to_owned(),
+        revision: revision(b"old"),
+    };
+
+    let error = install_coordinated(vault.path(), &[change]).unwrap_err();
+
+    assert_eq!(error.code, "collision");
+    assert_eq!(
+        fs::read_to_string(vault.path().join("New.md")).unwrap(),
+        "external"
+    );
+    assert_eq!(
+        fs::read_to_string(vault.path().join("Old.md")).unwrap(),
+        "old"
+    );
+}
+
+#[test]
 fn derives_portable_filenames_without_changing_titles() {
     let vault = tempdir().unwrap();
     let store = persistence(vault.path());

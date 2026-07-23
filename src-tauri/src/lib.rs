@@ -1,3 +1,4 @@
+mod links;
 mod note_persistence;
 mod search;
 mod storage;
@@ -15,6 +16,8 @@ pub fn run() {
             storage::open_vault,
             storage::search_notes,
             storage::create_note,
+            storage::open_note_link,
+            storage::get_backlinks,
             storage::read_note,
             storage::save_note,
             storage::rename_note,
