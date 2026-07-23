@@ -13,7 +13,7 @@ The editor parses CommonMark plus the GitHub Flavored Markdown extensions suppli
 - Autolinks
 - Syntax highlighting for recognized fenced-code language names
 
-The document remains plain Markdown. Supported wiki links use `[[target]]` or `[[target|display text]]`; paths, headings, blocks, embeds, and links in code remain unsupported. Backlink discovery remains outside the current application phase. Persistence is provided through the Tauri Markdown vault commands.
+The document remains plain Markdown. Supported wiki links use `[[target]]` or `[[target|display text]]`; paths, headings, blocks, embeds, and links in code remain unsupported. Backlinks are derived from the rebuildable index and remain hidden in an on-demand popover until requested. Persistence is provided through the Tauri Markdown vault commands.
 
 ## Writing behavior
 

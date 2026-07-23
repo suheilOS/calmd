@@ -1,4 +1,5 @@
 import { canonicalizeTitle, type Note, type NoteDraft } from './notes'
+import { mergeConcurrentTextChanges } from './threeWayTextMerge'
 
 export type NotePersistenceFailure = {
   code: string
@@ -211,9 +212,34 @@ export class NoteEditingSession {
       const canonicalDraft = draftFrom(note)
       if (note.key !== key) this.onRename(key, note.key)
       const currentDraft = this.snapshot.draft
+      const mergedBody = mergeConcurrentTextChanges(
+        sentDraft.body,
+        canonicalDraft.body,
+        currentDraft.body,
+      )
+      if (mergedBody === null) {
+        this.setSnapshot({
+          ...this.snapshot,
+          draft: currentDraft,
+          savedDraft: canonicalDraft,
+          key: note.key,
+          revision: note.revision,
+          conflict: true,
+          failure: {
+            code: 'conflict',
+            message: 'The saved note and newer edits changed the same text. Reload to use the saved version.',
+          },
+        })
+        return false
+      }
       this.setSnapshot({
         ...this.snapshot,
-        draft: draftsMatch(currentDraft, sentDraft) ? canonicalDraft : currentDraft,
+        draft: {
+          title: currentDraft.title === sentDraft.title
+            ? canonicalDraft.title
+            : currentDraft.title,
+          body: mergedBody,
+        },
         savedDraft: canonicalDraft,
         key: note.key,
         revision: note.revision,

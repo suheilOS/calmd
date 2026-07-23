@@ -41,6 +41,7 @@ import { markdownHighlight } from './markdownHighlight'
 import { toggleLink, toggleMarkdown } from './markdownCommands'
 import {
   canonicalResolvedWikiLink,
+  isWikiLinkNavigationClick,
   parseWikiLinkText,
   selectionTouchesSourceRange,
   validateWikiLinkOccurrence,
@@ -321,7 +322,7 @@ function wikiLinkInteraction(onActivate: (activation: WikiLinkActivation) => voi
     }
 
     activate(view: EditorView, event: MouseEvent) {
-      if (event.button !== 0 || event.shiftKey || event.altKey || event.metaKey === event.ctrlKey) return false
+      if (!isWikiLinkNavigationClick(navigator.platform || navigator.userAgent, event)) return false
       const position = view.posAtDOM(event.target as Node)
       let node = syntaxTree(view.state).resolveInner(position, -1)
       while (node && node.name !== 'WikiLink') node = node.parent!

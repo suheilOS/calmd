@@ -8,6 +8,24 @@ export type WikiLinkSyntaxChild = SourceRange & {
   name: string
 }
 
+export type WikiLinkClickModifiers = {
+  button: number
+  altKey: boolean
+  ctrlKey: boolean
+  metaKey: boolean
+  shiftKey: boolean
+}
+
+export function isWikiLinkNavigationClick(
+  platform: string,
+  modifiers: WikiLinkClickModifiers,
+) {
+  if (modifiers.button !== 0 || modifiers.altKey || modifiers.shiftKey) return false
+  return /Mac/i.test(platform)
+    ? modifiers.metaKey && !modifiers.ctrlKey
+    : modifiers.ctrlKey && !modifiers.metaKey
+}
+
 export function selectionTouchesSourceRange(
   selection: SourceRange,
   range: SourceRange,

@@ -128,6 +128,75 @@ describe('NoteEditingSession', () => {
     expect(session.current().draft.body).toBe('Newer edit')
   })
 
+  test('rebases newer body edits onto canonical link rewrites from a pending rename', async () => {
+    const pendingRename = deferred<Note>()
+    const savedBodies: string[] = []
+    const renamed: Note = {
+      key: 'New.md',
+      title: 'New',
+      body: 'Self [[New]]',
+      revision: 'two',
+    }
+    const session = new NoteEditingSession(adapter({
+      rename: () => pendingRename.promise,
+      save: async (key, draft) => {
+        savedBodies.push(draft.body)
+        return { ...draft, key, revision: 'three' }
+      },
+    }), {
+      ...original,
+      key: 'Old.md',
+      title: 'Old',
+      body: 'Self [[Old]]',
+    }, () => {})
+
+    session.updateDraft({ title: 'New', body: 'Self [[Old]]' })
+    const rename = session.save()
+    await Promise.resolve()
+    session.updateBody('Self [[Old]]\nNewer text')
+    pendingRename.resolve(renamed)
+    await rename
+
+    expect(session.current().draft.body).toBe('Self [[New]]\nNewer text')
+    expect((await session.flush())?.savedDraft.body).toBe('Self [[New]]\nNewer text')
+    expect(savedBodies).toEqual(['Self [[New]]\nNewer text'])
+  })
+
+  test('enters a recoverable conflict when canonical and newer edits overlap', async () => {
+    const pendingRename = deferred<Note>()
+    let saves = 0
+    const session = new NoteEditingSession(adapter({
+      rename: () => pendingRename.promise,
+      save: async (key, draft) => {
+        saves += 1
+        return { ...draft, key, revision: 'three' }
+      },
+    }), {
+      ...original,
+      key: 'Old.md',
+      title: 'Old',
+      body: 'Self [[Old]]',
+    }, () => {})
+
+    session.updateDraft({ title: 'New', body: 'Self [[Old]]' })
+    const rename = session.save()
+    await Promise.resolve()
+    session.updateBody('Self [[Custom]]')
+    pendingRename.resolve({
+      key: 'New.md',
+      title: 'New',
+      body: 'Self [[New]]',
+      revision: 'two',
+    })
+    expect(await rename).toBe(false)
+
+    expect(session.current().conflict).toBe(true)
+    expect(session.current().draft.body).toBe('Self [[Custom]]')
+    expect(session.current().savedDraft.body).toBe('Self [[New]]')
+    expect(await session.flush()).toBeNull()
+    expect(saves).toBe(0)
+  })
+
   test('serializes a newer flush behind an in-flight save', async () => {
     const first = deferred<Note>()
     const savedBodies: string[] = []

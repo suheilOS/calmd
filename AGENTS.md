@@ -1,6 +1,6 @@
 ## Project State
 
-Calmd is currently a Tauri 2 desktop application backed by top-level Markdown files in one user-selected, portable vault. Rust owns filesystem access through dedicated commands; a framework-independent Note persistence module owns Markdown parsing, filename policy, revisions, and atomic create/read/save/rename behavior. Vault selection is persisted separately. A rebuildable SQLite/FTS5 index under Tauri app data provides ranked literal search and excerpts; Markdown remains the sole source of truth. Frontend Note editing is a framework-neutral session module with autosave, save sequencing, and conflict handling behind a local-substitutable persistence seam. Backlinks, wiki-link behavior, embeddings, and semantic retrieval remain deferred. The backlinks popover is a visual placeholder only.
+Calmd is currently a Tauri 2 desktop application backed by top-level Markdown files in one user-selected, portable vault. Rust owns filesystem access through dedicated commands; a framework-independent Note persistence module owns Markdown parsing, filename policy, revisions, and atomic create/read/save/rename behavior. Vault selection is persisted separately. A rebuildable SQLite/FTS5 index under Tauri app data provides ranked literal search and excerpts; Markdown remains the sole source of truth. Frontend Note editing is a framework-neutral session module with autosave, save sequencing, and conflict handling behind a local-substitutable persistence seam. Supported wiki links use cursor-sensitive Live Preview and platform-specific modifier navigation through the conflict-safe persistence flow. Backlinks are derived from the rebuildable index and remain collapsed until requested. Embeddings and semantic retrieval remain deferred.
 
 Current UI stack:
 
@@ -24,9 +24,9 @@ Focus only on:
 - Ranked literal retrieval through a derived index reconciled from the selected vault
 - Creating and renaming portable Markdown notes through Rust
 - A minimal full-page note editor with conflict-safe saving
-- A backlinks popover revealed only when requested, with static placeholder content
+- A backlinks popover revealed only when requested
 
-Keep backlinks static or mocked. Do not introduce embeddings, backlink indexing, or other backend architecture beyond the derived literal search index during this phase.
+Do not introduce embeddings or other backend architecture beyond the existing derived literal-search and backlink index during this phase.
 
 ## Constraints
 
