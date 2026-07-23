@@ -13,7 +13,7 @@ The editor parses CommonMark plus the GitHub Flavored Markdown extensions suppli
 - Autolinks
 - Syntax highlighting for recognized fenced-code language names
 
-The document remains plain Markdown. Preview, live-preview replacement widgets, wiki links, backlinks discovery, and persistence are outside the current prototype phase.
+The document remains plain Markdown. Preview, live-preview replacement widgets, wiki links, and backlink discovery are outside the current application phase. Persistence is provided through the Tauri Markdown vault commands.
 
 ## Writing behavior
 

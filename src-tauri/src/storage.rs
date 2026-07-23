@@ -1,3 +1,4 @@
+use crate::search::{IndexedNote, SearchResponse, SearchState};
 use atomic_write_file::AtomicWriteFile;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -11,8 +12,9 @@ use std::{
         Mutex,
         atomic::{AtomicU64, Ordering},
     },
+    time::UNIX_EPOCH,
 };
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 use tauri_plugin_store::StoreExt;
 
@@ -25,7 +27,7 @@ static NEXT_TEMP_FILE: AtomicU64 = AtomicU64::new(0);
 #[derive(Default)]
 pub struct VaultState(Mutex<Option<PathBuf>>);
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Note {
     key: String,
@@ -86,7 +88,8 @@ pub async fn select_vault(
     name: String,
     app: AppHandle,
     state: State<'_, VaultState>,
-) -> CommandResult<Option<Vec<Note>>> {
+    search: State<'_, SearchState>,
+) -> CommandResult<bool> {
     validate_vault_name(&name)?;
     let selection = app
         .dialog()
@@ -95,12 +98,12 @@ pub async fn select_vault(
         .blocking_pick_folder();
 
     let Some(FilePath::Path(path)) = selection else {
-        return Ok(None);
+        return Ok(false);
     };
 
     let parent = canonical_vault(&path)?;
     let root = create_vault_directory(&parent, &name)?;
-    let notes = match scan_vault(&root) {
+    let indexed_notes = match scan_indexed_vault(&root) {
         Ok(notes) => notes,
         Err(error) => {
             let _ = fs::remove_dir(&root);
@@ -111,35 +114,88 @@ pub async fn select_vault(
         let _ = fs::remove_dir(&root);
         return Err(error);
     }
-    *state
+    let mut guard = state
         .0
         .lock()
-        .map_err(|_| CommandError::new("state", "Vault state is unavailable."))? = Some(root);
-
-    Ok(Some(notes))
+        .map_err(|_| CommandError::new("state", "Vault state is unavailable."))?;
+    *guard = Some(root.clone());
+    search.reconcile_best_effort(&root, &indexed_notes);
+    Ok(true)
 }
 
 #[tauri::command]
-pub fn open_vault(state: State<'_, VaultState>) -> CommandResult<Option<Vec<Note>>> {
+pub async fn open_vault(app: AppHandle) -> CommandResult<bool> {
+    tauri::async_runtime::spawn_blocking(move || open_vault_in(&app))
+        .await
+        .map_err(|error| CommandError::new("state", format!("Could not open the vault: {error}")))?
+}
+
+fn open_vault_in(app: &AppHandle) -> CommandResult<bool> {
+    let state = app.state::<VaultState>();
+    let search = app.state::<SearchState>();
     let guard = state
         .0
         .lock()
         .map_err(|_| CommandError::new("state", "Vault state is unavailable."))?;
     let Some(_) = guard.as_ref() else {
-        return Ok(None);
+        return Ok(false);
     };
     let root = vault_root(&guard)?;
-    scan_vault(&root).map(Some)
+    let notes = scan_indexed_vault(&root)?;
+    search.reconcile_best_effort(&root, &notes);
+    Ok(true)
 }
 
 #[tauri::command]
-pub fn create_note(title: String, state: State<'_, VaultState>) -> CommandResult<Note> {
+pub async fn search_notes(query: String, app: AppHandle) -> CommandResult<SearchResponse> {
+    tauri::async_runtime::spawn_blocking(move || search_notes_in(&app, &query))
+        .await
+        .map_err(|error| CommandError::new("search", format!("Could not search notes: {error}")))?
+}
+
+fn search_notes_in(app: &AppHandle, query: &str) -> CommandResult<SearchResponse> {
+    let state = app.state::<VaultState>();
+    let search = app.state::<SearchState>();
     let guard = state
         .0
         .lock()
         .map_err(|_| CommandError::new("state", "Vault state is unavailable."))?;
     let root = vault_root(&guard)?;
-    create_note_in(&root, &title)
+
+    if search.needs_reconciliation() {
+        let notes = scan_indexed_vault(&root)?;
+        search
+            .reconcile(&root, &notes)
+            .map_err(search_command_error)?;
+    }
+
+    match search.search(query) {
+        Ok(response) => Ok(response),
+        Err(error) if error.is_recoverable() => {
+            let notes = scan_indexed_vault(&root)?;
+            search
+                .reconcile(&root, &notes)
+                .map_err(search_command_error)?;
+            search.search(query).map_err(search_command_error)
+        }
+        Err(error) => Err(search_command_error(error)),
+    }
+}
+
+#[tauri::command]
+pub fn create_note(
+    title: String,
+    state: State<'_, VaultState>,
+    search: State<'_, SearchState>,
+) -> CommandResult<Note> {
+    let guard = state
+        .0
+        .lock()
+        .map_err(|_| CommandError::new("state", "Vault state is unavailable."))?;
+    let root = vault_root(&guard)?;
+    let note = find_or_create_note_in(&root, &title)?;
+    best_effort_index(&search, &root, None, &note);
+    Ok(note)
 }
 
 #[tauri::command]
@@ -159,13 +215,16 @@ pub fn save_note(
     body: String,
     expected_revision: String,
     state: State<'_, VaultState>,
+    search: State<'_, SearchState>,
 ) -> CommandResult<Note> {
     let guard = state
         .0
         .lock()
         .map_err(|_| CommandError::new("state", "Vault state is unavailable."))?;
     let root = vault_root(&guard)?;
-    save_note_in(&root, &key, &title, &body, &expected_revision)
+    let note = save_note_in(&root, &key, &title, &body, &expected_revision)?;
+    best_effort_index(&search, &root, None, &note);
+    Ok(note)
 }
 
 #[tauri::command]
@@ -175,13 +234,20 @@ pub fn rename_note(
     body: String,
     expected_revision: String,
     state: State<'_, VaultState>,
+    search: State<'_, SearchState>,
 ) -> CommandResult<Note> {
     let guard = state
         .0
         .lock()
         .map_err(|_| CommandError::new("state", "Vault state is unavailable."))?;
     let root = vault_root(&guard)?;
-    rename_note_in(&root, &key, &title, &body, &expected_revision)
+    let note = rename_note_in(&root, &key, &title, &body, &expected_revision)?;
+    best_effort_index(&search, &root, Some(&key), &note);
+    Ok(note)
+}
+
+fn search_command_error(error: impl std::fmt::Display) -> CommandError {
+    CommandError::new("search", format!("Search is unavailable: {error}"))
 }
 
 fn persist_vault(app: &AppHandle, root: &Path) -> CommandResult<()> {
@@ -268,6 +334,10 @@ fn vault_root(guard: &Option<PathBuf>) -> CommandResult<PathBuf> {
     let stored_root = guard
         .as_deref()
         .ok_or_else(|| CommandError::new("no_vault", "Choose a vault folder first."))?;
+    validate_vault_root(stored_root)
+}
+
+fn validate_vault_root(stored_root: &Path) -> CommandResult<PathBuf> {
     let current_root = canonical_vault(stored_root)?;
     if current_root != stored_root {
         return Err(CommandError::new(
@@ -305,6 +375,63 @@ fn scan_vault(root: &Path) -> CommandResult<Vec<Note>> {
             .then_with(|| left.key.to_lowercase().cmp(&right.key.to_lowercase()))
     });
     Ok(notes)
+}
+
+fn scan_indexed_vault(root: &Path) -> CommandResult<Vec<IndexedNote>> {
+    scan_vault(root)?
+        .iter()
+        .map(|note| indexed_note(root, note))
+        .collect()
+}
+
+fn indexed_note(root: &Path, note: &Note) -> CommandResult<IndexedNote> {
+    let metadata = fs::metadata(root.join(&note.key))
+        .map_err(|error| CommandError::io("Could not inspect a note modification time", error))?;
+    let modified_at_ms = metadata
+        .modified()
+        .map_err(|error| CommandError::io("Could not read a note modification time", error))?
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+        .try_into()
+        .unwrap_or(i64::MAX);
+    Ok(IndexedNote {
+        key: note.key.clone(),
+        title: note.title.clone(),
+        body: note.body.clone(),
+        revision: note.revision.clone(),
+        modified_at_ms,
+    })
+}
+
+fn find_or_create_note_in(root: &Path, title: &str) -> CommandResult<Note> {
+    let normalized_title = canonicalize_title(title)?.to_lowercase();
+    if let Some(note) = scan_vault(root)?.into_iter().find(|note| {
+        note.title
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+            .to_lowercase()
+            == normalized_title
+    }) {
+        return Ok(note);
+    }
+    create_note_in(root, title)
+}
+
+fn best_effort_index(search: &SearchState, root: &Path, previous_key: Option<&str>, note: &Note) {
+    let result = indexed_note(root, note).and_then(|indexed| {
+        search
+            .replace(previous_key, &indexed)
+            .map_err(search_command_error)
+    });
+    if let Err(error) = result {
+        search.mark_dirty();
+        log::warn!(
+            "The Markdown note was saved, but its derived search entry is stale: {}",
+            error.message
+        );
+    }
 }
 
 fn create_note_in(root: &Path, title: &str) -> CommandResult<Note> {
@@ -722,266 +849,5 @@ fn prepare_atomic_write(path: &Path, content: &str) -> CommandResult<AtomicWrite
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::tempdir;
-
-    #[test]
-    fn parses_canonical_markdown() {
-        assert_eq!(
-            parse_markdown("# Purification\n\nThe body", "fallback"),
-            ("Purification".to_owned(), "The body".to_owned())
-        );
-    }
-
-    #[test]
-    fn parses_a_leading_title_after_a_bom_or_blank_lines() {
-        assert_eq!(
-            parse_markdown("\u{feff}# BOM title\n\nBody", "fallback"),
-            ("BOM title".to_owned(), "Body".to_owned())
-        );
-        assert_eq!(
-            parse_markdown("\n\r\n# Blank title\n\nBody", "fallback"),
-            ("Blank title".to_owned(), "Body".to_owned())
-        );
-    }
-
-    #[test]
-    fn preserves_external_content_when_an_h1_is_not_leading() {
-        let content = "Preface\n# Later title\nBody";
-        assert_eq!(
-            parse_markdown(content, "External"),
-            ("External".to_owned(), content.to_owned())
-        );
-    }
-
-    #[test]
-    fn preserves_files_without_an_h1() {
-        let content = "An external note without a heading";
-        assert_eq!(
-            parse_markdown(content, "External"),
-            ("External".to_owned(), content.to_owned())
-        );
-    }
-
-    #[test]
-    fn parses_crlf_and_unicode_titles() {
-        assert_eq!(
-            parse_markdown("# عنوان عربي\r\n\r\nالمحتوى", "fallback"),
-            ("عنوان عربي".to_owned(), "المحتوى".to_owned())
-        );
-        assert_eq!(
-            parse_markdown("# 静かな考え\n\n本文", "fallback"),
-            ("静かな考え".to_owned(), "本文".to_owned())
-        );
-    }
-
-    #[test]
-    fn derives_portable_filenames_without_changing_titles() {
-        assert_eq!(safe_filename_stem("A/B: C?"), "A-B- C-");
-        assert_eq!(safe_filename_stem("CON"), "CON note");
-        assert_eq!(safe_filename_stem("NUL.txt"), "NUL.txt note");
-        assert_eq!(safe_filename_stem("Trailing. "), "Trailing");
-        assert_eq!(safe_filename_stem("عنوان عربي"), "عنوان عربي");
-    }
-
-    #[test]
-    fn creates_a_named_vault_inside_the_selected_location() {
-        let location = tempdir().unwrap();
-        let vault = create_vault_directory(location.path(), "Research").unwrap();
-        assert_eq!(
-            vault,
-            location.path().join("Research").canonicalize().unwrap()
-        );
-        assert!(vault.is_dir());
-        assert!(create_vault_directory(location.path(), "Research").is_err());
-        assert!(create_vault_directory(location.path(), "NUL").is_err());
-        assert!(create_vault_directory(location.path(), "unsafe/name").is_err());
-        assert!(create_vault_directory(location.path(), "trailing.").is_err());
-    }
-
-    #[test]
-    fn handles_case_insensitive_filename_collisions() {
-        let vault = tempdir().unwrap();
-        fs::write(vault.path().join("Purification.md"), "existing").unwrap();
-        assert_eq!(
-            available_filename(vault.path(), "purification", None).unwrap(),
-            "purification (2).md"
-        );
-    }
-
-    #[test]
-    fn creates_saves_renames_and_detects_conflicts() {
-        let vault = tempdir().unwrap();
-        let created = create_note_in(vault.path(), "Purification").unwrap();
-        assert_eq!(created.key, "Purification.md");
-
-        let saved = save_note_in(
-            vault.path(),
-            &created.key,
-            &created.title,
-            "Complete body",
-            &created.revision,
-        )
-        .unwrap();
-        assert_eq!(saved.body, "Complete body");
-
-        fs::write(
-            vault.path().join(&saved.key),
-            "# Purification\n\nExternal edit",
-        )
-        .unwrap();
-        let conflict = save_note_in(
-            vault.path(),
-            &saved.key,
-            &saved.title,
-            "Calmd edit",
-            &saved.revision,
-        )
-        .unwrap_err();
-        assert_eq!(conflict.code, "conflict");
-
-        let reopened = read_note_in(vault.path(), &saved.key).unwrap();
-        let renamed = rename_note_in(
-            vault.path(),
-            &reopened.key,
-            "تنقية",
-            &reopened.body,
-            &reopened.revision,
-        )
-        .unwrap();
-        assert_eq!(renamed.key, "تنقية.md");
-        assert!(!vault.path().join("Purification.md").exists());
-        assert_eq!(
-            read_note_in(vault.path(), "تنقية.md").unwrap().title,
-            "تنقية"
-        );
-    }
-
-    #[test]
-    fn rename_uses_a_collision_suffix_without_overwriting() {
-        let vault = tempdir().unwrap();
-        let note = create_note_in(vault.path(), "First").unwrap();
-        fs::write(vault.path().join("Taken.md"), "unrelated").unwrap();
-
-        let renamed =
-            rename_note_in(vault.path(), &note.key, "Taken", "updated", &note.revision).unwrap();
-
-        assert_eq!(renamed.key, "Taken (2).md");
-        assert_eq!(
-            fs::read_to_string(vault.path().join("Taken.md")).unwrap(),
-            "unrelated"
-        );
-        assert_no_temporary_files(vault.path());
-    }
-
-    #[test]
-    fn handles_case_only_renames() {
-        let vault = tempdir().unwrap();
-        let note = create_note_in(vault.path(), "Case").unwrap();
-        let renamed =
-            rename_note_in(vault.path(), &note.key, "case", &note.body, &note.revision).unwrap();
-
-        assert_eq!(renamed.key, "case.md");
-        assert_eq!(renamed.title, "case");
-        assert_no_temporary_files(vault.path());
-    }
-
-    #[test]
-    fn rename_conflict_leaves_the_original_unchanged() {
-        let vault = tempdir().unwrap();
-        let note = create_note_in(vault.path(), "Original").unwrap();
-        let original_path = vault.path().join(&note.key);
-        fs::write(&original_path, "# Original\n\nExternal edit").unwrap();
-
-        let error = rename_note_in(
-            vault.path(),
-            &note.key,
-            "Renamed",
-            "Calmd edit",
-            &note.revision,
-        )
-        .unwrap_err();
-
-        assert_eq!(error.code, "conflict");
-        assert_eq!(
-            fs::read_to_string(original_path).unwrap(),
-            "# Original\n\nExternal edit"
-        );
-        assert!(!vault.path().join("Renamed.md").exists());
-        assert_no_temporary_files(vault.path());
-    }
-
-    #[test]
-    fn failed_destination_install_restores_the_original() {
-        let vault = tempdir().unwrap();
-        let note = create_note_in(vault.path(), "Original").unwrap();
-        let original_path = vault.path().join(&note.key);
-        let original_content = fs::read_to_string(&original_path).unwrap();
-
-        let error = rename_note_in_with(
-            vault.path(),
-            &note.key,
-            "Renamed",
-            "updated",
-            &note.revision,
-            |_, _| Err(std::io::Error::other("injected destination failure")),
-        )
-        .unwrap_err();
-
-        assert_eq!(error.code, "io");
-        assert_eq!(fs::read_to_string(original_path).unwrap(), original_content);
-        assert!(!vault.path().join("Renamed.md").exists());
-        assert_no_temporary_files(vault.path());
-    }
-
-    #[test]
-    fn renames_unicode_filenames_and_returns_complete_canonical_note() {
-        let vault = tempdir().unwrap();
-        let note = create_note_in(vault.path(), "Original").unwrap();
-        let renamed = rename_note_in(
-            vault.path(),
-            &note.key,
-            "  تنقية   هادئة  ",
-            "المحتوى",
-            &note.revision,
-        )
-        .unwrap();
-
-        assert_eq!(renamed.key, "تنقية هادئة.md");
-        assert_eq!(renamed.title, "تنقية هادئة");
-        assert_eq!(renamed.body, "المحتوى");
-        assert_eq!(
-            renamed.revision,
-            revision("# تنقية هادئة\n\nالمحتوى".as_bytes())
-        );
-        assert_no_temporary_files(vault.path());
-    }
-
-    fn assert_no_temporary_files(root: &Path) {
-        let temporary_files = fs::read_dir(root)
-            .unwrap()
-            .filter_map(Result::ok)
-            .filter_map(|entry| entry.file_name().to_str().map(str::to_owned))
-            .filter(|name| name.starts_with(TEMP_FILE_PREFIX))
-            .collect::<Vec<_>>();
-        assert!(
-            temporary_files.is_empty(),
-            "temporary files: {temporary_files:?}"
-        );
-    }
-
-    #[test]
-    fn rejects_traversal_and_symlinks() {
-        let vault = tempdir().unwrap();
-        assert!(validated_note_path(vault.path(), "../outside.md").is_err());
-
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::symlink;
-            fs::write(vault.path().join("real.md"), "# Real\n\n").unwrap();
-            symlink(vault.path().join("real.md"), vault.path().join("link.md")).unwrap();
-            assert!(validated_note_path(vault.path(), "link.md").is_err());
-        }
-    }
-}
+#[path = "storage_tests.rs"]
+mod tests;

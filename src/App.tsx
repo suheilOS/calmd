@@ -1,16 +1,15 @@
 import { Button } from '@base-ui/react/button'
 import { Input } from '@base-ui/react/input'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ComposerScreen } from './ComposerScreen'
 import { NoteEditor } from './NoteEditor'
 import { AppShell } from './TitleBar'
 import {
   canonicalizeTitle,
-  findExactNote,
-  findRetrievalMatches,
-  normalizeTitle,
   type Note,
   type NoteDraft,
+  type SearchHit,
+  type SearchResponse,
 } from './notes'
 import { draftsMatch, reconcileSavedDraft } from './saveState'
 import {
@@ -20,6 +19,7 @@ import {
   readStoredNote,
   renameStoredNote,
   saveStoredNote,
+  searchStoredNotes,
   selectVault,
 } from './storage'
 import './App.css'
@@ -31,8 +31,17 @@ type EditorSession = {
   savedDraft: NoteDraft
 }
 
+type SearchView = SearchResponse & {
+  query: string
+}
+
+const EMPTY_SEARCH_VIEW: SearchView = {
+  query: '',
+  results: [],
+  hasExactMatch: false,
+}
+
 function App() {
-  const [notes, setNotes] = useState<Note[]>([])
   const [vaultReady, setVaultReady] = useState<boolean | null>(null)
   const [selectingVault, setSelectingVault] = useState(false)
   const [vaultName, setVaultName] = useState('')
@@ -43,34 +52,33 @@ function App() {
   const [activeResultIndex, setActiveResultIndex] = useState(-1)
   const [storageMessage, setStorageMessage] = useState<string | null>(null)
   const [hasConflict, setHasConflict] = useState(false)
+  const [searchView, setSearchView] = useState<SearchView>(EMPTY_SEARCH_VIEW)
+  const [searchGeneration, setSearchGeneration] = useState(0)
   const editorDraftRef = useRef<NoteDraft | null>(null)
   const conflictRef = useRef(false)
   const sessionRef = useRef<EditorSession | null>(null)
   const nextSessionIdRef = useRef(0)
   const saveChainRef = useRef<Promise<void>>(Promise.resolve())
+  const searchRequestRef = useRef(0)
 
-  const normalizedThought = normalizeTitle(thought)
-  const exactNote = useMemo(
-    () => findExactNote(notes, normalizedThought),
-    [notes, normalizedThought],
-  )
-  const searchResults = useMemo(
-    () => exactNote
-      ? [exactNote]
-      : findRetrievalMatches(notes, normalizedThought),
-    [exactNote, notes, normalizedThought],
-  )
+  const searchQuery = canonicalizeTitle(thought)
+  const isEditing = editorDraft !== null
+  const currentSearch = searchView.query === searchQuery
+    ? searchView
+    : EMPTY_SEARCH_VIEW
+  const searchResults = currentSearch.results
+  const exactNote = currentSearch.hasExactMatch
+    ? currentSearch.results[0] ?? null
+    : null
 
   const refreshVault = useCallback(async () => {
     try {
-      const storedNotes = await openVault()
-      if (storedNotes === null) {
-        setVaultReady(false)
-        return
+      const isReady = await openVault()
+      setVaultReady(isReady)
+      if (isReady) {
+        setSearchGeneration((generation) => generation + 1)
+        setStorageMessage(null)
       }
-      setNotes(storedNotes)
-      setVaultReady(true)
-      setStorageMessage(null)
     } catch (error) {
       setVaultReady(false)
       setStorageMessage(getStorageError(error).message)
@@ -91,14 +99,28 @@ function App() {
     return () => window.removeEventListener('focus', handleFocus)
   }, [refreshVault])
 
-  const replaceStoredNote = useCallback((note: Note, previousKey: string) => {
-    setNotes((currentNotes) => [
-      note,
-      ...currentNotes.filter(
-        (currentNote) => currentNote.key !== previousKey && currentNote.key !== note.key,
-      ),
-    ])
-  }, [])
+  useEffect(() => {
+    const requestId = ++searchRequestRef.current
+    if (!vaultReady || isEditing || !searchQuery) return
+
+    const searchTimer = window.setTimeout(() => {
+      void searchStoredNotes(searchQuery).then(
+        (response) => {
+          if (searchRequestRef.current !== requestId) return
+          setSearchView({ ...response, query: searchQuery })
+          setActiveResultIndex(-1)
+          setStorageMessage(null)
+        },
+        (error) => {
+          if (searchRequestRef.current !== requestId) return
+          setSearchView({ ...EMPTY_SEARCH_VIEW, query: searchQuery })
+          setStorageMessage(getStorageError(error).message)
+        },
+      )
+    }, 120)
+
+    return () => window.clearTimeout(searchTimer)
+  }, [isEditing, searchGeneration, searchQuery, vaultReady])
 
   const persistDraft = useCallback((draft: NoteDraft) => {
     let didSave = true
@@ -126,7 +148,6 @@ function App() {
           : await saveStoredNote(session.key, requestDraft, session.revision)
 
         if (sessionRef.current?.id !== session.id) return
-        const previousKey = session.key
         const currentDraft = editorDraftRef.current ?? draft
         const {
           canonicalDraft: nextSavedDraft,
@@ -143,7 +164,6 @@ function App() {
           editorDraftRef.current = nextEditorDraft
           setEditorDraft(nextEditorDraft)
         }
-        replaceStoredNote(note, previousKey)
       } catch (error) {
         didSave = false
         const storageError = getStorageError(error)
@@ -157,7 +177,7 @@ function App() {
 
     saveChainRef.current = operation.then(() => undefined, () => undefined)
     return operation.then(() => didSave)
-  }, [replaceStoredNote])
+  }, [])
 
   useEffect(() => {
     if (
@@ -192,7 +212,7 @@ function App() {
     setStorageMessage(null)
   }
 
-  async function openNote(note: Note) {
+  async function openNote(note: Pick<Note, 'key'>) {
     try {
       beginEditing(await readStoredNote(note.key))
     } catch (error) {
@@ -211,16 +231,14 @@ function App() {
     }
 
     try {
-      const note = await createStoredNote(title)
-      replaceStoredNote(note, note.key)
-      beginEditing(note)
+      beginEditing(await createStoredNote(title))
     } catch (error) {
       setStorageMessage(getStorageError(error).message)
     }
   }
 
   function selectSearchResult(index: number) {
-    const note = searchResults[index]
+    const note: SearchHit | undefined = searchResults[index]
     if (note) {
       void openNote(note)
       return
@@ -256,10 +274,10 @@ function App() {
     setSelectingVault(true)
     setStorageMessage(null)
     try {
-      const storedNotes = await selectVault(vaultName)
-      if (storedNotes !== null) {
-        setNotes(storedNotes)
+      const didSelect = await selectVault(vaultName)
+      if (didSelect) {
         setVaultReady(true)
+        setSearchGeneration((generation) => generation + 1)
         setVaultName('')
       }
     } catch (error) {

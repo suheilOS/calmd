@@ -1,16 +1,14 @@
 ## Project State
 
-This project is currently an interactive, in-memory web prototype.
+Calmd is currently a Tauri 2 desktop application backed by top-level Markdown files in one user-selected, portable vault. Rust owns filesystem access through dedicated commands, vault selection is persisted, and writes use revision checks plus atomic replacement. A rebuildable SQLite/FTS5 index under Tauri app data provides ranked literal search and excerpts; Markdown remains the sole source of truth. Backlinks, wiki-link behavior, embeddings, and semantic retrieval remain deferred. The backlinks popover is a visual placeholder only.
 
-Current stack:
+Current UI stack:
 
 - React
 - Vite
 - TypeScript
 - Tailwind CSS
 - Base UI
-
-The Tauri 2 desktop shell stores notes as top-level Markdown files in one user-selected vault. Rust owns filesystem access through dedicated commands, vault selection is persisted, and writes use revision checks plus atomic replacement. SQLite, backlink discovery, wiki links, and semantic search are not implemented yet. The backlinks popover is a visual placeholder only.
 
 ## Product Goal
 
@@ -23,12 +21,12 @@ The interface should feel like starting a thought, not managing a vault.
 Focus only on:
 
 - A plain composer-style home screen
-- Literal retrieval over notes scanned from the selected vault
+- Ranked literal retrieval through a derived index reconciled from the selected vault
 - Creating and renaming portable Markdown notes through Rust
 - A minimal full-page note editor with conflict-safe saving
 - A backlinks popover revealed only when requested, with static placeholder content
 
-Keep backlinks static or mocked. Do not introduce databases, indexing, or other backend architecture during this phase.
+Keep backlinks static or mocked. Do not introduce embeddings, backlink indexing, or other backend architecture beyond the derived literal search index during this phase.
 
 ## Constraints
 
