@@ -3,6 +3,7 @@ import { history, undo } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
 import { EditorSelection, EditorState, type StateCommand, type Transaction } from '@codemirror/state'
 import { GFM } from '@lezer/markdown'
+import { markdownHighlight } from '../src/markdownHighlight'
 import { toggleLink, toggleMarkdown } from '../src/markdownCommands'
 
 function runCommand(
@@ -14,7 +15,7 @@ function runCommand(
   let state = EditorState.create({
     doc,
     selection: EditorSelection.single(anchor, head),
-    extensions: [markdown({ extensions: GFM })],
+    extensions: [markdown({ extensions: [GFM, markdownHighlight] })],
   })
 
   const handled = command({
@@ -43,7 +44,7 @@ function runRanges(
     ),
     extensions: [
       EditorState.allowMultipleSelections.of(true),
-      markdown({ extensions: GFM }),
+      markdown({ extensions: [GFM, markdownHighlight] }),
     ],
   })
 
@@ -66,6 +67,7 @@ describe('toggleMarkdown', () => {
   test.each([
     ['**', 'A **partly bold** paragraph.', '**A partly bold paragraph.**'],
     ['~~', 'A ~~partly struck~~ paragraph.', '~~A partly struck paragraph.~~'],
+    ['==', 'A ==partly highlighted== paragraph.', '==A partly highlighted paragraph.=='],
   ] as const)('normalizes partial %s formatting across a paragraph', (delimiter, source, expected) => {
     expect(runCommand(source, toggleMarkdown(delimiter)).doc).toBe(expected)
   })
@@ -285,7 +287,7 @@ describe('toggleMarkdown', () => {
     let state = EditorState.create({
       doc: source,
       selection: EditorSelection.single(0, source.length),
-      extensions: [history(), markdown({ extensions: GFM })],
+      extensions: [history(), markdown({ extensions: [GFM, markdownHighlight] })],
     })
     const dispatch = (transaction: Transaction) => {
       state = transaction.state

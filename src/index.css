@@ -32,6 +32,7 @@
   --color-hover: oklch(0.937 0.008 91.486);
   --color-selection: oklch(0.880 0.018 95.099);
   --color-selection-ink: oklch(0.279 0.007 106.855);
+  --color-highlight: oklch(0.900 0.120 90);
 }
 
 * {
@@ -66,6 +67,7 @@ html {
     --color-hover: oklch(0.280 0.008 91.486);
     --color-selection: oklch(0.320 0.018 95.099);
     --color-selection-ink: oklch(0.920 0.007 106.855);
+    --color-highlight: oklch(0.430 0.100 90);
   }
 }
 

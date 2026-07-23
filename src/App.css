@@ -51,6 +51,13 @@
   font-weight: 650;
 }
 
+.markdown-editor .cm-highlight {
+  background-color: var(--color-highlight);
+  border-radius: 0.2em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
 .markdown-editor .cm-emphasis {
   font-style: italic;
 }

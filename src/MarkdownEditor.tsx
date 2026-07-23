@@ -37,6 +37,7 @@ import { tags } from '@lezer/highlight'
 import { GFM } from '@lezer/markdown'
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { insertNewlineContinueBlockquote } from './markdownBlockquote'
+import { markdownHighlight } from './markdownHighlight'
 import { toggleLink, toggleMarkdown } from './markdownCommands'
 
 type MarkdownEditorProps = {
@@ -138,6 +139,74 @@ const hangingMarkdown = ViewPlugin.fromClass(class {
   decorations: (plugin) => plugin.decorations,
 })
 
+function selectionTouchesRange(
+  view: EditorView,
+  range: { from: number; to: number },
+) {
+  return view.state.selection.ranges.some((selection) => selection.empty
+    ? selection.from >= range.from && selection.from <= range.to
+    : selection.from < range.to && selection.to > range.from)
+}
+
+function inlineMarkdownDecorations(view: EditorView) {
+  const decorations: Range<Decoration>[] = []
+
+  syntaxTree(view.state).iterate({
+    enter: (node) => {
+      if (node.name === 'EmphasisMark') {
+        const format = node.node.parent
+        if (format && !selectionTouchesRange(view, format)) {
+          decorations.push(Decoration.replace({}).range(node.from, node.to))
+        }
+        return
+      }
+
+      if (node.name !== 'Highlight') return
+
+      const marks: { from: number; to: number }[] = []
+      const cursor = node.node.cursor()
+      if (cursor.firstChild()) {
+        do {
+          if (cursor.name === 'HighlightMark') {
+            marks.push({ from: cursor.from, to: cursor.to })
+          }
+        } while (cursor.nextSibling())
+      }
+
+      if (marks.length >= 2) {
+        const first = marks[0]
+        const last = marks[marks.length - 1]
+        decorations.push(Decoration.mark({ class: 'cm-highlight' }).range(
+          first.to,
+          last.from,
+        ))
+        if (!selectionTouchesRange(view, node)) {
+          decorations.push(Decoration.replace({}).range(first.from, first.to))
+          decorations.push(Decoration.replace({}).range(last.from, last.to))
+        }
+      }
+    },
+  })
+
+  return Decoration.set(decorations, true)
+}
+
+const inlineMarkdown = ViewPlugin.fromClass(class {
+  decorations: DecorationSet
+
+  constructor(view: EditorView) {
+    this.decorations = inlineMarkdownDecorations(view)
+  }
+
+  update(update: ViewUpdate) {
+    if (update.docChanged || update.viewportChanged || update.selectionSet) {
+      this.decorations = inlineMarkdownDecorations(update.view)
+    }
+  }
+}, {
+  decorations: (plugin) => plugin.decorations,
+})
+
 const editorTheme = EditorView.theme({
   '&': {
     backgroundColor: 'transparent',
@@ -217,16 +286,18 @@ const editorExtensions = [
   syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
   markdownHighlighting,
   hangingMarkdown,
+  inlineMarkdown,
   markdown({
     addKeymap: false,
     base: commonmarkLanguage,
     codeLanguages: languages,
-    extensions: GFM,
+    extensions: [GFM, markdownHighlight],
   }),
   keymap.of([
     { key: 'Enter', run: insertNewlineContinueBlockquote },
     { key: 'Mod-b', run: toggleMarkdown('**') },
     { key: 'Mod-i', run: toggleMarkdown('*') },
+    { key: 'Mod-Shift-h', run: toggleMarkdown('==') },
     { key: 'Mod-k', run: toggleLink },
     { key: 'Mod-`', run: toggleMarkdown('`') },
     { key: 'Mod-Shift-x', run: toggleMarkdown('~~') },

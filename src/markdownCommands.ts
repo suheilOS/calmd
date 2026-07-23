@@ -2,16 +2,18 @@ import { syntaxTree } from '@codemirror/language'
 import { markdown } from '@codemirror/lang-markdown'
 import { EditorSelection, EditorState, type StateCommand } from '@codemirror/state'
 import { GFM } from '@lezer/markdown'
+import { markdownHighlight } from './markdownHighlight'
 
-type MarkdownDelimiter = '*' | '**' | '~~' | '`'
+type MarkdownDelimiter = '*' | '**' | '~~' | '`' | '=='
 
-const parserExtensions = [markdown({ extensions: GFM })]
+const parserExtensions = [markdown({ extensions: [GFM, markdownHighlight] })]
 
 const syntaxByDelimiter: Record<MarkdownDelimiter, { mark: string; node: string }> = {
   '*': { mark: 'EmphasisMark', node: 'Emphasis' },
   '**': { mark: 'EmphasisMark', node: 'StrongEmphasis' },
   '~~': { mark: 'StrikethroughMark', node: 'Strikethrough' },
   '`': { mark: 'CodeMark', node: 'InlineCode' },
+  '==': { mark: 'HighlightMark', node: 'Highlight' },
 }
 
 function parse(text: string) {
