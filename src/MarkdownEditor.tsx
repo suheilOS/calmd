@@ -42,12 +42,15 @@ import { toggleLink, toggleMarkdown } from './markdownCommands'
 import {
   canonicalResolvedWikiLink,
   parseWikiLinkText,
+  selectionTouchesSourceRange,
+  validateWikiLinkOccurrence,
+  wikiLinkHiddenSyntaxRanges,
   wikiLinkMarkdown,
 } from './wikiLinks'
 
 export type WikiLinkActivation = {
   target: string
-  validateCurrentOccurrence: () => boolean
+  validateCurrentOccurrence: (authoritativeBody: string) => boolean
   applyCanonical: (canonicalTarget: string, resolvedTitle: string) => string | null
 }
 
@@ -155,9 +158,9 @@ function selectionTouchesRange(
   view: EditorView,
   range: { from: number; to: number },
 ) {
-  return view.state.selection.ranges.some((selection) => selection.empty
-    ? selection.from >= range.from && selection.from <= range.to
-    : selection.from < range.to && selection.to > range.from)
+  return view.state.selection.ranges.some((selection) =>
+    selectionTouchesSourceRange(selection, range),
+  )
 }
 
 function inlineMarkdownDecorations(view: EditorView) {
@@ -167,6 +170,22 @@ function inlineMarkdownDecorations(view: EditorView) {
     enter: (node) => {
       if (node.name === 'WikiLink') {
         decorations.push(Decoration.mark({ class: 'cm-wiki-link' }).range(node.from, node.to))
+
+        const children: { name: string; from: number; to: number }[] = []
+        const cursor = node.node.cursor()
+        if (cursor.firstChild()) {
+          do {
+            children.push({ name: cursor.name, from: cursor.from, to: cursor.to })
+          } while (cursor.nextSibling())
+        }
+
+        for (const range of wikiLinkHiddenSyntaxRanges(
+          node,
+          children,
+          view.state.selection.ranges,
+        )) {
+          decorations.push(Decoration.replace({}).range(range.from, range.to))
+        }
         return
       }
 
@@ -312,12 +331,12 @@ function wikiLinkInteraction(onActivate: (activation: WikiLinkActivation) => voi
       if (!parsed) return false
       event.preventDefault()
       this.pending = { from: node.from, to: node.to, original, target: parsed.target }
-      const validateCurrentOccurrence = () => {
+      const validateCurrentOccurrence = (authoritativeBody: string) => {
         const pending = this.pending
         return Boolean(
           pending
           && pending.target === parsed.target
-          && view.state.sliceDoc(pending.from, pending.to) === pending.original,
+          && validateWikiLinkOccurrence(view.state, pending, authoritativeBody),
         )
       }
       onActivate({
@@ -325,7 +344,7 @@ function wikiLinkInteraction(onActivate: (activation: WikiLinkActivation) => voi
         validateCurrentOccurrence,
         applyCanonical: (canonicalTarget, resolvedTitle) => {
           const pending = this.pending
-          if (!validateCurrentOccurrence() || !pending) return null
+          if (!validateCurrentOccurrence(view.state.doc.toString()) || !pending) return null
           this.pending = null
           const replacement = canonicalResolvedWikiLink(
             canonicalTarget,

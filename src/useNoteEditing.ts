@@ -47,7 +47,10 @@ export function useNoteEditing(
   }, [])
 
   const flush = useCallback(async () => {
-    return await sessionRef.current?.flush() ?? false
+    const session = sessionRef.current
+    if (!session) return null
+    const snapshot = await session.flush()
+    return sessionRef.current === session ? snapshot : null
   }, [])
 
   const close = useCallback(() => {

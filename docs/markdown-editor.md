@@ -13,7 +13,7 @@ The editor parses CommonMark plus the GitHub Flavored Markdown extensions suppli
 - Autolinks
 - Syntax highlighting for recognized fenced-code language names
 
-The document remains plain Markdown. Preview, live-preview replacement widgets, wiki links, and backlink discovery are outside the current application phase. Persistence is provided through the Tauri Markdown vault commands.
+The document remains plain Markdown. Supported wiki links use `[[target]]` or `[[target|display text]]`; paths, headings, blocks, embeds, and links in code remain unsupported. Backlink discovery remains outside the current application phase. Persistence is provided through the Tauri Markdown vault commands.
 
 ## Writing behavior
 
@@ -25,6 +25,7 @@ The document remains plain Markdown. Preview, live-preview replacement widgets, 
 - Narrow editor layouts reserve enough source gutter to keep headings through level six visible without horizontal scrolling.
 - Programming ligatures are disabled in the Markdown surface so punctuation remains literal, while normal kerning remains enabled.
 - Long URLs and identifiers can wrap without widening the writing column.
+- Wiki links use a Live Preview treatment: inactive plain links show their target, aliases show only their display text, and the complete source syntax reappears whenever a cursor or selection touches the link. Primary Ctrl-click on Linux/Windows or Cmd-click on macOS uses the existing flush-gated open-or-create navigation path.
 - Markdown-aware Enter and Backspace continue or exit lists and blockquotes. Enter continues a blockquote once; pressing Enter again on that untouched empty quote line exits it.
 - Cmd/Ctrl-B, Cmd/Ctrl-I, Cmd/Ctrl-`, and Cmd/Ctrl-Shift-X semantically toggle bold, italic, inline-code, and strikethrough markup. Commands normalize partial same-style spans, operate independently across parsed blocks and multiple selections, preserve structural prefixes, and keep invalid boundary whitespace outside delimiters.
 - Cmd/Ctrl-K creates or removes Markdown links. It edits existing destinations instead of nesting links and declines selections that cross block boundaries.

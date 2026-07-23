@@ -89,6 +89,23 @@ describe('NoteEditingSession', () => {
     expect(session.current().draft.title).toBe('New title')
   })
 
+  test('flush returns the authoritative canonical snapshot', async () => {
+    const session = new NoteEditingSession(adapter({
+      rename: async () => ({
+        key: 'New.md',
+        title: 'New',
+        body: 'Self [[New]]',
+        revision: 'two',
+      }),
+    }), { ...original, key: 'Old.md', title: 'Old', body: 'Self [[Old]]' }, () => {})
+
+    session.updateDraft({ title: 'New', body: 'Self [[Old]]' })
+    const flushed = await session.flush()
+
+    expect(flushed?.key).toBe('New.md')
+    expect(flushed?.draft.body).toBe('Self [[New]]')
+  })
+
   test('preserves newer edits while an older save is pending', async () => {
     const pending = deferred<Note>()
     const session = new NoteEditingSession(adapter({
@@ -138,7 +155,7 @@ describe('NoteEditingSession', () => {
     })
     await firstSave
 
-    expect(await flush).toBe(true)
+    expect((await flush)?.savedDraft.body).toBe('Newer edit')
     expect(savedBodies).toEqual(['First edit', 'Newer edit'])
     expect(session.current().savedDraft.body).toBe('Newer edit')
   })
@@ -153,7 +170,7 @@ describe('NoteEditingSession', () => {
     }), original, () => {})
 
     session.updateDraft({ title: original.title, body: 'Local edit' })
-    expect(await session.flush()).toBe(false)
+    expect(await session.flush()).toBeNull()
     session.updateDraft({ title: original.title, body: 'Another edit' })
     await session.save()
 

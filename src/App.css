@@ -134,6 +134,12 @@
   }
 }
 
+@media (prefers-color-scheme: dark) {
+  .markdown-editor .cm-wiki-link {
+    color: var(--color-ink);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .backlinks-popover {
     transform: none !important;

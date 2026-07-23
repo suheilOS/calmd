@@ -5,6 +5,7 @@ import { ComposerScreen } from './ComposerScreen'
 import { NoteEditor } from './NoteEditor'
 import type { WikiLinkActivation } from './MarkdownEditor'
 import { NoteNavigation } from './noteNavigation'
+import { resolveWikiLinkActivation } from './wikiLinkNavigation'
 import { AppShell } from './TitleBar'
 import {
   canonicalizeTitle,
@@ -195,22 +196,19 @@ function App() {
   }
 
   async function activateWikiLink(activation: WikiLinkActivation) {
+    const activatedKey = noteEditing.snapshot?.key
     const generation = navigationRef.current.startTransition()
-    if (generation === null) return
+    if (generation === null || !activatedKey) return
     try {
-      if (!(await noteEditing.flush()) || !navigationRef.current.isCurrent(generation)) return
-      if (!activation.validateCurrentOccurrence()) return
-      const resolved = await openStoredNoteLink(activation.target)
-      if (!navigationRef.current.isCurrent(generation)) return
-      const rewrittenBody = activation.applyCanonical(
-        resolved.canonicalTarget,
-        resolved.note.title,
-      )
-      if (rewrittenBody === null) return
-      noteEditing.updateBody(rewrittenBody)
-      if (!(await noteEditing.flush()) || !navigationRef.current.isCurrent(generation)) return
-      if (noteEditing.snapshot?.key === resolved.note.key) return
-      beginEditing(resolved.note)
+      const destination = await resolveWikiLinkActivation({
+        activatedKey,
+        activation,
+        flush: noteEditing.flush,
+        open: openStoredNoteLink,
+        updateBody: noteEditing.updateBody,
+        isCurrent: () => navigationRef.current.isCurrent(generation),
+      })
+      if (destination) beginEditing(destination)
     } catch (error) {
       setStorageMessage(getStorageError(error).message)
       await refreshVault()

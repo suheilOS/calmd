@@ -124,9 +124,9 @@ export class NoteEditingSession {
     return operation
   }
 
-  async flush() {
+  async flush(): Promise<NoteEditingSnapshot | null> {
     this.cancelScheduledSave()
-    if (this.snapshot.conflict) return false
+    if (this.snapshot.conflict) return null
     if (!draftsMatch(this.snapshot.draft, this.snapshot.savedDraft)) {
       await this.save()
     } else {
@@ -136,6 +136,8 @@ export class NoteEditingSession {
       this.snapshot.draft,
       this.snapshot.savedDraft,
     )
+      ? this.snapshot
+      : null
   }
 
   async reload() {
