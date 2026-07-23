@@ -1,8 +1,8 @@
 # Derived SQLite + FTS5 index research
 
-## Recommendation
+## Implemented design
 
-Proceed with a rebuildable SQLite database in Tauri’s app-data directory, using:
+Calmd uses a rebuildable SQLite database in Tauri’s app-data directory, using:
 
 - `rusqlite` with bundled SQLite
 - A regular `notes` table for derived metadata
@@ -14,15 +14,16 @@ Proceed with a rebuildable SQLite database in Tauri’s app-data directory, usin
 
 ## Current architecture impact
 
-Today:
+The implemented phase:
 
-- `open_vault` scans and returns every Markdown note: `src-tauri/src/storage.rs:122`
-- React stores the entire vault and searches synchronously: `src/App.tsx:35-62`
-- Exact-title detection prevents accidental duplicate creation: `src/App.tsx:204-215`
-- Focus triggers another complete scan into frontend memory: `src/App.tsx:85-92`
-- Retrieval uses case-folded substring checks and returns three results: `src/notes.ts:28-51`
+- Keeps Markdown files as the source of truth in the selected vault
+- Keeps filesystem access and note mutations in Rust-owned Tauri commands
+- Removes complete-vault search data from frontend memory
+- Uses explicit exact-title detection to prevent duplicate creation
+- Reconciles the derived index on launch and focus, then searches asynchronously
+- Preserves the three-result composer presentation and returns only bounded excerpts
 
-The next phase should remove the frontend `notes` collection while preserving exact-title behavior and the three-result composer presentation.
+The SQLite database is derived state and can be rebuilt without changing Markdown files.
 
 ## Recommended storage design
 
@@ -92,7 +93,7 @@ Tradeoff: trigram indexes are larger than word-token indexes. That is acceptable
 
 ## Search contract
 
-Suggested Rust command:
+Implemented Rust command:
 
 ```ts
 type SearchResponse = {
@@ -116,18 +117,20 @@ Behavior:
 
 An explicit exact-title query is necessary because BM25 ranking alone cannot guarantee the duplicate-prevention behavior currently provided by React.
 
-Suggested FTS ordering:
+Implemented FTS query shape:
 
 ```sql
-SELECT
-  notes.key,
-  notes.title,
-  snippet(note_fts, 1, '', '', ' … ', 32) AS excerpt
-FROM note_fts(?, 'bm25(8.0, 1.0)')
+SELECT notes.key,
+       notes.title,
+       snippet(note_fts, 1, '', '', ' … ', 96)
+FROM note_fts
 JOIN notes ON notes.id = note_fts.rowid
-ORDER BY rank, notes.normalized_title, notes.key
-LIMIT 3;
+WHERE note_fts MATCH ?1
+ORDER BY bm25(note_fts, 8.0, 1.0), notes.normalized_title, notes.key
+LIMIT ?2;
 ```
+
+The Rust boundary normalizes the snippet, removes visible `[[...]]` wiki-link brackets, and caps every returned excerpt at 240 Unicode characters. Exact-title results use a bounded leading body excerpt and bypass FTS.
 
 FTS5 assigns numerically lower BM25 values to better matches and supports per-column weights, so `8.0` gives titles substantially more influence than bodies. See [BM25](https://www.sqlite.org/fts5.html#the_bm25_function) and [snippet](https://www.sqlite.org/fts5.html#the_snippet_function).
 
@@ -240,20 +243,20 @@ Bundling avoids relying on each platform’s system SQLite configuration. Rusqli
 
 ## Frontend integration
 
-Replace the synchronous `useMemo` search with:
+The frontend search integration uses:
 
-- A 100–150 ms debounce
+- A 120 ms debounce
 - A monotonically increasing request ID
 - Ignoring responses older than the latest request
 - Immediate clearing for an empty query
 - Rerunning the current query after a focus reconciliation
-- An immediate authoritative search before composer submission, so Enter cannot create a duplicate while a debounced request is pending
+- The authoritative Rust create-or-open operation when submitting without a known exact result
 
-Keep `ComposerScreen` visually unchanged. It should receive `SearchHit[]` and render the returned excerpt instead of deriving one from the complete note body.
+`ComposerScreen` remains visually unchanged. It receives `SearchHit[]` and renders the bounded excerpt returned by Rust rather than deriving one from a complete note body.
 
-An index or search failure should not set `vaultReady` to false. The vault and editor remain usable independently of SQLite.
+An index or search failure does not set `vaultReady` to false. The vault and editor remain usable independently of SQLite.
 
-Tauri recommends async commands for heavy work; rescans and SQLite work should run through its blocking executor rather than freezing the UI.
+Tauri blocking commands keep rescans and SQLite work from freezing the UI.
 
 ## Required validation
 
@@ -269,7 +272,7 @@ Automated Rust tests should cover:
 8. Quotes and FTS metacharacters never producing syntax errors.
 9. Title matches ranking above equivalent body-only matches.
 10. Japanese substring and accent-insensitive retrieval.
-11. Excerpts centered near body matches.
+11. Excerpts bounded around body matches and cleaned before IPC.
 12. Failed index updates not changing successful note-save results.
 13. Database files never appearing inside the vault.
 

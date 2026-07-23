@@ -32,7 +32,7 @@ Renames stage and sync the complete new file in the vault, verify the original r
 
 A filesystem cannot provide one portable atomic operation that simultaneously replaces file content and changes its name. There is therefore a brief interval between unlinking the original path and installing the new path. Calmd restores the original after ordinary errors, but a process or machine failure in that interval can leave the complete original in a `.calmd-backup-*.tmp` file. The strategy also requires same-filesystem hard-link support inside the vault. As with atomic save replacement, an external process can still race the final revision check. Cleanup failures are logged rather than reported as failed saves after the new note has already been committed.
 
-The search database stores note keys, titles, bodies, revisions, and filesystem modification times under Tauri app data. FTS5 indexes titles and bodies with title-weighted BM25 ranking and trigram substring matching. Launch and focus scans reconcile the complete top-level Markdown snapshot transactionally. Missing, incompatible, and corrupt databases are discarded and rebuilt; index failures never roll back a successful Markdown write.
+The search database stores note keys, titles, bodies, revisions, and filesystem modification times under Tauri app data. FTS5 indexes titles and bodies with title-weighted BM25 ranking and trigram substring matching. Non-exact results use match-specific FTS5 snippets with a 96-token context window; Rust removes visible `[[...]]` brackets and bounds every excerpt at 240 Unicode characters before Tauri IPC. Exact-title results bypass FTS, read at most 480 body characters, and return one result with a bounded leading excerpt. Launch and focus scans reconcile the complete top-level Markdown snapshot transactionally. Missing, incompatible, and corrupt databases are discarded and rebuilt; index failures never roll back a successful Markdown write.
 
 ### Deferred
 
@@ -72,15 +72,16 @@ The full collection is never shown by default.
 * SQLite stores indexes and system metadata
 * Markdown remains the source of truth
 
-## Target search
+## Current search
 
-Use hybrid retrieval:
+Use literal retrieval through the derived index:
 
-* SQLite FTS5 for exact text matching
-* Embeddings for semantic similarity
-* Combined ranking for final results
+* SQLite FTS5 trigram matching for title and body text
+* Title-weighted BM25 ranking
+* Exact-title precedence
+* Match-specific, bounded excerpts
 
-Results show the title and a short matching excerpt.
+Results show the title and a short matching excerpt. Embeddings, semantic similarity, and combined ranking remain deferred.
 
 ## Target editor
 
@@ -104,8 +105,8 @@ Results show the title and a short matching excerpt.
 
 1. **Completed:** Composer prototype with mock notes
 2. **Completed:** Minimal note editor
-3. **Prototype only:** Literal title and body retrieval over mock notes
-4. **Prototype only:** In-memory note creation and saving
+3. **Superseded:** Prototype literal title and body retrieval over mock notes
+4. **Superseded:** Prototype in-memory note creation and saving
 5. **UI placeholder only:** Backlinks popover; wiki links and backlink discovery remain deferred
 6. **Completed:** Tauri Markdown vault integration with atomic, conflict-safe saving
 7. **Completed:** Rebuildable SQLite/FTS5 literal search with ranked excerpts

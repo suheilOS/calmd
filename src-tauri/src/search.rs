@@ -13,6 +13,8 @@ const DATABASE_FILE: &str = "search-index.sqlite3";
 const SCHEMA_VERSION: i64 = 1;
 const APPLICATION_ID: i64 = 0x4341_4c4d;
 const MAX_QUERY_CHARACTERS: usize = 120;
+const MAX_EXCERPT_CHARACTERS: usize = 240;
+const EXACT_EXCERPT_SOURCE_CHARACTERS: i64 = 480;
 const RESULT_LIMIT: i64 = 3;
 
 const UPSERT_NOTE: &str = "
@@ -588,12 +590,12 @@ fn search_connection(
     let normalized_title = normalize_title(canonical_query);
     let exact = connection
         .query_row(
-            "SELECT key, title, body
+            "SELECT key, title, substr(body, 1, ?2)
              FROM notes
              WHERE normalized_title = ?1
              ORDER BY key COLLATE NOCASE, key
              LIMIT 1",
-            [&normalized_title],
+            params![normalized_title, EXACT_EXCERPT_SOURCE_CHARACTERS],
             |row| {
                 let body: String = row.get(2)?;
                 Ok(SearchHit {
@@ -619,7 +621,7 @@ fn search_connection(
         .prepare(
             "SELECT notes.key,
                     notes.title,
-                    notes.body
+                    snippet(note_fts, 1, '', '', ' … ', 96)
              FROM note_fts
              JOIN notes ON notes.id = note_fts.rowid
              WHERE note_fts MATCH ?1
@@ -680,12 +682,22 @@ fn fts_expression(query: &str) -> Option<String> {
 }
 
 fn clean_excerpt(excerpt: &str) -> String {
-    excerpt
+    let cleaned = excerpt
         .replace("[[", "")
         .replace("]]", "")
         .split_whitespace()
         .collect::<Vec<_>>()
-        .join(" ")
+        .join(" ");
+    let mut characters = cleaned.chars();
+    let bounded = characters
+        .by_ref()
+        .take(MAX_EXCERPT_CHARACTERS.saturating_sub(1))
+        .collect::<String>();
+    if characters.next().is_some() {
+        format!("{}…", bounded.trim_end())
+    } else {
+        bounded
+    }
 }
 
 #[cfg(test)]
@@ -757,18 +769,67 @@ mod tests {
     }
 
     #[test]
-    fn exact_titles_bypass_fts_minimum_and_return_one_result() {
+    fn body_excerpt_is_match_specific_concise_and_cleans_wiki_brackets() {
+        let data = tempdir().unwrap();
+        let vault = tempdir().unwrap();
+        let search = state(data.path());
+        let opening = "unrelated opening material ".repeat(80);
+        let body =
+            format!("{opening}transition text [[distinctive phrase]] with useful nearby context");
+        search
+            .reconcile(vault.path(), &[note("Long.md", "Long note", &body, "one")])
+            .unwrap();
+
+        let response = search.search("distinctive phrase").unwrap();
+        let excerpt = &response.results[0].excerpt;
+
+        assert!(excerpt.contains("distinctive phrase"));
+        assert!(excerpt.contains("useful nearby context"));
+        assert!(!excerpt.starts_with("unrelated opening material"));
+        assert!(excerpt.chars().count() <= MAX_EXCERPT_CHARACTERS);
+        assert!(!excerpt.contains("[["));
+        assert!(!excerpt.contains("]]"));
+    }
+
+    #[test]
+    fn title_matches_rank_above_equivalent_body_only_matches() {
         let data = tempdir().unwrap();
         let vault = tempdir().unwrap();
         let search = state(data.path());
         search
-            .reconcile(vault.path(), &[note("Go.md", "Go", "Short title", "one")])
+            .reconcile(
+                vault.path(),
+                &[
+                    note("Body.md", "Field notes", "quiet signal", "one"),
+                    note("Title.md", "Quiet signal", "unrelated body", "two"),
+                ],
+            )
+            .unwrap();
+
+        let response = search.search("quiet sig").unwrap();
+        assert_eq!(response.results[0].key, "Title.md");
+    }
+
+    #[test]
+    fn exact_titles_bypass_fts_minimum_and_return_one_bounded_result() {
+        let data = tempdir().unwrap();
+        let vault = tempdir().unwrap();
+        let search = state(data.path());
+        search
+            .reconcile(
+                vault.path(),
+                &[
+                    note("Go.md", "Go", &"opening text ".repeat(100), "one"),
+                    note("Other.md", "Other", "Go appears in the body", "two"),
+                ],
+            )
             .unwrap();
 
         let response = search.search("  GO ").unwrap();
         assert!(response.has_exact_match);
         assert_eq!(response.results.len(), 1);
         assert_eq!(response.results[0].key, "Go.md");
+        assert!(response.results[0].excerpt.chars().count() <= MAX_EXCERPT_CHARACTERS);
     }
 
     #[test]
