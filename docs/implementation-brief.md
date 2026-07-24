@@ -1,18 +1,19 @@
-# Product Implementation Brief
+# Product implementation brief
 
-## Current phase: literal retrieval and internal linking
+## Current phase: literal retrieval, Markdown editing, and internal linking
 
-The interface reads and writes top-level Markdown notes in one user-selected vault through dedicated Rust commands. Markdown remains the sole source of truth. A disposable schema-version-2 SQLite/FTS5 database in Tauri app data provides ranked literal retrieval and derived backlinks without placing system metadata in the vault.
+The interface reads and writes top-level Markdown notes in one user-selected vault through dedicated Rust commands. Markdown is the sole source of truth. A disposable schema-version-2 SQLite/FTS5 database in Tauri app data provides ranked literal retrieval and derived backlinks without placing system metadata in the vault.
 
 ### Completed
 
 - Blank composer with no collection overview or recent-notes feed
 - Ranked title and body retrieval through a rebuildable SQLite/FTS5 trigram index
+- Literal match highlighting in composer result titles and excerpts
 - Concise matching excerpts returned by Rust without loading the vault into frontend memory
 - Exact-title matching that opens the existing note instead of creating a duplicate
 - Keyboard and pointer navigation through retrieval results
 - Named vault creation inside a user-selected parent directory, with the canonicalized child path persisted
-- Rust create, read, save, and rename commands using relative note keys
+- Rust create, read, save, rename, and link open-or-create commands using relative note keys
 - Framework-independent Note persistence behind the Tauri commands, with filesystem behavior tested through its interface
 - Framework-neutral Note editing sessions that own autosave sequencing, canonical save reconciliation, conflict state, and flush-before-return behavior
 - Canonical `# Title` Markdown serialization and content-preserving external-file parsing
@@ -36,7 +37,7 @@ Renames stage and sync the complete new file in the vault, verify the original r
 
 A filesystem cannot provide one portable atomic operation that simultaneously replaces file content and changes its name. There is therefore a brief interval between unlinking the original path and installing the new path. Calmd restores the original after ordinary errors, but a process or machine failure in that interval can leave the complete original in a `.calmd-backup-*.tmp` file. The strategy also requires same-filesystem hard-link support inside the vault. As with atomic save replacement, an external process can still race the final revision check. Cleanup failures are logged rather than reported as failed saves after the new note has already been committed.
 
-The search database stores note keys, normalized filename identities, titles, bodies, revisions, filesystem modification times, and outgoing links under Tauri app data. Schema version 2 derives backlinks while FTS5 indexes titles and bodies with title-weighted BM25 ranking and trigram substring matching. Non-exact results use match-specific FTS5 snippets with a 96-token context window; Rust removes visible `[[...]]` brackets and bounds every excerpt at 240 Unicode characters before Tauri IPC. Exact-title results bypass FTS, read at most 480 body characters, and return one result with a bounded leading excerpt. Launch and focus scans reconcile the complete top-level Markdown snapshot transactionally. Missing, incompatible, and corrupt databases are discarded and rebuilt; index failures never roll back a successful Markdown write.
+The search database stores note keys, normalized filename identities, titles, bodies, revisions, filesystem modification times, and outgoing links under Tauri app data. Schema version 2 derives backlinks while FTS5 indexes titles and bodies with title-weighted BM25 ranking and trigram substring matching. Non-exact results use match-specific FTS5 snippets with a 96-token context window. Rust removes visible `[[...]]` brackets and bounds every excerpt at 240 Unicode characters before Tauri IPC. Exact-title results bypass FTS, read at most 480 body characters, and return one result with a bounded leading excerpt. Launch and focus scans reconcile the complete top-level Markdown snapshot transactionally. Missing, incompatible, and corrupt databases are discarded and rebuilt. Index failures never roll back a successful Markdown write.
 
 ### Remaining limitations and deferred work
 
@@ -46,67 +47,45 @@ The search database stores note keys, normalized filename identities, titles, bo
 - Filesystem watching, deletion, nested folders, and multiple vaults
 - Operating-system/browser history integration, persisted history, and cursor or scroll restoration
 
-## Target experience
+## Current experience
 
-The app opens to a single composer.
+The app opens to a single composer. As the user types, it searches existing notes, shows relevant matches, and offers to create a new note. There is no sidebar, file tree, dashboard, graph, note count, or recent-notes feed.
 
-As the user types, it:
+## Current navigation
 
-* Searches existing notes
-* Shows relevant matches
-* Offers to create a new note
+Knowledge is accessed through literal retrieval, inline `[[links]]`, backlinks, and application-owned back and forward navigation. The full collection is never shown by default.
 
-There is no sidebar, file tree, dashboard, graph, note count, or recent-notes feed.
+## Current note storage
 
-## Target navigation
-
-Knowledge is accessed through:
-
-* Search
-* Inline `[[links]]`
-* Backlinks
-* Browser-style back navigation
-
-The full collection is never shown by default.
-
-## Target note storage
-
-* Stored as plain Markdown files
-* Kept in one vault folder
-* No folders, tags, or user-defined properties
-* SQLite stores indexes and system metadata
-* Markdown remains the source of truth
+- Plain Markdown files in one vault folder
+- No folders, tags, or user-defined properties
+- SQLite indexes and system metadata in Tauri app data
+- Markdown remains the source of truth
 
 ## Current search
 
-Use literal retrieval through the derived index:
+Literal retrieval uses SQLite FTS5 trigram matching for title and body text, title-weighted BM25 ranking, exact-title precedence, bounded match-specific excerpts, and client-side highlighting of literal query matches. Embeddings, semantic similarity, and combined ranking remain deferred.
 
-* SQLite FTS5 trigram matching for title and body text
-* Title-weighted BM25 ranking
-* Exact-title precedence
-* Match-specific, bounded excerpts
+## Current editor
 
-Results show the title and a short matching excerpt. Embeddings, semantic similarity, and combined ranking remain deferred.
+- Full-page CodeMirror Markdown editor
+- Automatic saving with conflict detection and reload recovery
+- Live Preview treatment for supported wiki links
+- Minimal formatting controls
+- Backlinks hidden until requested
+- No permanent secondary panels
 
-## Target editor
+## Current technology
 
-* Full-page Markdown editor
-* Automatic saving
-* Minimal formatting controls
-* Backlinks hidden until requested
-* No permanent secondary panels
+- React + Vite
+- Base UI
+- Tauri 2 desktop shell
+- Tailwind CSS
+- CodeMirror
+- Rust
+- SQLite with FTS5
 
-## Target technology
-
-* React + Vite
-* Base UI
-* Tauri 2 desktop shell
-* Tailwind CSS
-* CodeMirror
-* Rust
-* SQLite
-
-## Delivery roadmap
+## Delivery history
 
 1. **Completed:** Composer prototype with mock notes
 2. **Completed:** Minimal note editor
@@ -115,11 +94,11 @@ Results show the title and a short matching excerpt. Embeddings, semantic simila
 5. **Completed:** On-demand backlinks, internal wiki links, and conflict-safe navigation
 6. **Completed:** Tauri Markdown vault integration with atomic, conflict-safe saving and coordinated rename rewriting
 7. **Completed:** Rebuildable schema-version-2 SQLite/FTS5 literal search, ranked excerpts, and backlink index
-8. **Research next:** Embeddings, semantic retrieval, and combined ranking
+
+Further work on embeddings and semantic retrieval is deferred and outside the current prototype scope.
 
 ## Constraint
 
 Every feature must pass one test:
 
 > Does this help the user retrieve or develop the current thought without exposing the scale of the entire collection?
-

@@ -37,19 +37,15 @@ An existing note that is relevant to the current thought but does not have the s
 _Avoid_: Exact match
 
 **Title match**:
-A retrieval match found through the note’s title. The result is represented by the note title.
+A retrieval match found through the note's title. The result is represented by the note title.
 _Avoid_: Content result
 
-**Semantic match**:
-A retrieval match found through related meaning without a literal matching phrase. The result is represented by the note title only.
-_Avoid_: Generated answer
-
 **Content match**:
-A retrieval match found in the note’s content. The result shows the note title and the line containing the match when available.
+A retrieval match found in the note's content. The result shows the note title and the line containing the match when available.
 _Avoid_: Title-only result
 
 **Rename note**:
-Changing a note’s title without creating a second note or changing the note’s content.
+Changing a note's title without creating a second note or changing the note's content.
 _Avoid_: Create replacement note
 
 **Create note**:

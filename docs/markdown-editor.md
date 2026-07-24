@@ -12,6 +12,7 @@ The editor parses CommonMark plus the GitHub Flavored Markdown extensions suppli
 - Strikethrough
 - Autolinks
 - Syntax highlighting for recognized fenced-code language names
+- The project's `==highlighted text==` inline extension
 
 The document remains plain Markdown. Supported wiki links use `[[target]]` or `[[target|display text]]`; paths, headings, blocks, embeds, and links in code remain unsupported. Backlinks are derived from the rebuildable index and remain hidden in an on-demand popover until requested. Persistence is provided through the Tauri Markdown vault commands.
 
@@ -27,12 +28,12 @@ The document remains plain Markdown. Supported wiki links use `[[target]]` or `[
 - Long URLs and identifiers can wrap without widening the writing column.
 - Wiki links use a Live Preview treatment: inactive plain links show their target, aliases show only their display text, and the complete source syntax reappears whenever a cursor or selection touches the link. Primary Ctrl-click on Linux/Windows or Cmd-click on macOS uses the existing flush-gated open-or-create navigation path.
 - Markdown-aware Enter and Backspace continue or exit lists and blockquotes. Enter continues a blockquote once; pressing Enter again on that untouched empty quote line exits it.
-- Cmd/Ctrl-B, Cmd/Ctrl-I, Cmd/Ctrl-`, and Cmd/Ctrl-Shift-X semantically toggle bold, italic, inline-code, and strikethrough markup. Commands normalize partial same-style spans, operate independently across parsed blocks and multiple selections, preserve structural prefixes, and keep invalid boundary whitespace outside delimiters.
+- Cmd/Ctrl-B, Cmd/Ctrl-I, Cmd/Ctrl-`, Cmd/Ctrl-Shift-H, and Cmd/Ctrl-Shift-X semantically toggle bold, italic, inline code, highlight, and strikethrough markup. Commands operate across parsed blocks and multiple selections, preserve structural prefixes, and keep invalid boundary whitespace outside delimiters.
 - Cmd/Ctrl-K creates or removes Markdown links. It edits existing destinations instead of nesting links and declines selections that cross block boundaries.
 - Undo, redo, find, replace, multiple selections, bracket matching, bracket closing, and Tab indentation use CodeMirror's standard commands and keymaps.
-- Browser spellcheck and an accessible multiline label are set on the editable surface.
+- Browser spellcheck is disabled on the editable surface so the source editor does not add browser-specific annotations. The surface still has an accessible multiline label.
 - The editor owns its document state while typing. React receives document changes through an update listener and only dispatches an external replacement when the incoming value actually differs.
 
 ## Benchmarks
 
-iA Writer informs the restrained, full-page writing surface: no toolbar, gutter, preview split, or persistent controls. Obsidian informs source-mode interoperability: familiar Markdown continuation, search/history commands, GFM syntax, and fenced-code language highlighting. The prototype intentionally does not reproduce either product's file-management or plugin features.
+iA Writer informs the restrained, full-page writing surface: no toolbar, gutter, preview split, or persistent controls. Obsidian informs source-mode interoperability: familiar Markdown continuation, search/history commands, GFM syntax, and fenced-code language highlighting. Calmd uses those precedents without reproducing either product's file-management or plugin features.

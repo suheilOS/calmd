@@ -1,46 +1,30 @@
-# Derived SQLite + FTS5 index research
+# Derived SQLite + FTS5 index
 
 ## Implemented design
 
-Calmd uses a rebuildable SQLite database in Tauri’s app-data directory, using:
+Calmd uses a rebuildable SQLite database in Tauri's app-data directory at `search-index.sqlite3`, using:
 
-- `rusqlite` with bundled SQLite
-- A regular `notes` table for derived metadata
+- `rusqlite` with bundled SQLite and FTS5
+- A regular `notes` table for derived note metadata
 - An external-content FTS5 table indexing only `title` and `body`
-- The FTS5 trigram tokenizer to preserve Calmd’s current substring-oriented, multilingual retrieval
+- The FTS5 trigram tokenizer with case folding and diacritic removal
+- A `note_links` table for outgoing wiki-link identities and on-demand backlinks
 - Transactional reconciliation on launch and window focus
-- Immediate best-effort index updates after create, save, and rename
+- Immediate best-effort index updates after create and save
+- Full reconciliation after coordinated rename
 - Automatic recreation for missing, incompatible, or corrupt databases
 
-## Current architecture impact
+The SQLite database is derived state. It can be removed and rebuilt without changing Markdown files.
 
-The implemented phase:
+## Schema
 
-- Keeps Markdown files as the source of truth in the selected vault
-- Keeps filesystem access and note mutations in Rust-owned Tauri commands
-- Removes complete-vault search data from frontend memory
-- Uses explicit exact-title detection to prevent duplicate creation
-- Reconciles the derived index on launch and focus, then searches asynchronously
-- Preserves the three-result composer presentation and returns only bounded excerpts
-
-The SQLite database is derived state and can be rebuilt without changing Markdown files.
-
-## Recommended storage design
-
-Database path:
-
-```text
-app.path().app_data_dir()/search-index.sqlite3
-```
-
-With the current identifier, Tauri resolves app-data beneath the platform data directory plus `com.calmd.desktop`. This is the intended API behavior in [Tauri’s implementation](https://github.com/tauri-apps/tauri/blob/08acfb3fa04945a6a4f822d66c7556111d9385aa/crates/tauri/src/path/desktop.rs#L244-L250).
-
-Suggested schema:
+The current schema is version 2. It stores the canonical vault path in `metadata`, does not store a unique normalized filename identity, and intentionally permits case-colliding external files so links can resolve them as ambiguous.
 
 ```sql
 CREATE TABLE notes (
   id               INTEGER PRIMARY KEY,
   key              TEXT NOT NULL UNIQUE,
+  normalized_key   TEXT NOT NULL,
   title            TEXT NOT NULL,
   normalized_title TEXT NOT NULL,
   body             TEXT NOT NULL,
@@ -48,8 +32,13 @@ CREATE TABLE notes (
   modified_at_ms   INTEGER NOT NULL
 );
 
-CREATE INDEX notes_normalized_title
-ON notes(normalized_title);
+CREATE TABLE note_links (
+  source_key            TEXT NOT NULL,
+  position              INTEGER NOT NULL,
+  target_normalized_key TEXT NOT NULL,
+  PRIMARY KEY (source_key, position),
+  FOREIGN KEY (source_key) REFERENCES notes(key) ON DELETE CASCADE
+);
 
 CREATE VIRTUAL TABLE note_fts USING fts5(
   title,
@@ -60,40 +49,11 @@ CREATE VIRTUAL TABLE note_fts USING fts5(
 );
 ```
 
-Add standard insert, update, and delete triggers from `notes` into `note_fts`.
-
-This design:
-
-- Stores every required field in `notes`
-- Tokenizes only meaningful searchable content
-- Avoids FTS duplicating complete title and body values
-- Allows ordinary constraints on `key`
-- Supports `bm25()` and `snippet()`
-
-SQLite documents the external-content pattern and required triggers in its [FTS5 external-content guidance](https://www.sqlite.org/fts5.html#external_content_tables).
-
-Also store a schema version and canonical vault path, using `PRAGMA user_version` plus a small metadata table. A different vault path or unknown schema version should cause a clean rebuild.
-
-## Tokenizer decision
-
-### Recommend trigram
-
-Calmd currently performs substring matching, not word-only matching. FTS5’s trigram tokenizer is explicitly designed for general substring retrieval and works better for:
-
-- Partial words while typing
-- Technical strings such as `C++`
-- Japanese and other text without whitespace-delimited words
-- Matches in the middle of a token
-
-SQLite documents that trigram queries require at least three Unicode characters. This aligns with Calmd’s current filtering of terms shorter than three characters. See [SQLite’s trigram tokenizer documentation](https://www.sqlite.org/fts5.html#the_trigram_tokenizer).
-
-A local prototype confirmed that a Japanese substring matched with trigram but not with `unicode61`.
-
-Tradeoff: trigram indexes are larger than word-token indexes. That is acceptable for this local, derived phase and better preserves current retrieval semantics.
+Triggers keep the external-content FTS table aligned with `notes`. Every connection enables foreign keys and uses a two-second busy timeout. Schema validation checks the application ID, user version, required tables, indexes, triggers, foreign keys, SQLite quick-check, and the FTS integrity check.
 
 ## Search contract
 
-Implemented Rust command:
+The Rust command returns:
 
 ```ts
 type SearchResponse = {
@@ -110,182 +70,53 @@ type SearchHit = {
 
 Behavior:
 
-1. Normalize the title query in Rust and check `normalized_title` first.
-2. If exact, return only that note and `hasExactMatch: true`.
-3. Otherwise run FTS and return at most three results.
-4. Open a selected result through the existing `read_note` command.
+1. Rust canonicalizes the query and checks normalized titles first.
+2. An exact title returns only that note with `hasExactMatch: true`.
+3. Otherwise FTS returns at most three results.
+4. Title matches receive a higher BM25 weight than body matches.
+5. Rust removes visible wiki-link brackets and bounds every excerpt at 240 Unicode characters.
+6. The frontend highlights literal query segments in result titles and excerpts.
+7. Selecting a result opens it through `read_note`; submitting an inexact thought uses the authoritative create-or-open command.
 
-An explicit exact-title query is necessary because BM25 ranking alone cannot guarantee the duplicate-prevention behavior currently provided by React.
+The FTS expression quotes the complete query and each whitespace-separated term of at least three characters. Embedded quotes are doubled. Raw composer text is never passed as FTS syntax, and the Rust query limit matches the 120-character composer limit.
 
-Implemented FTS query shape:
+Exact-title results bypass FTS and use at most 480 characters from the beginning of the body. Non-exact results use match-specific FTS5 snippets with a 96-token context window.
 
-```sql
-SELECT notes.key,
-       notes.title,
-       snippet(note_fts, 1, '', '', ' … ', 96)
-FROM note_fts
-JOIN notes ON notes.id = note_fts.rowid
-WHERE note_fts MATCH ?1
-ORDER BY bm25(note_fts, 8.0, 1.0), notes.normalized_title, notes.key
-LIMIT ?2;
-```
-
-The Rust boundary normalizes the snippet, removes visible `[[...]]` wiki-link brackets, and caps every returned excerpt at 240 Unicode characters. Exact-title results use a bounded leading body excerpt and bypass FTS.
-
-FTS5 assigns numerically lower BM25 values to better matches and supports per-column weights, so `8.0` gives titles substantially more influence than bodies. See [BM25](https://www.sqlite.org/fts5.html#the_bm25_function) and [snippet](https://www.sqlite.org/fts5.html#the_snippet_function).
-
-### Query safety
-
-Never pass raw composer text directly as FTS query syntax.
-
-Construct a bound FTS expression from quoted phrases:
-
-- Escape embedded `"` by doubling it
-- Include the complete query phrase
-- Include whitespace-separated terms of at least three characters joined with `OR`
-- Deduplicate terms
-- Keep the backend query-length limit consistent with the composer’s 120-character limit
-
-For example:
-
-```text
-"quiet process" OR "quiet" OR "process"
-```
-
-This rewards the full substring while still returning notes matching either term.
+FTS5 assigns lower BM25 values to better matches. Title and body weights are `8.0` and `1.0`. The trigram tokenizer preserves substring retrieval for partial words, technical strings, Japanese text, and matches in the middle of tokens. Queries shorter than three characters contribute no FTS phrase, although exact titles still work.
 
 ## Reconciliation lifecycle
 
-### Launch and focus
+On launch and window focus, Rust scans all top-level regular `.md` files using the note parser. It reads the content, calculates the revision, records filesystem modification time, extracts outgoing links, and reconciles notes and links in one SQLite transaction. Stale index rows are removed; no Markdown file is deleted.
 
-A reconciliation should:
+Each vault command holds the vault state lock before reading or mutating the index. Create and save update the changed note and its outgoing links after the Markdown write. Rename rewrites Markdown through the persistence transaction first, then scans the full vault. A successful Markdown write remains successful if its derived index update fails. The index is marked dirty and a later search or backlink request retries full reconciliation.
 
-1. Lock vault mutation for the duration.
-2. Scan all top-level regular `.md` files using the existing parsing rules.
-3. Read content, calculate revision, and collect filesystem modification time.
-4. Abort before changing SQLite if any required scan operation fails.
-5. In one SQLite transaction:
-   - Upsert every scanned note
-   - Record all scanned keys in a temporary table
-   - Delete index rows whose keys were not scanned
-   - Update the stored canonical vault path
-6. Commit atomically.
+A new target can make existing broken-link rows resolve after reconciliation because rows store normalized target identity. An ambiguous normalized filename identity resolves to neither note.
 
-Deleting stale SQLite rows is necessary reconciliation, not a Markdown deletion feature. No vault file is removed.
+## Recovery
 
-Do not trust modification time alone to skip reading files. Filesystems can have coarse timestamps, and external tools can preserve timestamps. The revision hash should remain authoritative for content identity; modification time is indexed metadata.
+Calmd recreates the database when it is missing, not a database, corrupt, incompatible with the current schema, or fails SQLite or FTS integrity checks. It does not delete the database for permission errors, disk-full errors, lock contention, or generic I/O failures.
 
-### Create, save, and rename
-
-Update the index immediately after successful filesystem mutation so returning to the composer does not show stale results.
-
-Important failure rule:
-
-> Once Markdown has been successfully written, an index failure must not turn that save into a reported note-save failure.
-
-Instead:
-
-- Return the successfully saved `Note`
-- Mark the index dirty
-- Log the index error
-- Force a full reconciliation before the next search
-
-A process crash between the Markdown write and index update is repaired by the next launch reconciliation.
-
-All vault and index operations should use a consistent lock order—vault first, index second—to prevent an older rescan snapshot overwriting a newer save.
-
-## Missing and corrupt database recovery
-
-Recommended startup sequence:
-
-1. Create the app-data directory.
-2. Open or create the database.
-3. Verify schema and application version.
-4. Run `PRAGMA quick_check(1)`.
-5. Run the FTS external-content integrity check:
-
-```sql
-INSERT INTO note_fts(note_fts, rank)
-VALUES('integrity-check', 1);
-```
-
-Passing `rank = 1` makes FTS5 compare its index against the external content table. SQLite documents this at [FTS5 integrity-check](https://www.sqlite.org/fts5.html#the_integrity_check_command).
-
-Recreate the database when:
-
-- It is missing
-- It is not an SQLite database
-- SQLite reports database corruption
-- The schema version is unsupported
-- FTS integrity fails
-
-Do **not** recreate it for permission errors, disk-full errors, lock contention, or generic I/O failures. Those should be surfaced without risking repeated deletion.
-
-`rusqlite` exposes distinct `DatabaseCorrupt` and `NotADatabase` codes in its [error mapping](https://github.com/rusqlite/rusqlite/blob/4707a1fce4d1bdbc2c4fc7b35266c13e31643cd8/libsqlite3-sys/src/error.rs#L26-L55).
-
-Close all connections before removing the database and any associated journal or WAL sidecars. Do not remove a journal before first allowing SQLite to attempt normal crash recovery.
-
-## Rust dependency
-
-Use the minimal bundled feature:
-
-```toml
-rusqlite = {
-  version = "0.40",
-  default-features = false,
-  features = ["bundled"]
-}
-```
-
-Bundling avoids relying on each platform’s system SQLite configuration. Rusqlite’s bundled build explicitly compiles SQLite with `SQLITE_ENABLE_FTS5` in [its build script](https://github.com/rusqlite/rusqlite/blob/4707a1fce4d1bdbc2c4fc7b35266c13e31643cd8/libsqlite3-sys/build.rs#L128-L137).
-
-`bundled-full` is unnecessary and enables many unrelated features.
+Connections close before the database and its `-journal`, `-wal`, and `-shm` sidecars are removed. The vault is never recreated or modified as part of index recovery. The next reconciliation rebuilds every derived row from Markdown.
 
 ## Frontend integration
 
-The frontend search integration uses:
+The composer uses a 120 ms debounce, a monotonically increasing request ID, immediate clearing for an empty query, and reruns the current query after a focus reconciliation. Search and index failures do not make the vault unavailable. Tauri blocking commands keep rescans and SQLite work off the UI thread.
 
-- A 120 ms debounce
-- A monotonically increasing request ID
-- Ignoring responses older than the latest request
-- Immediate clearing for an empty query
-- Rerunning the current query after a focus reconciliation
-- The authoritative Rust create-or-open operation when submitting without a known exact result
+## Validation
 
-`ComposerScreen` remains visually unchanged. It receives `SearchHit[]` and renders the bounded excerpt returned by Rust rather than deriving one from a complete note body.
+Rust tests cover initial indexing, external content changes, stale-row pruning, missing and invalid database recreation, exact Unicode titles, quotes and FTS metacharacters, title ranking, Japanese and accent-insensitive retrieval, bounded excerpts, backlink deduplication, ambiguity, transactional replacement, and successful note persistence when the index is unavailable. TypeScript tests cover frontend search-match segmentation.
 
-An index or search failure does not set `vaultReady` to false. The vault and editor remain usable independently of SQLite.
+A manual rebuild check is:
 
-Tauri blocking commands keep rescans and SQLite work from freezing the UI.
-
-## Required validation
-
-Automated Rust tests should cover:
-
-1. Initial build from Markdown.
-2. Incremental update after external content change.
-3. External rename represented as old-row removal plus new-row insertion.
-4. Stale index row pruning without deleting Markdown.
-5. Missing database recreation.
-6. Garbage or corrupt database recreation.
-7. Exact Unicode title matching.
-8. Quotes and FTS metacharacters never producing syntax errors.
-9. Title matches ranking above equivalent body-only matches.
-10. Japanese substring and accent-insensitive retrieval.
-11. Excerpts bounded around body matches and cleaned before IPC.
-12. Failed index updates not changing successful note-save results.
-13. Database files never appearing inside the vault.
-
-Completion test:
-
-1. Create several real Markdown notes.
+1. Create several Markdown notes.
 2. Launch Calmd and search through the composer.
-3. Close Calmd.
-4. Delete `search-index.sqlite3`.
-5. Relaunch.
-6. Confirm the same notes and excerpts are searchable.
-7. Confirm every Markdown file is byte-for-byte intact.
+3. Close Calmd and remove `search-index.sqlite3` from Tauri app data.
+4. Relaunch and search again.
+5. Confirm the same notes and excerpts are available.
+6. Confirm every Markdown file is unchanged.
 
 ## Not included
 
-This design adds no embeddings, backlink discovery, watcher, nested-folder traversal, or Markdown deletion. The SQLite database will contain plaintext derived copies of note content in app data; encryption is outside this phase.
+This phase does not include embeddings, semantic retrieval, combined ranking, filesystem watching, Markdown deletion, nested-folder traversal, multiple vaults, or encryption. SQLite stores plaintext derived copies of note content in app data; Markdown remains the source of truth.
+
+Sources: [SQLite external-content FTS5 tables](https://www.sqlite.org/fts5.html#external_content_tables), [FTS5 trigram tokenizer](https://www.sqlite.org/fts5.html#the_trigram_tokenizer), [BM25](https://www.sqlite.org/fts5.html#the_bm25_function), [FTS5 snippets](https://www.sqlite.org/fts5.html#the_snippet_function), and [FTS5 integrity checks](https://www.sqlite.org/fts5.html#the_integrity_check_command).

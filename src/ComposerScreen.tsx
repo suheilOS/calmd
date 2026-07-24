@@ -1,7 +1,8 @@
 import { Button } from '@base-ui/react/button'
 import { Input } from '@base-ui/react/input'
-import type { FormEvent, KeyboardEvent } from 'react'
+import type { FormEvent, KeyboardEvent, ReactNode } from 'react'
 import { MAX_NOTE_TITLE_LENGTH, type SearchHit } from './notes'
+import { segmentSearchMatches } from './searchHighlight'
 
 type ComposerScreenProps = {
   thought: string
@@ -16,6 +17,14 @@ type ComposerScreenProps = {
 
 const RESULT_CLASS_NAME =
   'group text-base block w-full rounded-xl bg-surface px-3 py-3 text-left text-ink transition-[background-color,color,transform] duration-150 ease-out aria-selected:bg-active aria-selected:text-active-ink focus-visible:bg-active focus-visible:text-active-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-faint active:scale-[0.97]'
+
+function highlightedText(text: string, query: string): ReactNode {
+  return segmentSearchMatches(text, query).map((segment, index) => (
+    segment.kind === 'match'
+      ? <mark className="rounded-[2px] bg-highlight text-inherit" key={index}>{segment.text}</mark>
+      : segment.text
+  ))
+}
 
 export function ComposerScreen({
   thought,
@@ -101,8 +110,8 @@ export function ComposerScreen({
                 role="option"
                 type="button"
               >
-                <span className="block break-words">{note.title}</span>
-                {note.excerpt ? <span className="mt-1 block truncate text-small text-faint group-aria-selected:text-active-muted group-focus-visible:text-active-muted">{note.excerpt}</span> : null}
+                <span className="block break-words">{highlightedText(note.title, thought)}</span>
+                {note.excerpt ? <span className="mt-1 block truncate text-small text-faint group-aria-selected:text-active-muted group-focus-visible:text-active-muted">{highlightedText(note.excerpt, thought)}</span> : null}
               </Button>
             ))}
             {!hasExactMatch ? (

@@ -78,6 +78,7 @@ body,
 html {
   background: var(--color-page);
   color-scheme: light dark;
+  scrollbar-gutter: stable;
 }
 
 @media (prefers-color-scheme: dark) {

@@ -90,7 +90,7 @@ export function TitleBar({ navigation }: { navigation?: TitleBarNavigation }) {
 
   return (
     <header
-      className="relative flex h-10 shrink-0 select-none items-center bg-canvas text-small text-secondary"
+      className="sticky top-0 z-20 flex h-10 shrink-0 select-none items-center bg-canvas text-small text-secondary"
       data-tauri-drag-region
     >
       <span className="pointer-events-none absolute inset-0 flex items-center justify-center" data-tauri-drag-region>

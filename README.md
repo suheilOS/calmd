@@ -4,13 +4,14 @@ A calm notes interface for developing or retrieving the current thought without 
 
 ## Current application
 
-Calmd is a Tauri 2 desktop application backed by a portable, user-selected Markdown vault. It includes:
+Calmd is a Tauri 2 desktop application backed by a portable Markdown vault. It includes:
 
 - A blank composer with ranked literal retrieval while typing
+- Literal match highlighting in result titles and excerpts
 - Exact-title handling that opens an existing note instead of creating a duplicate
 - Rust-owned create, read, save, and coordinated rename commands with conflict-safe Markdown writes
 - A rebuildable schema-version-2 SQLite/FTS5 trigram index with concise excerpts and derived backlinks
-- A minimal full-page note editor with automatic saving
+- A minimal full-page CodeMirror Markdown editor with automatic saving
 - `[[target]]` and `[[target|display text]]` links with modifier-click open-or-create navigation
 - Application-owned Back, Forward, and Home navigation gated by successful saves
 - An on-demand backlinks popover
@@ -19,6 +20,8 @@ Calmd is a Tauri 2 desktop application backed by a portable, user-selected Markd
 Markdown remains the source of truth. Internal links identify top-level Markdown filename stems case-insensitively. Paths, headings, blocks, embeds, multiline links, links in code, and ambiguous case-folded targets are unsupported. Embeddings and semantic retrieval remain deferred.
 
 ## Development
+
+Install Bun and the Rust toolchain, then run:
 
 ```sh
 bun install
