@@ -40,9 +40,7 @@ import {
 } from '@codemirror/view'
 import { tags } from '@lezer/highlight'
 import { GFM } from '@lezer/markdown'
-import { openUrl } from '@tauri-apps/plugin-opener'
 import { useEffect, useLayoutEffect, useRef } from 'react'
-import { externalLinkInteraction } from './externalLinkInteraction'
 import { insertNewlineContinueBlockquote } from './markdownBlockquote'
 import { markdownHighlight } from './markdownHighlight'
 import { toggleLink, toggleMarkdown } from './markdownCommands'
@@ -459,7 +457,6 @@ export function MarkdownEditor({
           maxRenderedOptions: 8,
           override: [wikiLinkCompletion((query) => suggestWikiLinksRef.current(query))],
         }),
-        externalLinkInteraction(openUrl),
         wikiLinkInteraction((activation) => onWikiLinkActivateRef.current(activation)),
         EditorView.updateListener.of((update) => {
           const isExternalSync = update.transactions.some((transaction) =>
