@@ -3,6 +3,7 @@ import {
   canonicalizeTitle,
   constrainNoteTitle,
   MAX_NOTE_TITLE_LENGTH,
+  noteKeyStem,
 } from '../src/notes'
 
 describe('constrainNoteTitle', () => {
@@ -14,6 +15,14 @@ describe('constrainNoteTitle', () => {
     expect(constrainNoteTitle('a'.repeat(MAX_NOTE_TITLE_LENGTH + 1))).toHaveLength(
       MAX_NOTE_TITLE_LENGTH,
     )
+  })
+})
+
+describe('noteKeyStem', () => {
+  test('removes an optional Markdown extension case-insensitively', () => {
+    expect(noteKeyStem('Thought.MD')).toBe('Thought')
+    expect(noteKeyStem('Thought.mD')).toBe('Thought')
+    expect(noteKeyStem('Thought')).toBe('Thought')
   })
 })
 

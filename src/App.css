@@ -31,6 +31,34 @@
   transform: scale(0.97);
 }
 
+.markdown-editor .cm-tooltip.cm-tooltip-autocomplete {
+  background: var(--color-surface);
+  border: 0;
+  border-radius: 0.75rem;
+  box-shadow: 0 8px 24px oklch(0 0 0 / 0.18);
+  color: var(--color-ink);
+  padding: 0.5rem;
+}
+
+.markdown-editor .cm-tooltip.cm-tooltip-autocomplete > ul {
+  font-family: inherit;
+  max-height: min(20rem, 50vh);
+  min-width: 16rem;
+}
+
+.markdown-editor .cm-tooltip.cm-tooltip-autocomplete > ul > li {
+  align-items: center;
+  border-radius: 0.5rem;
+  display: flex;
+  min-height: 2.5rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.markdown-editor .cm-tooltip-autocomplete > ul > li[aria-selected] {
+  background: var(--color-active);
+  color: var(--color-active-ink);
+}
+
 .markdown-editor .cm-heading {
   color: var(--color-ink);
   font-weight: 600;

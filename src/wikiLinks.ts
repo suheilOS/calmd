@@ -1,6 +1,7 @@
 import { syntaxTree } from '@codemirror/language'
 import type { EditorState } from '@codemirror/state'
 import type { MarkdownConfig } from '@lezer/markdown'
+import { noteKeyStem } from './notes'
 
 export type SourceRange = { from: number; to: number }
 
@@ -94,7 +95,7 @@ export function parseWikiLinkText(text: string) {
   if (!inner || inner.includes('[[') || inner.includes(']]') || /[\\/#^\r\n]/u.test(inner)) return null
   const parts = inner.split('|')
   if (parts.length > 2) return null
-  const target = parts[0].trim().replace(/\.md$/iu, '')
+  const target = noteKeyStem(parts[0].trim())
   const display = parts[1]?.trim()
   return target && display !== '' ? { target, display } : null
 }

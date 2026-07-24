@@ -11,7 +11,11 @@ export type SearchHit = Pick<Note, 'key' | 'title'> & {
   excerpt: string
 }
 
-export type Backlink = Pick<Note, 'key' | 'title'>
+export type NoteReference = Pick<Note, 'key' | 'title'>
+
+export function noteKeyStem(key: string) {
+  return key.replace(/\.md$/iu, '')
+}
 
 export type OpenNoteLinkResponse = {
   note: Note

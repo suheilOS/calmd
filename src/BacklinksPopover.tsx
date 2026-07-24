@@ -1,6 +1,6 @@
 import { Popover } from '@base-ui/react/popover'
 import { useEffect, useRef, useState } from 'react'
-import type { Backlink } from './notes'
+import type { NoteReference } from './notes'
 import { getStorageError, getStoredBacklinks } from './storage'
 
 type BacklinksPopoverProps = {
@@ -21,7 +21,7 @@ function InfoIcon() {
 }
 
 export function BacklinksPopover({ noteKey, open, onOpenChange, onSelect }: BacklinksPopoverProps) {
-  const [backlinks, setBacklinks] = useState<Backlink[] | null>(null)
+  const [backlinks, setBacklinks] = useState<NoteReference[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const requestGenerationRef = useRef(0)
 

@@ -12,7 +12,7 @@ pub struct WikiLink {
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct Backlink {
+pub struct NoteReference {
     pub key: String,
     pub title: String,
 }

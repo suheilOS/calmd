@@ -1,4 +1,9 @@
-import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete'
+import {
+  autocompletion,
+  closeBrackets,
+  closeBracketsKeymap,
+  completionKeymap,
+} from '@codemirror/autocomplete'
 import {
   defaultKeymap,
   history,
@@ -39,6 +44,8 @@ import { useEffect, useLayoutEffect, useRef } from 'react'
 import { insertNewlineContinueBlockquote } from './markdownBlockquote'
 import { markdownHighlight } from './markdownHighlight'
 import { toggleLink, toggleMarkdown } from './markdownCommands'
+import type { NoteReference } from './notes'
+import { wikiLinkCompletion } from './wikiLinkCompletion'
 import {
   canonicalResolvedWikiLink,
   isWikiLinkNavigationClick,
@@ -60,6 +67,7 @@ type MarkdownEditorProps = {
   value: string
   onChange: (value: string) => void
   onWikiLinkActivate: (activation: WikiLinkActivation) => void
+  suggestWikiLinks: (query: string) => Promise<NoteReference[]>
 }
 
 const externalSync = Annotation.define<boolean>()
@@ -391,6 +399,7 @@ const editorExtensions = [
     extensions: [GFM, markdownHighlight, wikiLinkMarkdown],
   }),
   keymap.of([
+    ...completionKeymap,
     { key: 'Enter', run: insertNewlineContinueBlockquote },
     { key: 'Mod-b', run: toggleMarkdown('**') },
     { key: 'Mod-i', run: toggleMarkdown('*') },
@@ -415,17 +424,24 @@ const editorExtensions = [
   editorTheme,
 ]
 
-export function MarkdownEditor({ value, onChange, onWikiLinkActivate }: MarkdownEditorProps) {
+export function MarkdownEditor({
+  value,
+  onChange,
+  onWikiLinkActivate,
+  suggestWikiLinks,
+}: MarkdownEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<EditorView>(null)
   const initialValueRef = useRef(value)
   const onChangeRef = useRef(onChange)
   const onWikiLinkActivateRef = useRef(onWikiLinkActivate)
+  const suggestWikiLinksRef = useRef(suggestWikiLinks)
 
   useEffect(() => {
     onChangeRef.current = onChange
     onWikiLinkActivateRef.current = onWikiLinkActivate
-  }, [onChange, onWikiLinkActivate])
+    suggestWikiLinksRef.current = suggestWikiLinks
+  }, [onChange, onWikiLinkActivate, suggestWikiLinks])
 
   useLayoutEffect(() => {
     if (!containerRef.current) return
@@ -435,6 +451,12 @@ export function MarkdownEditor({ value, onChange, onWikiLinkActivate }: Markdown
       selection: { anchor: initialValueRef.current.length },
       extensions: [
         editorExtensions,
+        autocompletion({
+          activateOnTyping: true,
+          icons: false,
+          maxRenderedOptions: 8,
+          override: [wikiLinkCompletion((query) => suggestWikiLinksRef.current(query))],
+        }),
         wikiLinkInteraction((activation) => onWikiLinkActivateRef.current(activation)),
         EditorView.updateListener.of((update) => {
           const isExternalSync = update.transactions.some((transaction) =>

@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core'
 import {
   canonicalizeTitle,
   type Note,
-  type Backlink,
+  type NoteReference,
   type NoteDraft,
   type OpenNoteLinkResponse,
   type SearchResponse,
@@ -44,6 +44,10 @@ export function searchStoredNotes(query: string) {
   return invoke<SearchResponse>('search_notes', { query })
 }
 
+export function suggestStoredNotes(query: string) {
+  return invoke<NoteReference[]>('suggest_notes', { query })
+}
+
 export function createStoredNote(title: string) {
   return invoke<Note>('create_note', { title: canonicalizeTitle(title) })
 }
@@ -53,7 +57,7 @@ export function openStoredNoteLink(target: string) {
 }
 
 export function getStoredBacklinks(key: string) {
-  return invoke<Backlink[]>('get_backlinks', { key })
+  return invoke<NoteReference[]>('get_backlinks', { key })
 }
 
 export function readStoredNote(key: string) {

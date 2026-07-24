@@ -5,6 +5,7 @@ import type { WikiLinkActivation } from './MarkdownEditor'
 import {
   constrainNoteTitle,
   MAX_NOTE_TITLE_LENGTH,
+  type NoteReference,
   type NoteDraft,
 } from './notes'
 
@@ -22,6 +23,7 @@ type NoteEditorProps = {
   onConflictReload: (() => void) | null
   onWikiLinkActivate: (activation: WikiLinkActivation) => void
   onBacklinkSelect: (key: string) => void
+  suggestWikiLinks: (query: string) => Promise<NoteReference[]>
   saveMessage: string | null
 }
 
@@ -34,6 +36,7 @@ export function NoteEditor({
   onConflictReload,
   onWikiLinkActivate,
   onBacklinkSelect,
+  suggestWikiLinks,
   saveMessage,
 }: NoteEditorProps) {
   const titleRef = useRef<HTMLTextAreaElement>(null)
@@ -88,6 +91,7 @@ export function NoteEditor({
             <MarkdownEditor
               onChange={(body) => onDraftChange({ ...draft, body })}
               onWikiLinkActivate={onWikiLinkActivate}
+              suggestWikiLinks={suggestWikiLinks}
               value={draft.body}
             />
           </Suspense>

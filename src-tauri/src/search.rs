@@ -1,4 +1,4 @@
-use crate::links::{Backlink, extract_links, normalize_key};
+use crate::links::{NoteReference, extract_links, normalize_key};
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::Serialize;
 use std::{
@@ -17,6 +17,7 @@ const MAX_QUERY_CHARACTERS: usize = 120;
 const MAX_EXCERPT_CHARACTERS: usize = 240;
 const EXACT_EXCERPT_SOURCE_CHARACTERS: i64 = 480;
 const RESULT_LIMIT: i64 = 3;
+const SUGGESTION_LIMIT: i64 = 8;
 
 const UPSERT_NOTE: &str = "
     INSERT INTO notes (
@@ -232,24 +233,8 @@ impl SearchState {
         result
     }
 
-    pub fn backlinks(&self, key: &str) -> Result<Vec<Backlink>, SearchError> {
-        let path = self.database_path()?;
-        let mut inner = self.lock_inner()?;
-        ensure_connection(path, &mut inner)?;
-        let result = backlinks_connection(
-            inner
-                .connection
-                .as_ref()
-                .expect("connection was initialized"),
-            key,
-        );
-        if let Err(error) = &result {
-            inner.dirty = true;
-            if error.is_recoverable() {
-                inner.connection.take();
-            }
-        }
-        result
+    pub fn backlinks(&self, key: &str) -> Result<Vec<NoteReference>, SearchError> {
+        self.query(|connection| backlinks_connection(connection, key))
     }
 
     pub fn search(&self, query: &str) -> Result<SearchResponse, SearchError> {
@@ -257,17 +242,25 @@ impl SearchState {
         if canonical_query.is_empty() {
             return Ok(SearchResponse::empty());
         }
+        self.query(|connection| search_connection(connection, &canonical_query))
+    }
 
+    pub fn suggest_notes(&self, query: &str) -> Result<Vec<NoteReference>, SearchError> {
+        let canonical_query = canonicalize_query(query)?.to_lowercase();
+        self.query(|connection| suggest_notes_connection(connection, &canonical_query))
+    }
+
+    fn query<T>(
+        &self,
+        run: impl FnOnce(&Connection) -> Result<T, SearchError>,
+    ) -> Result<T, SearchError> {
         let path = self.database_path()?;
         let mut inner = self.lock_inner()?;
         ensure_connection(path, &mut inner)?;
-        let result = search_connection(
-            inner
-                .connection
-                .as_ref()
-                .expect("connection was initialized"),
-            &canonical_query,
-        );
+        let result = run(inner
+            .connection
+            .as_ref()
+            .expect("connection was initialized"));
         if let Err(error) = &result {
             inner.dirty = true;
             if error.is_recoverable() {
@@ -647,7 +640,10 @@ fn upsert_note(connection: &Connection, note: &IndexedNote) -> Result<(), Search
     Ok(())
 }
 
-fn backlinks_connection(connection: &Connection, key: &str) -> Result<Vec<Backlink>, SearchError> {
+fn backlinks_connection(
+    connection: &Connection,
+    key: &str,
+) -> Result<Vec<NoteReference>, SearchError> {
     let normalized = normalize_key(key);
     let target_count: i64 = connection
         .query_row(
@@ -669,7 +665,7 @@ fn backlinks_connection(connection: &Connection, key: &str) -> Result<Vec<Backli
         .map_err(|error| SearchError::sqlite("Could not prepare backlinks", error))?;
     let rows = statement
         .query_map([normalized], |row| {
-            Ok(Backlink {
+            Ok(NoteReference {
                 key: row.get(0)?,
                 title: row.get(1)?,
             })
@@ -677,6 +673,40 @@ fn backlinks_connection(connection: &Connection, key: &str) -> Result<Vec<Backli
         .map_err(|error| SearchError::sqlite("Could not query backlinks", error))?;
     rows.collect::<Result<Vec<_>, _>>()
         .map_err(|error| SearchError::sqlite("Could not read backlinks", error))
+}
+
+fn suggest_notes_connection(
+    connection: &Connection,
+    query: &str,
+) -> Result<Vec<NoteReference>, SearchError> {
+    let mut statement = connection
+        .prepare(
+            "SELECT key, title
+             FROM notes
+             WHERE ?1 = ''
+                OR instr(normalized_title, ?1) > 0
+                OR instr(normalized_key, ?1) > 0
+             ORDER BY CASE
+                        WHEN normalized_title = ?1 THEN 0
+                        WHEN instr(normalized_title, ?1) = 1 THEN 1
+                        WHEN instr(normalized_key, ?1) = 1 THEN 2
+                        ELSE 3
+                      END,
+                      normalized_title,
+                      key
+             LIMIT ?2",
+        )
+        .map_err(|error| SearchError::sqlite("Could not prepare note suggestions", error))?;
+    let rows = statement
+        .query_map(params![query, SUGGESTION_LIMIT], |row| {
+            Ok(NoteReference {
+                key: row.get(0)?,
+                title: row.get(1)?,
+            })
+        })
+        .map_err(|error| SearchError::sqlite("Could not suggest notes", error))?;
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|error| SearchError::sqlite("Could not read note suggestions", error))
 }
 
 fn search_connection(

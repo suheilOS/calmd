@@ -1,5 +1,5 @@
 use crate::{
-    links::{Backlink, key_stem, normalize_key},
+    links::{NoteReference, key_stem, normalize_key},
     note_persistence::{Note, NotePersistence, PersistenceError, recover_operation},
     search::{IndexedNote, SearchResponse, SearchState},
 };
@@ -138,6 +138,15 @@ fn open_vault_in(app: &AppHandle) -> CommandResult<bool> {
     Ok(true)
 }
 
+fn reconcile_search_if_needed(search: &SearchState, root: &Path) -> CommandResult<()> {
+    if search.needs_reconciliation() {
+        search
+            .reconcile(root, &scan_indexed_vault(root)?)
+            .map_err(search_command_error)?;
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn search_notes(query: String, app: AppHandle) -> CommandResult<SearchResponse> {
     tauri::async_runtime::spawn_blocking(move || search_notes_in(&app, &query))
@@ -154,12 +163,7 @@ fn search_notes_in(app: &AppHandle, query: &str) -> CommandResult<SearchResponse
         .map_err(|_| CommandError::new("state", "Vault state is unavailable."))?;
     let root = vault_root(&guard)?;
 
-    if search.needs_reconciliation() {
-        let notes = scan_indexed_vault(&root)?;
-        search
-            .reconcile(&root, &notes)
-            .map_err(search_command_error)?;
-    }
+    reconcile_search_if_needed(&search, &root)?;
 
     match search.search(query) {
         Ok(response) => Ok(response),
@@ -227,15 +231,13 @@ pub fn open_note_link(
 }
 
 #[tauri::command]
-pub async fn get_backlinks(key: String, app: AppHandle) -> CommandResult<Vec<Backlink>> {
-    tauri::async_runtime::spawn_blocking(move || get_backlinks_in(&app, &key))
+pub async fn suggest_notes(query: String, app: AppHandle) -> CommandResult<Vec<NoteReference>> {
+    tauri::async_runtime::spawn_blocking(move || suggest_notes_in(&app, &query))
         .await
-        .map_err(|error| {
-            CommandError::new("search", format!("Could not load backlinks: {error}"))
-        })?
+        .map_err(|error| CommandError::new("search", format!("Could not suggest notes: {error}")))?
 }
 
-fn get_backlinks_in(app: &AppHandle, key: &str) -> CommandResult<Vec<Backlink>> {
+fn suggest_notes_in(app: &AppHandle, query: &str) -> CommandResult<Vec<NoteReference>> {
     let state = app.state::<VaultState>();
     let search = app.state::<SearchState>();
     let guard = state
@@ -243,12 +245,28 @@ fn get_backlinks_in(app: &AppHandle, key: &str) -> CommandResult<Vec<Backlink>> 
         .lock()
         .map_err(|_| CommandError::new("state", "Vault state is unavailable."))?;
     let root = vault_root(&guard)?;
-    if search.needs_reconciliation() {
-        let notes = scan_indexed_vault(&root)?;
-        search
-            .reconcile(&root, &notes)
-            .map_err(search_command_error)?;
-    }
+    reconcile_search_if_needed(&search, &root)?;
+    search.suggest_notes(query).map_err(search_command_error)
+}
+
+#[tauri::command]
+pub async fn get_backlinks(key: String, app: AppHandle) -> CommandResult<Vec<NoteReference>> {
+    tauri::async_runtime::spawn_blocking(move || get_backlinks_in(&app, &key))
+        .await
+        .map_err(|error| {
+            CommandError::new("search", format!("Could not load backlinks: {error}"))
+        })?
+}
+
+fn get_backlinks_in(app: &AppHandle, key: &str) -> CommandResult<Vec<NoteReference>> {
+    let state = app.state::<VaultState>();
+    let search = app.state::<SearchState>();
+    let guard = state
+        .0
+        .lock()
+        .map_err(|_| CommandError::new("state", "Vault state is unavailable."))?;
+    let root = vault_root(&guard)?;
+    reconcile_search_if_needed(&search, &root)?;
     search.backlinks(key).map_err(search_command_error)
 }
 

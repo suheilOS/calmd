@@ -157,6 +157,38 @@ fn trigram_search_handles_unicode_diacritics_and_metacharacters() {
 }
 
 #[test]
+fn note_suggestions_match_titles_and_keys_without_searching_bodies() {
+    let data = tempdir().unwrap();
+    let vault = tempdir().unwrap();
+    let search = state(data.path());
+    search
+        .reconcile(
+            vault.path(),
+            &[
+                note("Field-guide.md", "Guide", "orchard", "one"),
+                note("Orchard.md", "Orchard notes", "", "two"),
+                note("Other.md", "Other", "orchard", "three"),
+            ],
+        )
+        .unwrap();
+
+    assert_eq!(
+        search
+            .suggest_notes("orch")
+            .unwrap()
+            .into_iter()
+            .map(|note| note.key)
+            .collect::<Vec<_>>(),
+        vec!["Orchard.md"]
+    );
+    assert_eq!(
+        search.suggest_notes("field").unwrap()[0].key,
+        "Field-guide.md"
+    );
+    assert_eq!(search.suggest_notes("").unwrap().len(), 3);
+}
+
+#[test]
 fn recreate_missing_or_invalid_database_without_touching_vault() {
     let data = tempdir().unwrap();
     let vault = tempdir().unwrap();
@@ -213,7 +245,7 @@ fn backlinks_are_deduplicated_and_ambiguity_resolves_to_neither_note() {
 
     assert_eq!(
         search.backlinks("Target.md").unwrap(),
-        vec![Backlink {
+        vec![NoteReference {
             key: "Source.md".to_owned(),
             title: "Source".to_owned(),
         }]
