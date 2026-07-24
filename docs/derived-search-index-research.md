@@ -117,6 +117,6 @@ A manual rebuild check is:
 
 ## Not included
 
-This phase does not include embeddings, semantic retrieval, combined ranking, filesystem watching, Markdown deletion, nested-folder traversal, multiple vaults, or encryption. SQLite stores plaintext derived copies of note content in app data; Markdown remains the source of truth.
+This design intentionally stays with literal retrieval. Semantic retrieval and embeddings were considered but rejected because current FTS5 retrieval is effective, predictable, and lightweight for the intended workflow and better aligned with Calmd's minimal product philosophy. They are not planned unless usage evidence shows repeated retrieval failures caused by differences in wording. Other current boundaries are filesystem watching, Markdown deletion, nested-folder traversal, multiple vaults, and encryption. SQLite stores plaintext derived copies of note content in app data; Markdown remains the source of truth.
 
 Sources: [SQLite external-content FTS5 tables](https://www.sqlite.org/fts5.html#external_content_tables), [FTS5 trigram tokenizer](https://www.sqlite.org/fts5.html#the_trigram_tokenizer), [BM25](https://www.sqlite.org/fts5.html#the_bm25_function), [FTS5 snippets](https://www.sqlite.org/fts5.html#the_snippet_function), and [FTS5 integrity checks](https://www.sqlite.org/fts5.html#the_integrity_check_command).

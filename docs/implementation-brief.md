@@ -41,7 +41,6 @@ The search database stores note keys, normalized filename identities, titles, bo
 
 ### Remaining limitations and deferred work
 
-- Embeddings, semantic retrieval, and combined ranking
 - Paths, headings, blocks, embeds, multiline wiki links, and wiki links inside code
 - Ambiguous case-insensitive filename identities resolve to neither note
 - Filesystem watching, deletion, nested folders, and multiple vaults
@@ -64,7 +63,7 @@ Knowledge is accessed through literal retrieval, inline `[[links]]`, backlinks, 
 
 ## Current search
 
-Literal retrieval uses SQLite FTS5 trigram matching for title and body text, title-weighted BM25 ranking, exact-title precedence, bounded match-specific excerpts, and client-side highlighting of literal query matches. Embeddings, semantic similarity, and combined ranking remain deferred.
+Literal retrieval uses SQLite FTS5 trigram matching for title and body text, title-weighted BM25 ranking, exact-title precedence, bounded match-specific excerpts, and client-side highlighting of literal query matches.
 
 ## Current editor
 
@@ -95,7 +94,7 @@ Literal retrieval uses SQLite FTS5 trigram matching for title and body text, tit
 6. **Completed:** Tauri Markdown vault integration with atomic, conflict-safe saving and coordinated rename rewriting
 7. **Completed:** Rebuildable schema-version-2 SQLite/FTS5 literal search, ranked excerpts, and backlink index
 
-Further work on embeddings and semantic retrieval is deferred and outside the current prototype scope.
+Semantic retrieval and embeddings were considered during planning, but current literal retrieval is effective, predictable, and lightweight for the intended workflow and better aligned with Calmd's minimal product philosophy. They are outside Calmd's current product direction and are not planned unless usage evidence shows repeated retrieval failures caused by differences in wording.
 
 ## Constraint
 

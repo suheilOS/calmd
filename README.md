@@ -17,7 +17,7 @@ Calmd is a Tauri 2 desktop application backed by a portable Markdown vault. It i
 - An on-demand backlinks popover
 - Responsive light and dark styling
 
-Markdown remains the source of truth. Internal links identify top-level Markdown filename stems case-insensitively. Paths, headings, blocks, embeds, multiline links, links in code, and ambiguous case-folded targets are unsupported. Embeddings and semantic retrieval remain deferred.
+Markdown remains the source of truth. Internal links identify top-level Markdown filename stems case-insensitively. Paths, headings, blocks, embeds, multiline links, links in code, and ambiguous case-folded targets are unsupported.
 
 ## Development
 

@@ -60,7 +60,7 @@ The complete original file remains recoverable because the rename strategy uses 
 - Only one selected vault and top-level Markdown files are supported.
 - Browser or operating-system history, persisted history, cursor restoration, and scroll restoration are deferred.
 - Paths, headings, blocks, embeds, multiline links, links in code, and ambiguous filename identities remain unsupported.
-- Embeddings, semantic retrieval, and combined ranking remain outside the current phase.
+- Semantic retrieval was considered, but literal title and body search is effective, predictable, and lightweight for the intended workflow and better aligned with Calmd's minimal product philosophy. It is outside Calmd's current product direction and is not planned unless usage evidence shows repeated retrieval failures caused by differences in wording. The supported retrieval paths are exact-title handling, literal title and body search, wiki links, and on-demand backlinks.
 
 ## Validation
 
