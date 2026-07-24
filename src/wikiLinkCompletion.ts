@@ -45,9 +45,11 @@ export function wikiLinkCompletion(
           label: note.title,
           apply: (view, completion, from, to) => {
             const link = canonicalResolvedWikiLink(target, note.title).slice(2)
+            const hasClosingBrackets = view.state.sliceDoc(to, to + 2) === ']]'
+            const replacementTo = hasClosingBrackets ? to + 2 : to
             view.dispatch({
               annotations: pickedCompletion.of(completion),
-              changes: { from, to, insert: link },
+              changes: { from, to: replacementTo, insert: link },
               selection: { anchor: from + link.length },
             })
           },

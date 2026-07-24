@@ -27,6 +27,7 @@ The document remains plain Markdown. Supported wiki links use `[[target]]` or `[
 - Programming ligatures are disabled in the Markdown surface so punctuation remains literal, while normal kerning remains enabled.
 - Long URLs and identifiers can wrap without widening the writing column.
 - Wiki links use a Live Preview treatment: inactive plain links show their target, aliases show only their display text, and the complete source syntax reappears whenever a cursor or selection touches the link. Primary Ctrl-click on Linux/Windows or Cmd-click on macOS uses the existing flush-gated open-or-create navigation path.
+- Ctrl-clicking an `http://`, `https://`, or `www.` URL opens it in the system browser; ordinary clicks remain editor interactions.
 - Markdown-aware Enter and Backspace continue or exit lists and blockquotes. Enter continues a blockquote once; pressing Enter again on that untouched empty quote line exits it.
 - Cmd/Ctrl-B, Cmd/Ctrl-I, Cmd/Ctrl-`, Cmd/Ctrl-Shift-H, and Cmd/Ctrl-Shift-X semantically toggle bold, italic, inline code, highlight, and strikethrough markup. Commands operate across parsed blocks and multiple selections, preserve structural prefixes, and keep invalid boundary whitespace outside delimiters.
 - Cmd/Ctrl-K creates or removes Markdown links. It edits existing destinations instead of nesting links and declines selections that cross block boundaries.
