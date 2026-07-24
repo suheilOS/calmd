@@ -1,4 +1,6 @@
+use pulldown_cmark::{Event, Parser, Tag};
 use serde::Serialize;
+use std::ops::Range;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WikiLink {
@@ -38,79 +40,49 @@ pub fn canonical_link(target: &str, display: Option<&str>) -> String {
 }
 
 pub fn extract_links(markdown: &str) -> Vec<WikiLink> {
+    let code_ranges = markdown_code_ranges(markdown);
     let mut links = Vec::new();
     let mut offset = 0;
-    let mut fenced: Option<(char, usize)> = None;
-    let mut code_ticks = 0;
     for line_with_end in markdown.split_inclusive('\n') {
         let line = line_with_end.trim_end_matches(['\r', '\n']);
-        let trimmed = line.trim_start();
-        let indent = line.len() - trimmed.len();
-        let marker_char = trimmed.as_bytes().first().copied().map(char::from);
-        let marker_len = marker_char
-            .map(|ch| trimmed.chars().take_while(|c| *c == ch).count())
-            .unwrap_or(0);
-        if let Some((ch, count)) = fenced {
-            if marker_char == Some(ch) && marker_len >= count {
-                fenced = None;
-            }
-            offset += line_with_end.len();
-            continue;
-        }
-        if code_ticks == 0
-            && indent <= 3
-            && matches!(marker_char, Some('`' | '~'))
-            && marker_len >= 3
-        {
-            fenced = Some((marker_char.unwrap(), marker_len));
-            offset += line_with_end.len();
-            continue;
-        }
-        if code_ticks == 0 && (line.starts_with("    ") || line.starts_with('\t')) {
-            offset += line_with_end.len();
-            continue;
-        }
-        if line.trim().is_empty() {
-            code_ticks = 0;
-        } else {
-            parse_inline(line, offset, &mut code_ticks, &mut links);
-        }
+        parse_inline(line, offset, &code_ranges, &mut links);
         offset += line_with_end.len();
     }
     links
 }
 
-fn parse_inline(line: &str, base: usize, code_ticks: &mut usize, links: &mut Vec<WikiLink>) {
+fn markdown_code_ranges(markdown: &str) -> Vec<Range<usize>> {
+    Parser::new(markdown)
+        .into_offset_iter()
+        .filter_map(|(event, range)| match event {
+            Event::Code(_) | Event::Start(Tag::CodeBlock(_)) => Some(range),
+            _ => None,
+        })
+        .collect()
+}
+
+fn parse_inline(line: &str, base: usize, code_ranges: &[Range<usize>], links: &mut Vec<WikiLink>) {
     let bytes = line.as_bytes();
     let mut index = 0;
     while index < bytes.len() {
-        if bytes[index] == b'`' {
-            let count = bytes[index..]
-                .iter()
-                .take_while(|byte| **byte == b'`')
-                .count();
-            if *code_ticks == 0 {
-                *code_ticks = count;
-            } else if *code_ticks == count {
-                *code_ticks = 0;
-            }
-            index += count;
-            continue;
-        }
-        if *code_ticks == 0
-            && bytes[index..].starts_with(b"[[")
-            && (index == 0 || bytes[index - 1] != b'!')
-        {
+        if bytes[index..].starts_with(b"[[") && (index == 0 || bytes[index - 1] != b'!') {
             if let Some(relative_end) = line[index + 2..].find("]]") {
                 let end = index + 2 + relative_end;
-                let inner = &line[index + 2..end];
-                if let Some((target, display)) = parse_inner(inner) {
-                    links.push(WikiLink {
-                        from: base + index,
-                        to: base + end + 2,
-                        target: target.to_owned(),
-                        display: display.map(str::to_owned),
-                    });
+                let start = base + index;
+                let finish = base + end + 2;
+                if !code_ranges
+                    .iter()
+                    .any(|range| range.start < finish && start < range.end)
+                {
+                    let inner = &line[index + 2..end];
+                    if let Some((target, display)) = parse_inner(inner) {
+                        links.push(WikiLink {
+                            from: start,
+                            to: finish,
+                            target: target.to_owned(),
+                            display: display.map(str::to_owned),
+                        });
+                    }
                 }
                 index = end + 2;
                 continue;
@@ -201,6 +173,25 @@ mod tests {
                 .map(|link| link.target.as_str())
                 .collect::<Vec<_>>(),
             vec!["Visible"]
+        );
+    }
+
+    #[test]
+    fn follows_commonmark_code_span_boundaries() {
+        let links = extract_links(
+            r"\` [[Escaped]]
+- `unfinished
+- [[List item]]
+> `unfinished
+>
+> [[Quote paragraph]]",
+        );
+        assert_eq!(
+            links
+                .iter()
+                .map(|link| link.target.as_str())
+                .collect::<Vec<_>>(),
+            vec!["Escaped", "List item", "Quote paragraph"]
         );
     }
 
