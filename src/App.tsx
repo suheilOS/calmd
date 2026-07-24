@@ -310,7 +310,7 @@ function App() {
               aria-describedby="vault-location-help"
               autoFocus
               autoComplete="off"
-              className="h-12 w-full rounded-lg border border-border bg-transparent px-4 text-base text-ink outline-none placeholder:text-placeholder focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-faint"
+              className="h-12 w-full rounded-xl bg-surface px-4 text-base text-ink outline-none placeholder:text-placeholder focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-faint"
               disabled={selectingVault}
               id="vault-name"
               onChange={(event) => {
@@ -329,7 +329,7 @@ function App() {
               Calmd will create this folder inside the location you choose.
             </p>
             <Button
-              className="mt-6 inline-flex h-11 w-full select-none items-center justify-center rounded-lg bg-ink px-5 text-base text-canvas transition-[background-color,color,transform] duration-150 ease-out enabled:hover:bg-body focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-faint active:scale-[0.96] disabled:cursor-not-allowed disabled:bg-surface disabled:text-faint"
+              className="mt-6 inline-flex h-11 w-full select-none items-center justify-center rounded-xl bg-accent px-5 text-base text-accent-ink transition-[background-color,color,transform] duration-150 ease-out enabled:hover:bg-accent/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-faint active:scale-[0.96] disabled:cursor-not-allowed disabled:bg-surface disabled:text-faint"
               disabled={selectingVault || !vaultName.trim()}
               type="submit"
             >

@@ -300,11 +300,11 @@ const editorTheme = EditorView.theme({
     backgroundColor: 'var(--color-surface)',
     color: 'var(--color-ink)',
   },
-  '.cm-panels.cm-panels-top': { borderBottom: '1px solid var(--color-border)' },
+  '.cm-panels.cm-panels-top': { borderBottom: '0.5px solid var(--color-divider)' },
   '.cm-textfield': {
     backgroundColor: 'var(--color-canvas)',
-    border: '1px solid var(--color-border)',
-    borderRadius: '0.25rem',
+    border: '0.5px solid var(--color-border)',
+    borderRadius: '0.625rem',
     color: 'var(--color-ink)',
     font: 'inherit',
     fontSize: '1rem',
@@ -312,7 +312,8 @@ const editorTheme = EditorView.theme({
   '.cm-button': {
     backgroundImage: 'none',
     backgroundColor: 'var(--color-hover)',
-    border: '1px solid var(--color-border)',
+    border: '0.5px solid var(--color-border)',
+    borderRadius: '0.625rem',
     color: 'var(--color-ink)',
   },
 })

@@ -15,7 +15,7 @@ type ComposerScreenProps = {
 }
 
 const RESULT_CLASS_NAME =
-  'text-base block w-full px-2 py-3 text-left transition-[background-color,color,transform] duration-150 ease-out focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-faint active:scale-[0.97]'
+  'group text-base block w-full rounded-xl bg-surface px-3 py-3 text-left text-ink transition-[background-color,color,transform] duration-150 ease-out aria-selected:bg-active aria-selected:text-active-ink focus-visible:bg-active focus-visible:text-active-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-faint active:scale-[0.97]'
 
 export function ComposerScreen({
   thought,
@@ -89,11 +89,11 @@ export function ComposerScreen({
         </form>
 
         {hasThought ? (
-          <div className="mt-4 border-t border-border motion-safe:animate-[result-in_180ms_ease-out]" id="search-results" role="listbox">
+          <div className="mt-4 space-y-2 motion-safe:animate-[result-in_180ms_ease-out]" id="search-results" role="listbox">
             {results.map((note, index) => (
               <Button
                 aria-selected={activeResultIndex === index}
-                className={`${RESULT_CLASS_NAME} border-b border-divider ${activeResultIndex === index ? 'bg-surface text-secondary' : 'text-ink'}`}
+                className={RESULT_CLASS_NAME}
                 id={`search-result-${index}`}
                 key={note.key}
                 onClick={() => onResultSelect(index)}
@@ -102,13 +102,13 @@ export function ComposerScreen({
                 type="button"
               >
                 <span className="block break-words">{note.title}</span>
-                {note.excerpt ? <span className="mt-1 block truncate text-small text-faint">{note.excerpt}</span> : null}
+                {note.excerpt ? <span className="mt-1 block truncate text-small text-faint group-aria-selected:text-active-muted group-focus-visible:text-active-muted">{note.excerpt}</span> : null}
               </Button>
             ))}
             {!hasExactMatch ? (
               <Button
                 aria-selected={activeResultIndex === results.length}
-                className={`${RESULT_CLASS_NAME} ${activeResultIndex === results.length ? 'bg-surface text-ink' : 'text-secondary'}`}
+                className={RESULT_CLASS_NAME}
                 id={`search-result-${results.length}`}
                 onClick={() => onResultSelect(results.length)}
                 onMouseEnter={() => onActiveResultChange(results.length)}

@@ -106,7 +106,7 @@ export function NoteEditor({
           <span>{saveMessage}</span>
           {onConflictReload ? (
             <Button
-              className="min-h-10 rounded-lg px-3 text-ink underline decoration-border underline-offset-4 transition-[background-color,transform] duration-150 ease-out hover:bg-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-faint active:scale-[0.96]"
+              className="min-h-10 rounded-xl bg-surface px-3 text-ink transition-[background-color,transform] duration-150 ease-out hover:bg-hover focus-visible:bg-active focus-visible:text-active-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-faint active:scale-[0.96]"
               onClick={onConflictReload}
               type="button"
             >

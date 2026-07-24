@@ -68,7 +68,7 @@
 
 .markdown-editor .cm-link,
 .markdown-editor .cm-url {
-  color: var(--color-secondary);
+  color: var(--color-accent);
   text-decoration: underline;
   text-decoration-skip-ink: auto;
   text-decoration-thickness: from-font;
@@ -76,7 +76,7 @@
 }
 
 .markdown-editor .cm-wiki-link {
-  color: var(--color-secondary);
+  color: var(--color-accent);
   text-decoration: underline;
   text-decoration-color: var(--color-border);
   text-underline-offset: 0.16em;
@@ -137,7 +137,7 @@
 
 @media (prefers-color-scheme: dark) {
   .markdown-editor .cm-wiki-link {
-    color: var(--color-ink);
+    color: var(--color-accent);
   }
 }
 
