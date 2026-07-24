@@ -1,5 +1,5 @@
 import { Button } from '@base-ui/react/button'
-import { lazy, Suspense, useEffect, useLayoutEffect, useRef } from 'react'
+import { lazy, Suspense, useLayoutEffect, useRef } from 'react'
 import { BacklinksPopover } from './BacklinksPopover'
 import type { WikiLinkActivation } from './MarkdownEditor'
 import {
@@ -20,18 +20,9 @@ type NoteEditorProps = {
   onDraftChange: (draft: NoteDraft) => void
   onBacklinksOpenChange: (open: boolean) => void
   onConflictReload: (() => void) | null
-  onReturn: () => void
   onWikiLinkActivate: (activation: WikiLinkActivation) => void
   onBacklinkSelect: (key: string) => void
   saveMessage: string | null
-}
-
-function ArrowLeftIcon() {
-  return (
-    <svg aria-hidden="true" className="size-5" fill="none" viewBox="0 0 20 20">
-      <path d="m11.5 4.5-5.5 5.5 5.5 5.5M6.5 10h9" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.6" />
-    </svg>
-  )
 }
 
 export function NoteEditor({
@@ -41,7 +32,6 @@ export function NoteEditor({
   onDraftChange,
   onBacklinksOpenChange,
   onConflictReload,
-  onReturn,
   onWikiLinkActivate,
   onBacklinkSelect,
   saveMessage,
@@ -59,40 +49,14 @@ export function NoteEditor({
     )
   }, [draft.title])
 
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (
-        event.key !== '['
-        || event.shiftKey
-        || event.altKey
-        || (!event.metaKey && !event.ctrlKey)
-      ) return
-
-      event.preventDefault()
-      void onReturn()
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onReturn])
-
   return (
     <main className="app bg-canvas text-ink">
-      <Button
-        aria-label="Return to composer"
-        className="fixed left-5 top-14 z-10 inline-flex size-9 items-center justify-center rounded-full text-muted transition-[background-color,color,transform] duration-150 ease-out hover:bg-hover hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-faint active:scale-[0.97] sm:left-8 sm:top-16"
-        onClick={onReturn}
-        type="button"
-      >
-        <ArrowLeftIcon />
-      </Button>
-
       <article className="note-editor-page mx-auto w-full max-w-[65ch] px-6 pb-24 pt-[15vh] sm:px-8">
         <label className="sr-only" htmlFor="note-title">Note title</label>
         <textarea
           aria-label="Note title"
           autoComplete="off"
-          className="block w-full resize-none overflow-y-auto border-0 bg-transparent p-0 text-large text-ink outline-none break-words placeholder:text-placeholder focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-faint [field-sizing:content]"
+          className="block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-large text-ink outline-none break-words placeholder:text-placeholder focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-faint [field-sizing:content]"
           id="note-title"
           maxLength={MAX_NOTE_TITLE_LENGTH}
           name="title"
