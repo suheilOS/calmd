@@ -6,7 +6,7 @@ import { NoteEditor } from './NoteEditor'
 import type { WikiLinkActivation } from './MarkdownEditor'
 import { NoteNavigation } from './noteNavigation'
 import { resolveWikiLinkActivation } from './wikiLinkNavigation'
-import { AppShell } from './TitleBar'
+import { AppShell, type TitleBarNavigation } from './TitleBar'
 import {
   canonicalizeTitle,
   type Note,
@@ -30,6 +30,8 @@ type SearchView = SearchResponse & {
   query: string
 }
 
+type NavigationDirection = 'back' | 'forward'
+
 const EMPTY_SEARCH_VIEW: SearchView = {
   query: '',
   results: [],
@@ -39,7 +41,7 @@ const EMPTY_SEARCH_VIEW: SearchView = {
 function App() {
   const [vaultReady, setVaultReady] = useState<boolean | null>(null)
   const [selectingVault, setSelectingVault] = useState(false)
-  const [vaultName, setVaultName] = useState('')
+  const [vaultName, setVaultName] = useState('My vault')
   const [thought, setThought] = useState('')
   const [backlinksOpen, setBacklinksOpen] = useState(false)
   const [activeResultIndex, setActiveResultIndex] = useState(-1)
@@ -47,9 +49,11 @@ function App() {
   const [searchView, setSearchView] = useState<SearchView>(EMPTY_SEARCH_VIEW)
   const [searchGeneration, setSearchGeneration] = useState(0)
   const searchRequestRef = useRef(0)
-  const navigationRef = useRef(new NoteNavigation())
+  const [navigation] = useState(() => new NoteNavigation())
+  const [, setNavigationRevision] = useState(0)
   const noteEditing = useNoteEditing(tauriNotePersistence, (oldKey, newKey) => {
-    navigationRef.current.rename(oldKey, newKey)
+    navigation.rename(oldKey, newKey)
+    setNavigationRevision((revision) => revision + 1)
   })
   const editorDraft = noteEditing.snapshot?.draft ?? null
 
@@ -115,26 +119,29 @@ function App() {
   }, [isEditing, searchGeneration, searchQuery, vaultReady])
 
   function beginEditing(note: Note, pushHistory = true) {
-    navigationRef.current.beginNote(note.key, pushHistory)
+    if (pushHistory) {
+      navigation.beginNote(note.key)
+      setNavigationRevision((revision) => revision + 1)
+    }
     noteEditing.begin(note)
     setBacklinksOpen(false)
     setStorageMessage(null)
   }
 
   async function openNote(note: Pick<Note, 'key'>) {
-    const generation = navigationRef.current.startTransition()
+    const generation = navigation.startTransition()
     if (generation === null) return
     try {
       if (isEditing && !(await noteEditing.flush())) return
-      if (!navigationRef.current.isCurrent(generation) || noteEditing.snapshot?.key === note.key) return
+      if (!navigation.isCurrent(generation) || noteEditing.snapshot?.key === note.key) return
       const destination = await readStoredNote(note.key)
-      if (!navigationRef.current.isCurrent(generation)) return
+      if (!navigation.isCurrent(generation)) return
       beginEditing(destination)
     } catch (error) {
       setStorageMessage(getStorageError(error).message)
       await refreshVault()
     } finally {
-      navigationRef.current.finishTransition()
+      navigation.finishTransition()
     }
   }
 
@@ -168,21 +175,35 @@ function App() {
     if (await noteEditing.reload()) await refreshVault()
   }
 
-  async function navigateBack() {
-    const generation = navigationRef.current.startTransition()
+  async function navigateHistory(direction: NavigationDirection) {
+    const generation = navigation.startTransition()
     if (generation === null) return
     try {
-      if (!(await noteEditing.flush()) || !navigationRef.current.isCurrent(generation)) return
-      const destination = navigationRef.current.previous()
+      if (
+        (isEditing && !(await noteEditing.flush()))
+        || !navigation.isCurrent(generation)
+      ) return
+
+      const destination = direction === 'back'
+        ? navigation.previous()
+        : navigation.next()
       if (!destination) return
+
       if (destination.type === 'note') {
         const note = await readStoredNote(destination.key)
-        if (!navigationRef.current.isCurrent(generation)) return
-        navigationRef.current.commitBack()
+        if (!navigation.isCurrent(generation)) return
+        const didCommit = direction === 'back'
+          ? navigation.commitBack()
+          : navigation.commitForward()
+        if (!didCommit) return
+        setNavigationRevision((revision) => revision + 1)
         beginEditing(note, false)
       } else {
-        navigationRef.current.commitBack()
-        navigationRef.current.leaveNote()
+        const didCommit = direction === 'back'
+          ? navigation.commitBack()
+          : navigation.commitForward()
+        if (!didCommit) return
+        setNavigationRevision((revision) => revision + 1)
         noteEditing.close()
         setThought(destination.thought)
         setBacklinksOpen(false)
@@ -191,13 +212,38 @@ function App() {
       setStorageMessage(getStorageError(error).message)
       await refreshVault()
     } finally {
-      navigationRef.current.finishTransition()
+      navigation.finishTransition()
+    }
+  }
+
+  async function navigateHome() {
+    if (navigation.current()?.type === 'composer') return
+
+    const generation = navigation.startTransition()
+    if (generation === null) return
+    try {
+      if (
+        (isEditing && !(await noteEditing.flush()))
+        || !navigation.isCurrent(generation)
+      ) return
+
+      navigation.beginComposer()
+      setNavigationRevision((revision) => revision + 1)
+      noteEditing.close()
+      setThought('')
+      setBacklinksOpen(false)
+      setStorageMessage(null)
+    } catch (error) {
+      setStorageMessage(getStorageError(error).message)
+      await refreshVault()
+    } finally {
+      navigation.finishTransition()
     }
   }
 
   async function activateWikiLink(activation: WikiLinkActivation) {
     const activatedKey = noteEditing.snapshot?.key
-    const generation = navigationRef.current.startTransition()
+    const generation = navigation.startTransition()
     if (generation === null || !activatedKey) return
     try {
       const destination = await resolveWikiLinkActivation({
@@ -206,14 +252,14 @@ function App() {
         flush: noteEditing.flush,
         open: openStoredNoteLink,
         updateBody: noteEditing.updateBody,
-        isCurrent: () => navigationRef.current.isCurrent(generation),
+        isCurrent: () => navigation.isCurrent(generation),
       })
       if (destination) beginEditing(destination)
     } catch (error) {
       setStorageMessage(getStorageError(error).message)
       await refreshVault()
     } finally {
-      navigationRef.current.finishTransition()
+      navigation.finishTransition()
     }
   }
 
@@ -245,7 +291,7 @@ function App() {
   if (!vaultReady) {
     return (
       <AppShell>
-      <main className="app flex items-center justify-center bg-canvas px-6 text-ink">
+      <main className="app flex items-center justify-center bg-canvas px-6 pb-[8svh] text-ink">
         <section className="w-full max-w-sm">
           <h1 className="sr-only">Calmd</h1>
           <form
@@ -254,48 +300,65 @@ function App() {
               void chooseVault()
             }}
           >
-            <label className="mb-2 block text-small text-secondary" htmlFor="vault-name">
-              Vault name
+            <label className="mb-1.5 block text-small text-secondary" htmlFor="vault-name">
+              Name your vault
             </label>
             <Input
               aria-describedby="vault-location-help"
               autoFocus
               autoComplete="off"
-              className="w-full rounded-lg border border-border bg-transparent px-4 py-2.5 text-base text-ink outline-none placeholder:text-placeholder focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-faint"
+              className="h-12 w-full rounded-lg border border-border bg-transparent px-4 text-base text-ink outline-none placeholder:text-placeholder focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-faint"
               disabled={selectingVault}
               id="vault-name"
               onChange={(event) => {
                 setVaultName(event.target.value)
                 setStorageMessage(null)
               }}
+              onFocus={(event) => {
+                if (event.currentTarget.value === 'My vault') {
+                  event.currentTarget.select()
+                }
+              }}
               placeholder="My vault"
               value={vaultName}
             />
-            <p className="mt-2 text-small text-faint" id="vault-location-help">
-              A folder with this name will be created in the location you choose.
+            <p className="mt-2 text-pretty text-small text-faint" id="vault-location-help">
+              Calmd will create this folder inside the location you choose.
             </p>
             <Button
-              className="mt-4 rounded-lg border border-border px-5 py-2.5 text-base text-ink transition-[background-color,transform] duration-150 ease-out hover:bg-hover focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-faint active:scale-[0.97] disabled:cursor-not-allowed disabled:text-faint"
+              className="mt-6 inline-flex h-11 w-full select-none items-center justify-center rounded-lg bg-ink px-5 text-base text-canvas transition-[background-color,color,transform] duration-150 ease-out enabled:hover:bg-body focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-faint active:scale-[0.96] disabled:cursor-not-allowed disabled:bg-surface disabled:text-faint"
               disabled={selectingVault || !vaultName.trim()}
               type="submit"
             >
-              {selectingVault ? 'Creating…' : 'Choose location…'}
+              {selectingVault ? 'Creating…' : 'Choose folder…'}
             </Button>
           </form>
-          {storageMessage ? (
-            <p className="mt-4 max-w-[45ch] text-small text-secondary" role="alert">
-              {storageMessage}
-            </p>
-          ) : null}
+          <div className="mt-4 min-h-10">
+            {storageMessage ? (
+              <p className="max-w-[45ch] text-pretty text-small text-secondary" role="alert">
+                {storageMessage}
+              </p>
+            ) : null}
+          </div>
         </section>
       </main>
       </AppShell>
     )
   }
 
+  const currentLocation = navigation.current()
+  const titleBarNavigation: TitleBarNavigation = {
+    canGoBack: navigation.canGoBack(),
+    canGoForward: navigation.canGoForward(),
+    canGoHome: currentLocation?.type === 'note',
+    onBack: () => void navigateHistory('back'),
+    onForward: () => void navigateHistory('forward'),
+    onHome: () => void navigateHome(),
+  }
+
   if (editorDraft) {
     return (
-      <AppShell>
+      <AppShell navigation={titleBarNavigation}>
       <NoteEditor
         backlinksOpen={backlinksOpen}
         draft={editorDraft}
@@ -303,7 +366,6 @@ function App() {
         onBacklinksOpenChange={setBacklinksOpen}
         onDraftChange={noteEditing.updateDraft}
         onConflictReload={noteEditing.snapshot?.conflict ? reloadConflictedNote : null}
-        onReturn={() => void navigateBack()}
         onWikiLinkActivate={(activation) => void activateWikiLink(activation)}
         onBacklinkSelect={(key) => void openNote({ key })}
         saveMessage={noteEditing.snapshot?.failure?.message ?? storageMessage}
@@ -313,7 +375,7 @@ function App() {
   }
 
   return (
-    <AppShell>
+    <AppShell navigation={titleBarNavigation}>
       <ComposerScreen
         activeResultIndex={activeResultIndex}
         hasExactMatch={Boolean(exactNote)}
@@ -322,7 +384,7 @@ function App() {
         onSubmit={() => void createNote()}
         onThoughtChange={(nextThought) => {
           setThought(nextThought)
-          navigationRef.current.updateComposerThought(nextThought)
+          navigation.updateComposerThought(nextThought)
           setActiveResultIndex(-1)
         }}
         results={searchResults}

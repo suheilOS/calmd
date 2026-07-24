@@ -4,6 +4,7 @@ export type NoteLocation =
 
 export class NoteNavigation {
   private locations: NoteLocation[] = [{ type: 'composer', thought: '' }]
+  private index = 0
   private generation = 0
   private transitionPending = false
 
@@ -21,21 +22,58 @@ export class NoteNavigation {
     return generation === this.generation
   }
 
-  beginNote(key: string, push = true) {
+  private push(location: NoteLocation) {
+    this.locations = [
+      ...this.locations.slice(0, this.index + 1),
+      location,
+    ]
+    this.index = this.locations.length - 1
     this.generation += 1
-    if (push) this.locations.push({ type: 'note', key })
   }
 
-  leaveNote() {
-    this.generation += 1
+  beginNote(key: string) {
+    this.push({ type: 'note', key })
+  }
+
+  beginComposer(thought = '') {
+    this.push({ type: 'composer', thought })
+  }
+
+  current() {
+    const location = this.locations[this.index]
+    return location ? { ...location } : null
+  }
+
+  canGoBack() {
+    return this.index > 0
+  }
+
+  canGoForward() {
+    return this.index < this.locations.length - 1
   }
 
   previous() {
-    return this.locations.at(-2) ?? null
+    const location = this.locations[this.index - 1]
+    return location ? { ...location } : null
+  }
+
+  next() {
+    const location = this.locations[this.index + 1]
+    return location ? { ...location } : null
   }
 
   commitBack() {
-    if (this.locations.length > 1) this.locations.pop()
+    if (!this.canGoBack()) return false
+    this.index -= 1
+    this.generation += 1
+    return true
+  }
+
+  commitForward() {
+    if (!this.canGoForward()) return false
+    this.index += 1
+    this.generation += 1
+    return true
   }
 
   rename(oldKey: string, newKey: string) {
@@ -47,7 +85,7 @@ export class NoteNavigation {
   }
 
   updateComposerThought(thought: string) {
-    const composer = this.locations[0]
+    const composer = this.locations[this.index]
     if (composer?.type === 'composer') composer.thought = thought
   }
 
