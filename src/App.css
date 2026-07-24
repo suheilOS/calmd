@@ -112,16 +112,17 @@
   color: transparent;
 }
 
-.markdown-editor .cm-quote-marker {
+.markdown-editor .cm-quote-line {
   position: relative;
 }
 
-.markdown-editor .cm-quote-marker::before {
-  color: var(--color-syntax);
-  content: "|";
-  font-weight: 600;
-  inset-inline-start: 0.25ch;
+.markdown-editor .cm-quote-line::before {
+  background: var(--color-syntax);
+  content: "";
+  inset-block: 0;
+  inset-inline-start: calc(0.25ch - var(--markdown-prefix-width));
   position: absolute;
+  width: 2px;
 }
 
 .markdown-editor .cm-line.cm-heading-line {

@@ -53,6 +53,7 @@ export type WikiLinkActivation = {
   target: string
   validateCurrentOccurrence: (authoritativeBody: string) => boolean
   applyCanonical: (canonicalTarget: string, resolvedTitle: string) => string | null
+  finish: () => void
 }
 
 type MarkdownEditorProps = {
@@ -82,7 +83,7 @@ const markdownHighlighting = syntaxHighlighting(HighlightStyle.define([
 
 function hangingMarkdownMarkers(view: EditorView) {
   const decorations: Range<Decoration>[] = []
-  const prefixes = new Map<number, { end: number; heading: boolean }>()
+  const prefixes = new Map<number, { end: number; heading: boolean; quote: boolean }>()
 
   for (const range of view.visibleRanges) {
     syntaxTree(view.state).iterate({
@@ -96,10 +97,13 @@ function hangingMarkdownMarkers(view: EditorView) {
 
           if (!/^\s*$/.test(gap)) return
 
-          if (
-            node.name === 'QuoteMark'
+          const isQuote = node.name === 'QuoteMark'
+          const isSpacedQuote = isQuote
             && /[\t ]/.test(view.state.sliceDoc(node.to, node.to + 1))
-          ) {
+
+          if (isQuote && !isSpacedQuote) return
+
+          if (isSpacedQuote) {
             decorations.push(Decoration.mark({
               class: 'cm-quote-marker',
             }).range(node.from, node.to))
@@ -108,6 +112,7 @@ function hangingMarkdownMarkers(view: EditorView) {
           prefixes.set(line.from, {
             end: node.to,
             heading: Boolean(prefix?.heading || node.name === 'HeaderMark'),
+            quote: Boolean(prefix?.quote || isSpacedQuote),
           })
         }
       },
@@ -128,10 +133,12 @@ function hangingMarkdownMarkers(view: EditorView) {
     }).range(line.from, prefixEnd))
     decorations.push(Decoration.line({
       attributes: {
-        class: prefix.heading
-          ? 'cm-hanging-markdown-line cm-heading-line'
-          : 'cm-hanging-markdown-line',
-        style: `text-indent: -${prefixLength}ch`,
+        class: [
+          'cm-hanging-markdown-line',
+          prefix.heading && 'cm-heading-line',
+          prefix.quote && 'cm-quote-line',
+        ].filter(Boolean).join(' '),
+        style: `--markdown-prefix-width: ${prefixLength}ch; text-indent: -${prefixLength}ch`,
       },
     }).range(line.from))
   }
@@ -312,12 +319,13 @@ const editorTheme = EditorView.theme({
 
 function wikiLinkInteraction(onActivate: (activation: WikiLinkActivation) => void) {
   return ViewPlugin.fromClass(class {
-    pending: { from: number; to: number; original: string; target: string } | null = null
+    active = new Set<{ from: number; to: number; original: string; target: string }>()
 
     update(update: ViewUpdate) {
-      if (this.pending && update.docChanged) {
-        this.pending.from = update.changes.mapPos(this.pending.from, 1)
-        this.pending.to = update.changes.mapPos(this.pending.to, -1)
+      if (!update.docChanged) return
+      for (const occurrence of this.active) {
+        occurrence.from = update.changes.mapPos(occurrence.from, 1)
+        occurrence.to = update.changes.mapPos(occurrence.to, -1)
       }
     }
 
@@ -331,30 +339,26 @@ function wikiLinkInteraction(onActivate: (activation: WikiLinkActivation) => voi
       const parsed = parseWikiLinkText(original)
       if (!parsed) return false
       event.preventDefault()
-      this.pending = { from: node.from, to: node.to, original, target: parsed.target }
-      const validateCurrentOccurrence = (authoritativeBody: string) => {
-        const pending = this.pending
-        return Boolean(
-          pending
-          && pending.target === parsed.target
-          && validateWikiLinkOccurrence(view.state, pending, authoritativeBody),
-        )
-      }
+      const occurrence = { from: node.from, to: node.to, original, target: parsed.target }
+      this.active.add(occurrence)
+      const validateCurrentOccurrence = (authoritativeBody: string) => (
+        this.active.has(occurrence)
+        && validateWikiLinkOccurrence(view.state, occurrence, authoritativeBody)
+      )
       onActivate({
         target: parsed.target,
         validateCurrentOccurrence,
         applyCanonical: (canonicalTarget, resolvedTitle) => {
-          const pending = this.pending
-          if (!validateCurrentOccurrence(view.state.doc.toString()) || !pending) return null
-          this.pending = null
+          if (!validateCurrentOccurrence(view.state.doc.toString())) return null
           const replacement = canonicalResolvedWikiLink(
             canonicalTarget,
             resolvedTitle,
             parsed.display,
           )
-          if (replacement !== pending.original) view.dispatch({ changes: { from: pending.from, to: pending.to, insert: replacement } })
+          if (replacement !== occurrence.original) view.dispatch({ changes: { from: occurrence.from, to: occurrence.to, insert: replacement } })
           return view.state.doc.toString()
         },
+        finish: () => this.active.delete(occurrence),
       })
       return true
     }
@@ -404,7 +408,7 @@ const editorExtensions = [
   EditorView.contentAttributes.of({
     'aria-label': 'Note content',
     'aria-multiline': 'true',
-    spellcheck: 'true',
+    spellcheck: 'false',
   }),
   placeholder('Start writing…'),
   editorTheme,

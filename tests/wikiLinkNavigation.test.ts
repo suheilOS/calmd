@@ -32,6 +32,7 @@ function activation(editor: EditorState, from: number, to: number) {
       body,
     ),
     applyCanonical: () => editor.doc.toString(),
+    finish: () => {},
   }
 }
 
@@ -86,6 +87,36 @@ describe('resolveWikiLinkActivation', () => {
       isCurrent: () => true,
     })
     expect(opens).toBe(0)
+  })
+
+  test('releases an activation when a delayed open becomes stale', async () => {
+    let finishCount = 0
+    let current = true
+    let releaseOpen: ((value: { note: Note; canonicalTarget: string }) => void) | null = null
+    const editor = state('[[Old]] and [[Old]]')
+    const first = {
+      ...activation(editor, 0, 7),
+      finish: () => { finishCount += 1 },
+    }
+
+    const navigation = resolveWikiLinkActivation({
+      activatedKey: 'Old.md',
+      activation: first,
+      flush: async () => ({
+        draft: { title: 'Old', body: editor.doc.toString() },
+        savedDraft: { title: 'Old', body: editor.doc.toString() },
+        key: 'Old.md', revision: 'two', conflict: false, failure: null,
+      }),
+      open: () => new Promise((resolve) => { releaseOpen = resolve }),
+      updateBody: () => {},
+      isCurrent: () => current,
+    })
+
+    await Promise.resolve()
+    current = false
+    releaseOpen?.({ note: oldNote, canonicalTarget: 'Old' })
+    expect(await navigation).toBeNull()
+    expect(finishCount).toBe(1)
   })
 
   test('does not resolve when flush canonicalizes the body ahead of CodeMirror', async () => {

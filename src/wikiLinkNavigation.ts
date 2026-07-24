@@ -19,20 +19,24 @@ export async function resolveWikiLinkActivation({
   updateBody,
   isCurrent,
 }: WikiLinkNavigation): Promise<Note | null> {
-  const flushed = await flush()
-  if (!flushed || !isCurrent() || flushed.key !== activatedKey) return null
-  if (!activation.validateCurrentOccurrence(flushed.draft.body)) return null
+  try {
+    const flushed = await flush()
+    if (!flushed || !isCurrent() || flushed.key !== activatedKey) return null
+    if (!activation.validateCurrentOccurrence(flushed.draft.body)) return null
 
-  const resolved = await open(activation.target)
-  if (!isCurrent()) return null
-  const rewrittenBody = activation.applyCanonical(
-    resolved.canonicalTarget,
-    resolved.note.title,
-  )
-  if (rewrittenBody === null) return null
-  updateBody(rewrittenBody)
+    const resolved = await open(activation.target)
+    if (!isCurrent()) return null
+    const rewrittenBody = activation.applyCanonical(
+      resolved.canonicalTarget,
+      resolved.note.title,
+    )
+    if (rewrittenBody === null) return null
+    updateBody(rewrittenBody)
 
-  const canonicalFlush = await flush()
-  if (!canonicalFlush || !isCurrent()) return null
-  return canonicalFlush.key === resolved.note.key ? null : resolved.note
+    const canonicalFlush = await flush()
+    if (!canonicalFlush || !isCurrent()) return null
+    return canonicalFlush.key === resolved.note.key ? null : resolved.note
+  } finally {
+    activation.finish()
+  }
 }

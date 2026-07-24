@@ -244,7 +244,10 @@ function App() {
   async function activateWikiLink(activation: WikiLinkActivation) {
     const activatedKey = noteEditing.snapshot?.key
     const generation = navigation.startTransition()
-    if (generation === null || !activatedKey) return
+    if (generation === null || !activatedKey) {
+      activation.finish()
+      return
+    }
     try {
       const destination = await resolveWikiLinkActivation({
         activatedKey,

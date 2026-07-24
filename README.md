@@ -8,14 +8,15 @@ Calmd is a Tauri 2 desktop application backed by a portable, user-selected Markd
 
 - A blank composer with ranked literal retrieval while typing
 - Exact-title handling that opens an existing note instead of creating a duplicate
-- Rust-owned create, read, save, and rename commands with conflict-safe Markdown writes
-- A rebuildable SQLite/FTS5 trigram index with concise match-specific excerpts
+- Rust-owned create, read, save, and coordinated rename commands with conflict-safe Markdown writes
+- A rebuildable schema-version-2 SQLite/FTS5 trigram index with concise excerpts and derived backlinks
 - A minimal full-page note editor with automatic saving
-- Keyboard and pointer navigation through retrieval results
-- A hidden backlinks popover with static placeholder content
+- `[[target]]` and `[[target|display text]]` links with modifier-click open-or-create navigation
+- Application-owned Back, Forward, and Home navigation gated by successful saves
+- An on-demand backlinks popover
 - Responsive light and dark styling
 
-Markdown remains the source of truth. Backlink discovery, wiki-link behavior, embeddings, and semantic retrieval are deferred.
+Markdown remains the source of truth. Internal links identify top-level Markdown filename stems case-insensitively. Paths, headings, blocks, embeds, multiline links, links in code, and ambiguous case-folded targets are unsupported. Embeddings and semantic retrieval remain deferred.
 
 ## Development
 

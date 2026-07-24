@@ -89,6 +89,25 @@ describe('NoteEditingSession', () => {
     expect(session.current().draft.title).toBe('New title')
   })
 
+  test('preserves editable whitespace when the canonical title is already saved', async () => {
+    let renames = 0
+    const clock = scheduler()
+    const session = new NoteEditingSession(adapter({
+      rename: async (_key, draft) => {
+        renames += 1
+        return { ...draft, key: `${draft.title}.md`, revision: 'two' }
+      },
+    }), original, () => {}, 450, clock.value)
+
+    session.updateDraft({ ...session.current().draft, title: 'Patient thought ' })
+    clock.run()
+    await Promise.resolve()
+
+    expect(session.current().draft.title).toBe('Patient thought ')
+    expect(renames).toBe(0)
+    expect(await session.flush()).not.toBeNull()
+  })
+
   test('flush returns the authoritative canonical snapshot', async () => {
     const session = new NoteEditingSession(adapter({
       rename: async () => ({

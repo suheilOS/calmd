@@ -60,6 +60,11 @@ function draftsMatch(left: NoteDraft, right: NoteDraft) {
   return left.title === right.title && left.body === right.body
 }
 
+function draftsMatchPersistedState(left: NoteDraft, right: NoteDraft) {
+  return canonicalizeTitle(left.title) === canonicalizeTitle(right.title)
+    && left.body === right.body
+}
+
 function draftFrom(note: Note): NoteDraft {
   return { title: note.title, body: note.body }
 }
@@ -128,12 +133,12 @@ export class NoteEditingSession {
   async flush(): Promise<NoteEditingSnapshot | null> {
     this.cancelScheduledSave()
     if (this.snapshot.conflict) return null
-    if (!draftsMatch(this.snapshot.draft, this.snapshot.savedDraft)) {
+    if (!draftsMatchPersistedState(this.snapshot.draft, this.snapshot.savedDraft)) {
       await this.save()
     } else {
       await this.saveChain
     }
-    return !this.snapshot.conflict && draftsMatch(
+    return !this.snapshot.conflict && draftsMatchPersistedState(
       this.snapshot.draft,
       this.snapshot.savedDraft,
     )
@@ -175,7 +180,7 @@ export class NoteEditingSession {
 
   private scheduleSave() {
     this.cancelScheduledSave()
-    if (draftsMatch(this.snapshot.draft, this.snapshot.savedDraft)) return
+    if (draftsMatchPersistedState(this.snapshot.draft, this.snapshot.savedDraft)) return
     this.timer = this.scheduler.set(() => {
       this.timer = null
       void this.save()
@@ -194,12 +199,7 @@ export class NoteEditingSession {
       ...sentDraft,
       title: canonicalizeTitle(sentDraft.title),
     }
-    if (draftsMatch(requestDraft, this.snapshot.savedDraft)) {
-      if (draftsMatch(this.snapshot.draft, sentDraft)) {
-        this.setSnapshot({ ...this.snapshot, draft: requestDraft })
-      }
-      return true
-    }
+    if (draftsMatch(requestDraft, this.snapshot.savedDraft)) return true
 
     const { key, revision, savedDraft } = this.snapshot
     this.setSnapshot({ ...this.snapshot, failure: null })

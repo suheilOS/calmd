@@ -1,8 +1,8 @@
 # Product Implementation Brief
 
-## Current phase: derived literal search index
+## Current phase: literal retrieval and internal linking
 
-The interface reads and writes top-level Markdown notes in one user-selected vault through dedicated Rust commands. Markdown remains the sole source of truth. A disposable SQLite/FTS5 database in Tauri app data provides ranked literal retrieval without placing system metadata in the vault.
+The interface reads and writes top-level Markdown notes in one user-selected vault through dedicated Rust commands. Markdown remains the sole source of truth. A disposable schema-version-2 SQLite/FTS5 database in Tauri app data provides ranked literal retrieval and derived backlinks without placing system metadata in the vault.
 
 ### Completed
 
@@ -17,13 +17,15 @@ The interface reads and writes top-level Markdown notes in one user-selected vau
 - Framework-neutral Note editing sessions that own autosave sequencing, canonical save reconciliation, conflict state, and flush-before-return behavior
 - Canonical `# Title` Markdown serialization and content-preserving external-file parsing
 - Portable filename derivation with case-insensitive collision handling
-- Atomic saves, staged transactional renames, and content-hash conflict detection
+- Atomic saves, recoverable journaled multi-file renames, incoming-link rewriting, and content-hash conflict detection
 - Minimal conflict recovery by reloading the external version from disk
 - Transactional launch and window-focus reconciliation without a filesystem watcher
 - Best-effort index updates after create, save, and rename, with Markdown-write success independent of index availability
 - Automatic recreation of missing, incompatible, or corrupt derived databases
-- Minimal full-page editor with return navigation
-- On-demand backlinks popover with static empty-state content
+- Minimal full-page editor with `[[target]]` and `[[target|display text]]` Live Preview links
+- Conflict-safe modifier-click link navigation that resolves or creates targets and canonicalizes the clicked occurrence
+- Application-owned Back, Forward, and Home navigation with save-gated transitions
+- On-demand backlinks derived from unambiguous normalized filename identity
 - Responsive light and dark presentation using a restrained three-level type scale
 
 ### Storage behavior
@@ -34,14 +36,15 @@ Renames stage and sync the complete new file in the vault, verify the original r
 
 A filesystem cannot provide one portable atomic operation that simultaneously replaces file content and changes its name. There is therefore a brief interval between unlinking the original path and installing the new path. Calmd restores the original after ordinary errors, but a process or machine failure in that interval can leave the complete original in a `.calmd-backup-*.tmp` file. The strategy also requires same-filesystem hard-link support inside the vault. As with atomic save replacement, an external process can still race the final revision check. Cleanup failures are logged rather than reported as failed saves after the new note has already been committed.
 
-The search database stores note keys, titles, bodies, revisions, and filesystem modification times under Tauri app data. FTS5 indexes titles and bodies with title-weighted BM25 ranking and trigram substring matching. Non-exact results use match-specific FTS5 snippets with a 96-token context window; Rust removes visible `[[...]]` brackets and bounds every excerpt at 240 Unicode characters before Tauri IPC. Exact-title results bypass FTS, read at most 480 body characters, and return one result with a bounded leading excerpt. Launch and focus scans reconcile the complete top-level Markdown snapshot transactionally. Missing, incompatible, and corrupt databases are discarded and rebuilt; index failures never roll back a successful Markdown write.
+The search database stores note keys, normalized filename identities, titles, bodies, revisions, filesystem modification times, and outgoing links under Tauri app data. Schema version 2 derives backlinks while FTS5 indexes titles and bodies with title-weighted BM25 ranking and trigram substring matching. Non-exact results use match-specific FTS5 snippets with a 96-token context window; Rust removes visible `[[...]]` brackets and bounds every excerpt at 240 Unicode characters before Tauri IPC. Exact-title results bypass FTS, read at most 480 body characters, and return one result with a bounded leading excerpt. Launch and focus scans reconcile the complete top-level Markdown snapshot transactionally. Missing, incompatible, and corrupt databases are discarded and rebuilt; index failures never roll back a successful Markdown write.
 
-### Deferred
+### Remaining limitations and deferred work
 
 - Embeddings, semantic retrieval, and combined ranking
-- Inline `[[links]]` and backlink discovery
+- Paths, headings, blocks, embeds, multiline wiki links, and wiki links inside code
+- Ambiguous case-insensitive filename identities resolve to neither note
 - Filesystem watching, deletion, nested folders, and multiple vaults
-- Browser-history-backed navigation
+- Operating-system/browser history integration, persisted history, and cursor or scroll restoration
 
 ## Target experience
 
@@ -109,10 +112,10 @@ Results show the title and a short matching excerpt. Embeddings, semantic simila
 2. **Completed:** Minimal note editor
 3. **Superseded:** Prototype literal title and body retrieval over mock notes
 4. **Superseded:** Prototype in-memory note creation and saving
-5. **UI placeholder only:** Backlinks popover; wiki links and backlink discovery remain deferred
-6. **Completed:** Tauri Markdown vault integration with atomic, conflict-safe saving
-7. **Completed:** Rebuildable SQLite/FTS5 literal search with ranked excerpts
-8. **Deferred:** Embeddings, semantic retrieval, and combined ranking
+5. **Completed:** On-demand backlinks, internal wiki links, and conflict-safe navigation
+6. **Completed:** Tauri Markdown vault integration with atomic, conflict-safe saving and coordinated rename rewriting
+7. **Completed:** Rebuildable schema-version-2 SQLite/FTS5 literal search, ranked excerpts, and backlink index
+8. **Research next:** Embeddings, semantic retrieval, and combined ranking
 
 ## Constraint
 

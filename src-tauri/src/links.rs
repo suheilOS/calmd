@@ -41,6 +41,7 @@ pub fn extract_links(markdown: &str) -> Vec<WikiLink> {
     let mut links = Vec::new();
     let mut offset = 0;
     let mut fenced: Option<(char, usize)> = None;
+    let mut code_ticks = 0;
     for line_with_end in markdown.split_inclusive('\n') {
         let line = line_with_end.trim_end_matches(['\r', '\n']);
         let trimmed = line.trim_start();
@@ -56,40 +57,47 @@ pub fn extract_links(markdown: &str) -> Vec<WikiLink> {
             offset += line_with_end.len();
             continue;
         }
-        if indent <= 3 && matches!(marker_char, Some('`' | '~')) && marker_len >= 3 {
+        if code_ticks == 0
+            && indent <= 3
+            && matches!(marker_char, Some('`' | '~'))
+            && marker_len >= 3
+        {
             fenced = Some((marker_char.unwrap(), marker_len));
             offset += line_with_end.len();
             continue;
         }
-        if line.starts_with("    ") || line.starts_with('\t') {
+        if code_ticks == 0 && (line.starts_with("    ") || line.starts_with('\t')) {
             offset += line_with_end.len();
             continue;
         }
-        parse_inline(line, offset, &mut links);
+        if line.trim().is_empty() {
+            code_ticks = 0;
+        } else {
+            parse_inline(line, offset, &mut code_ticks, &mut links);
+        }
         offset += line_with_end.len();
     }
     links
 }
 
-fn parse_inline(line: &str, base: usize, links: &mut Vec<WikiLink>) {
+fn parse_inline(line: &str, base: usize, code_ticks: &mut usize, links: &mut Vec<WikiLink>) {
     let bytes = line.as_bytes();
     let mut index = 0;
-    let mut code_ticks = 0;
     while index < bytes.len() {
         if bytes[index] == b'`' {
             let count = bytes[index..]
                 .iter()
                 .take_while(|byte| **byte == b'`')
                 .count();
-            if code_ticks == 0 {
-                code_ticks = count;
-            } else if code_ticks == count {
-                code_ticks = 0;
+            if *code_ticks == 0 {
+                *code_ticks = count;
+            } else if *code_ticks == count {
+                *code_ticks = 0;
             }
             index += count;
             continue;
         }
-        if code_ticks == 0
+        if *code_ticks == 0
             && bytes[index..].starts_with(b"[[")
             && (index == 0 || bytes[index - 1] != b'!')
         {
@@ -168,6 +176,31 @@ mod tests {
                 .map(|link| (&*link.target, link.display.as_deref()))
                 .collect::<Vec<_>>(),
             vec![("One", None), ("Two", Some("Alias"))]
+        );
+    }
+
+    #[test]
+    fn ignores_links_inside_multiline_code_spans() {
+        let body = "Before [[One]] `code\n[[Hidden]]\nmore code` [[Two]]";
+        let links = extract_links(body);
+        assert_eq!(
+            links
+                .iter()
+                .map(|link| link.target.as_str())
+                .collect::<Vec<_>>(),
+            vec!["One", "Two"]
+        );
+    }
+
+    #[test]
+    fn whitespace_only_lines_end_multiline_code_spans() {
+        let links = extract_links("`code\n \t \n[[Visible]]");
+        assert_eq!(
+            links
+                .iter()
+                .map(|link| link.target.as_str())
+                .collect::<Vec<_>>(),
+            vec!["Visible"]
         );
     }
 
