@@ -155,9 +155,11 @@ export function AppShell({
   navigation?: TitleBarNavigation
 }) {
   return (
-    <div className="flex min-h-screen flex-col bg-canvas">
+    <div className="flex h-svh flex-col overflow-hidden bg-canvas">
       <TitleBar navigation={navigation} />
-      {children}
+      <div className="app-scroll-container min-h-0 flex-1 overflow-y-auto">
+        {children}
+      </div>
     </div>
   )
 }
