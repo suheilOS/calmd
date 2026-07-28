@@ -2,10 +2,11 @@ import { Button } from '@base-ui/react/button'
 import { Input } from '@base-ui/react/input'
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
 import { ComposerScreen } from './ComposerScreen'
+import { createUntitledNote } from './createUntitledNote'
 import {
-  createUntitledNote,
   isCreateUntitledShortcut,
-} from './createUntitledNote'
+  isNavigateHomeShortcut,
+} from './keyboardShortcuts'
 import { NoteEditor } from './NoteEditor'
 import type { WikiLinkActivation } from './MarkdownEditor'
 import { NoteNavigation } from './noteNavigation'
@@ -76,6 +77,9 @@ function App() {
       setStorageMessage(getStorageError(error).message)
     }
   })
+  const handleNavigateHome = useEffectEvent(() => {
+    void navigateHome()
+  })
 
   const searchQuery = canonicalizeTitle(thought)
   const isEditing = editorDraft !== null
@@ -117,10 +121,16 @@ function App() {
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (!isCreateUntitledShortcut(event)) return
+      if (isCreateUntitledShortcut(event)) {
+        event.preventDefault()
+        void handleCreateUntitledNote()
+        return
+      }
 
-      event.preventDefault()
-      void handleCreateUntitledNote()
+      if (isNavigateHomeShortcut(event)) {
+        event.preventDefault()
+        handleNavigateHome()
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown)

@@ -1,18 +1,5 @@
 import type { Note } from './notes'
 
-type KeyboardShortcut = Pick<KeyboardEvent,
-  'altKey' | 'ctrlKey' | 'key' | 'metaKey' | 'repeat' | 'shiftKey'
->
-
-export function isCreateUntitledShortcut(event: KeyboardShortcut) {
-  return !event.repeat
-    && event.ctrlKey
-    && !event.altKey
-    && !event.metaKey
-    && !event.shiftKey
-    && event.key.toLowerCase() === 'n'
-}
-
 type TransitionCoordinator = {
   startTransition: () => number | null
   isCurrent: (generation: number) => boolean

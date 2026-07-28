@@ -52,7 +52,7 @@ The app opens to a single composer. As the user types, it searches existing note
 
 ## Current navigation
 
-Knowledge is accessed through literal retrieval, inline `[[links]]`, backlinks, and application-owned back and forward navigation. The full collection is never shown by default.
+Knowledge is accessed through literal retrieval, inline `[[links]]`, backlinks, and application-owned back and forward navigation. While Calmd is focused, `Ctrl+Shift+H` returns Home through the same save-gated navigation flow as the title-bar control. The full collection is never shown by default.
 
 ## Current note storage
 

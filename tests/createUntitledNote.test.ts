@@ -1,8 +1,9 @@
 import { describe, expect, test } from 'bun:test'
+import { createUntitledNote } from '../src/createUntitledNote'
 import {
-  createUntitledNote,
   isCreateUntitledShortcut,
-} from '../src/createUntitledNote'
+  isNavigateHomeShortcut,
+} from '../src/keyboardShortcuts'
 import { NoteNavigation } from '../src/noteNavigation'
 import type { Note } from '../src/notes'
 
@@ -37,6 +38,23 @@ describe('createUntitledNote', () => {
     expect(isCreateUntitledShortcut({ ...shortcut, ctrlKey: false })).toBe(false)
     expect(isCreateUntitledShortcut({ ...shortcut, shiftKey: true })).toBe(false)
     expect(isCreateUntitledShortcut({ ...shortcut, repeat: true })).toBe(false)
+  })
+
+  test('recognizes only an initial Ctrl+Shift+H press for Home', () => {
+    const shortcut = {
+      altKey: false,
+      ctrlKey: true,
+      key: 'h',
+      metaKey: false,
+      repeat: false,
+      shiftKey: true,
+    }
+
+    expect(isNavigateHomeShortcut(shortcut)).toBe(true)
+    expect(isNavigateHomeShortcut({ ...shortcut, key: 'H' })).toBe(true)
+    expect(isNavigateHomeShortcut({ ...shortcut, shiftKey: false })).toBe(false)
+    expect(isNavigateHomeShortcut({ ...shortcut, altKey: true })).toBe(false)
+    expect(isNavigateHomeShortcut({ ...shortcut, repeat: true })).toBe(false)
   })
 
   test('prepares before creating and opens exactly once', async () => {
