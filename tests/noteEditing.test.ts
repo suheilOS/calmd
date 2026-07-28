@@ -39,6 +39,9 @@ function scheduler() {
   }
   return {
     value,
+    pending() {
+      return callback !== null
+    },
     run() {
       const next = callback
       callback = null
@@ -86,7 +89,27 @@ describe('NoteEditingSession', () => {
 
     expect(renames[0].title).toBe('New title')
     expect(session.current().key).toBe('New title.md')
-    expect(session.current().draft.title).toBe('New title')
+    expect(session.current().draft.title).toBe('  New   title ')
+    expect(session.current().savedDraft.title).toBe('New title')
+  })
+
+  test('preserves a trailing-space rename without scheduling a redundant save', async () => {
+    const renames: NoteDraft[] = []
+    const clock = scheduler()
+    const session = new NoteEditingSession(adapter({
+      rename: async (_key, draft) => {
+        renames.push(draft)
+        return { ...draft, key: 'New word.md', revision: 'two' }
+      },
+    }), original, () => {}, 450, clock.value)
+
+    session.updateDraft({ title: 'New word ', body: original.body })
+    await session.save()
+
+    expect(renames).toEqual([{ title: 'New word', body: original.body }])
+    expect(session.current().draft.title).toBe('New word ')
+    expect(session.current().savedDraft.title).toBe('New word')
+    expect(clock.pending()).toBe(false)
   })
 
   test('preserves editable whitespace when the canonical title is already saved', async () => {

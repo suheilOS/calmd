@@ -69,6 +69,17 @@ function draftFrom(note: Note): NoteDraft {
   return { title: note.title, body: note.body }
 }
 
+function reconcilePersistedTitle(
+  sentTitle: string,
+  currentTitle: string,
+  persistedTitle: string,
+) {
+  if (currentTitle !== sentTitle) return currentTitle
+  return canonicalizeTitle(currentTitle) === persistedTitle
+    ? currentTitle
+    : persistedTitle
+}
+
 export class NoteEditingSession {
   private snapshot: NoteEditingSnapshot
   private saveChain: Promise<boolean> = Promise.resolve(true)
@@ -235,9 +246,11 @@ export class NoteEditingSession {
       this.setSnapshot({
         ...this.snapshot,
         draft: {
-          title: currentDraft.title === sentDraft.title
-            ? canonicalDraft.title
-            : currentDraft.title,
+          title: reconcilePersistedTitle(
+            sentDraft.title,
+            currentDraft.title,
+            canonicalDraft.title,
+          ),
           body: mergedBody,
         },
         savedDraft: canonicalDraft,
@@ -245,9 +258,7 @@ export class NoteEditingSession {
         revision: note.revision,
         failure: null,
       })
-      if (!draftsMatch(this.snapshot.draft, this.snapshot.savedDraft)) {
-        this.scheduleSave()
-      }
+      this.scheduleSave()
       return true
     } catch (error) {
       if (this.disposed) return false

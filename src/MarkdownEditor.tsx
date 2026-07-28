@@ -40,7 +40,7 @@ import {
 } from '@codemirror/view'
 import { tags } from '@lezer/highlight'
 import { GFM } from '@lezer/markdown'
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } from 'react'
 import { insertNewlineContinueBlockquote } from './markdownBlockquote'
 import { markdownHighlight } from './markdownHighlight'
 import { toggleLink, toggleMarkdown } from './markdownCommands'
@@ -61,6 +61,10 @@ export type WikiLinkActivation = {
   validateCurrentOccurrence: (authoritativeBody: string) => boolean
   applyCanonical: (canonicalTarget: string, resolvedTitle: string) => string | null
   finish: () => void
+}
+
+export type MarkdownEditorHandle = {
+  focusAtEnd: () => void
 }
 
 type MarkdownEditorProps = {
@@ -424,15 +428,24 @@ const editorExtensions = [
   editorTheme,
 ]
 
-export function MarkdownEditor({
+export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(function MarkdownEditor({
   value,
   onChange,
   onWikiLinkActivate,
   suggestWikiLinks,
-}: MarkdownEditorProps) {
+}, ref) {
   const containerRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<EditorView>(null)
   const initialValueRef = useRef(value)
+
+  useImperativeHandle(ref, () => ({
+    focusAtEnd() {
+      const editor = editorRef.current
+      if (!editor) return
+      editor.dispatch({ selection: { anchor: editor.state.doc.length } })
+      editor.focus()
+    },
+  }), [])
   const onChangeRef = useRef(onChange)
   const onWikiLinkActivateRef = useRef(onWikiLinkActivate)
   const suggestWikiLinksRef = useRef(suggestWikiLinks)
@@ -491,4 +504,4 @@ export function MarkdownEditor({
   }, [value])
 
   return <div className="markdown-editor" ref={containerRef} />
-}
+})

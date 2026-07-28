@@ -1,7 +1,8 @@
 import { Button } from '@base-ui/react/button'
 import { lazy, Suspense, useLayoutEffect, useRef } from 'react'
 import { BacklinksPopover } from './BacklinksPopover'
-import type { WikiLinkActivation } from './MarkdownEditor'
+import type { MarkdownEditorHandle, WikiLinkActivation } from './MarkdownEditor'
+import { handleTitleKeyDown } from './titleKeyDown'
 import {
   constrainNoteTitle,
   MAX_NOTE_TITLE_LENGTH,
@@ -40,6 +41,7 @@ export function NoteEditor({
   saveMessage,
 }: NoteEditorProps) {
   const titleRef = useRef<HTMLTextAreaElement>(null)
+  const bodyEditorRef = useRef<MarkdownEditorHandle>(null)
   const titleSelectionRef = useRef({ start: 0, end: 0 })
 
   useLayoutEffect(() => {
@@ -73,9 +75,11 @@ export function NoteEditor({
               title: constrainNoteTitle(event.target.value),
             })
           }}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') event.preventDefault()
-          }}
+          onKeyDown={(event) => handleTitleKeyDown({
+            key: event.key,
+            isComposing: event.nativeEvent.isComposing,
+            preventDefault: () => event.preventDefault(),
+          }, bodyEditorRef.current)}
           onSelect={(event) => {
             titleSelectionRef.current = {
               start: event.currentTarget.selectionStart,
@@ -89,6 +93,7 @@ export function NoteEditor({
         <div className="mt-6 sm:mt-8">
           <Suspense fallback={<div aria-hidden="true" className="min-h-[58vh]" />}>
             <MarkdownEditor
+              ref={bodyEditorRef}
               onChange={(body) => onDraftChange({ ...draft, body })}
               onWikiLinkActivate={onWikiLinkActivate}
               suggestWikiLinks={suggestWikiLinks}
