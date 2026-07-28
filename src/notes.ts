@@ -13,6 +13,11 @@ export type SearchHit = Pick<Note, 'key' | 'title'> & {
 
 export type NoteReference = Pick<Note, 'key' | 'title'>
 
+export type NotePreview = Pick<Note, 'key' | 'title'> & {
+  excerpt: string
+  truncated: boolean
+}
+
 export function noteKeyStem(key: string) {
   return key.replace(/\.md$/iu, '')
 }

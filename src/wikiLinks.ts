@@ -2,6 +2,7 @@ import { syntaxTree } from '@codemirror/language'
 import type { EditorState } from '@codemirror/state'
 import type { MarkdownConfig } from '@lezer/markdown'
 import { noteKeyStem } from './notes'
+import { isPlatformPrimaryModifier } from './notePreview'
 
 export type SourceRange = { from: number; to: number }
 
@@ -21,10 +22,8 @@ export function isWikiLinkNavigationClick(
   platform: string,
   modifiers: WikiLinkClickModifiers,
 ) {
-  if (modifiers.button !== 0 || modifiers.altKey || modifiers.shiftKey) return false
-  return /Mac/i.test(platform)
-    ? modifiers.metaKey && !modifiers.ctrlKey
-    : modifiers.ctrlKey && !modifiers.metaKey
+  return modifiers.button === 0
+    && isPlatformPrimaryModifier(platform, modifiers)
 }
 
 export function selectionTouchesSourceRange(

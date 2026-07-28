@@ -1,6 +1,7 @@
 import { Button } from '@base-ui/react/button'
-import { lazy, Suspense, useLayoutEffect, useRef } from 'react'
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { BacklinksPopover } from './BacklinksPopover'
+import { NotePreviewPopover } from './NotePreviewPopover'
 import type { MarkdownEditorHandle, WikiLinkActivation } from './MarkdownEditor'
 import { handleTitleKeyDown } from './titleKeyDown'
 import {
@@ -9,11 +10,37 @@ import {
   type NoteReference,
   type NoteDraft,
 } from './notes'
+import {
+  NotePreviewController,
+  type NotePreviewCandidate,
+  type NotePreviewLoadResult,
+} from './notePreview'
+import {
+  getStorageError,
+  readStoredNotePreview,
+  resolveStoredNotePreview,
+} from './storage'
 
 const MarkdownEditor = lazy(async () => {
   const module = await import('./MarkdownEditor')
   return { default: module.MarkdownEditor }
 })
+
+async function loadNotePreview(
+  candidate: NotePreviewCandidate,
+): Promise<NotePreviewLoadResult> {
+  try {
+    const preview = candidate.source === 'wiki-link'
+      ? await resolveStoredNotePreview(candidate.target)
+      : await readStoredNotePreview(candidate.key)
+    return preview ? { kind: 'found', preview } : { kind: 'missing' }
+  } catch (reason) {
+    const error = getStorageError(reason)
+    return error.code === 'not_found' || error.code === 'invalid_link'
+      ? { kind: 'missing' }
+      : { kind: 'error', message: error.message }
+  }
+}
 
 type NoteEditorProps = {
   draft: NoteDraft
@@ -43,6 +70,9 @@ export function NoteEditor({
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const bodyEditorRef = useRef<MarkdownEditorHandle>(null)
   const titleSelectionRef = useRef({ start: 0, end: 0 })
+  const [previewController] = useState(() => new NotePreviewController(loadNotePreview))
+
+  useEffect(() => () => previewController.dispose(), [previewController])
 
   useLayoutEffect(() => {
     const title = titleRef.current
@@ -95,6 +125,9 @@ export function NoteEditor({
             <MarkdownEditor
               ref={bodyEditorRef}
               onChange={(body) => onDraftChange({ ...draft, body })}
+              onPreviewCandidateEnter={previewController.enterSource}
+              onPreviewCandidateLeave={previewController.leaveSource}
+              onPreviewDismiss={previewController.dismiss}
               onWikiLinkActivate={onWikiLinkActivate}
               suggestWikiLinks={suggestWikiLinks}
               value={draft.body}
@@ -105,9 +138,21 @@ export function NoteEditor({
 
       <BacklinksPopover
         noteKey={noteKey}
-        onOpenChange={onBacklinksOpenChange}
+        onOpenChange={(open) => {
+          if (!open) previewController.dismiss()
+          onBacklinksOpenChange(open)
+        }}
+        onPreviewCandidateEnter={previewController.enterSource}
+        onPreviewCandidateLeave={previewController.leaveSource}
+        onPreviewDismiss={previewController.dismiss}
         onSelect={onBacklinkSelect}
         open={backlinksOpen}
+      />
+
+      <NotePreviewPopover
+        controller={previewController}
+        currentDraft={draft}
+        currentNoteKey={noteKey}
       />
 
       {saveMessage ? (

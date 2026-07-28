@@ -1,3 +1,6 @@
+#[path = "note_preview_read.rs"]
+mod note_preview_read;
+
 use crate::links::{key_stem, normalize_key, rewrite_target};
 use atomic_write_file::AtomicWriteFile;
 use serde::{Deserialize, Serialize};
@@ -23,6 +26,31 @@ pub struct Note {
     pub title: String,
     pub body: String,
     pub revision: String,
+}
+
+pub enum LinkResolution {
+    Missing,
+    Found(Note),
+    Ambiguous,
+}
+
+pub enum LinkKeyResolution {
+    Missing,
+    Found(String),
+    Ambiguous,
+}
+
+pub struct NotePreviewRead {
+    pub key: String,
+    pub title: String,
+    pub body: String,
+    pub truncated: bool,
+}
+
+enum KeyResolution {
+    Missing,
+    Found(String),
+    Ambiguous,
 }
 
 #[derive(Debug)]
@@ -62,11 +90,10 @@ impl<'a> NotePersistence<'a> {
         Self { root }
     }
 
-    pub fn scan(&self) -> PersistenceResult<Vec<Note>> {
-        let mut notes = Vec::new();
+    fn note_keys(&self) -> PersistenceResult<Vec<String>> {
         let entries = fs::read_dir(self.root)
             .map_err(|error| PersistenceError::io("Could not scan the vault", error))?;
-
+        let mut keys = Vec::new();
         for entry in entries {
             let entry =
                 entry.map_err(|error| PersistenceError::io("Could not scan the vault", error))?;
@@ -74,15 +101,22 @@ impl<'a> NotePersistence<'a> {
             let file_type = entry
                 .file_type()
                 .map_err(|error| PersistenceError::io("Could not inspect a vault entry", error))?;
-            if !file_type.is_file() || !has_markdown_extension(&path) {
-                continue;
+            if file_type.is_file()
+                && has_markdown_extension(&path)
+                && let Some(key) = entry.file_name().to_str()
+            {
+                keys.push(key.to_owned());
             }
-            let Some(key) = entry.file_name().to_str().map(str::to_owned) else {
-                continue;
-            };
-            notes.push(self.read(&key)?);
         }
+        Ok(keys)
+    }
 
+    pub fn scan(&self) -> PersistenceResult<Vec<Note>> {
+        let mut notes = self
+            .note_keys()?
+            .into_iter()
+            .map(|key| self.read(&key))
+            .collect::<PersistenceResult<Vec<_>>>()?;
         notes.sort_by(|left, right| {
             left.title
                 .to_lowercase()
@@ -90,6 +124,22 @@ impl<'a> NotePersistence<'a> {
                 .then_with(|| left.key.to_lowercase().cmp(&right.key.to_lowercase()))
         });
         Ok(notes)
+    }
+
+    pub fn resolve_link_key(&self, target: &str) -> PersistenceResult<LinkKeyResolution> {
+        match resolve_matching_key(self.note_keys()?, target) {
+            KeyResolution::Missing => Ok(LinkKeyResolution::Missing),
+            KeyResolution::Found(key) => Ok(LinkKeyResolution::Found(key)),
+            KeyResolution::Ambiguous => Ok(LinkKeyResolution::Ambiguous),
+        }
+    }
+
+    pub fn resolve_link(&self, target: &str) -> PersistenceResult<LinkResolution> {
+        match self.resolve_link_key(target)? {
+            LinkKeyResolution::Missing => Ok(LinkResolution::Missing),
+            LinkKeyResolution::Found(key) => self.read(&key).map(LinkResolution::Found),
+            LinkKeyResolution::Ambiguous => Ok(LinkResolution::Ambiguous),
+        }
     }
 
     pub fn find_or_create(&self, title: &str) -> PersistenceResult<Note> {
@@ -139,6 +189,15 @@ impl<'a> NotePersistence<'a> {
         let content = fs::read_to_string(&path)
             .map_err(|error| PersistenceError::io("Could not read the note", error))?;
         note_from_content(key.to_owned(), content)
+    }
+
+    pub fn read_preview(
+        &self,
+        key: &str,
+        character_limit: usize,
+    ) -> PersistenceResult<NotePreviewRead> {
+        let path = validated_note_path(self.root, key)?;
+        note_preview_read::read(&path, key, character_limit)
     }
 
     pub fn save(
@@ -600,6 +659,20 @@ fn validated_note_path(root: &Path, key: &str) -> PersistenceResult<PathBuf> {
         ));
     }
     Ok(canonical)
+}
+
+fn resolve_matching_key(keys: impl IntoIterator<Item = String>, target: &str) -> KeyResolution {
+    let normalized = normalize_key(target);
+    let mut matches = keys
+        .into_iter()
+        .filter(|key| normalize_key(key) == normalized);
+    let Some(key) = matches.next() else {
+        return KeyResolution::Missing;
+    };
+    if matches.next().is_some() {
+        return KeyResolution::Ambiguous;
+    }
+    KeyResolution::Found(key)
 }
 
 fn has_markdown_extension(path: &Path) -> bool {

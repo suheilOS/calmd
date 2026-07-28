@@ -1,6 +1,9 @@
 use crate::{
-    links::{NoteReference, key_stem, normalize_key},
-    note_persistence::{Note, NotePersistence, PersistenceError, recover_operation},
+    links::{NoteReference, key_stem},
+    note_persistence::{
+        LinkKeyResolution, LinkResolution, Note, NotePersistence, NotePreviewRead,
+        PersistenceError, recover_operation,
+    },
     search::{IndexedNote, SearchResponse, SearchState},
 };
 use serde::Serialize;
@@ -17,6 +20,7 @@ use tauri_plugin_store::StoreExt;
 const SETTINGS_FILE: &str = "settings.json";
 const VAULT_PATH_KEY: &str = "vault_path";
 const MAX_FILENAME_BYTES: usize = 180;
+const NOTE_PREVIEW_CHARACTER_LIMIT: usize = 4_000;
 
 #[derive(Default)]
 pub struct VaultState(Mutex<Option<PathBuf>>);
@@ -26,6 +30,15 @@ pub struct VaultState(Mutex<Option<PathBuf>>);
 pub struct OpenNoteLinkResponse {
     note: Note,
     canonical_target: String,
+}
+
+#[derive(Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NotePreview {
+    key: String,
+    title: String,
+    excerpt: String,
+    truncated: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -209,6 +222,15 @@ pub fn create_untitled_note(
     Ok(note)
 }
 
+fn note_preview(note: NotePreviewRead) -> NotePreview {
+    NotePreview {
+        key: note.key,
+        title: note.title,
+        excerpt: note.body,
+        truncated: note.truncated,
+    }
+}
+
 #[tauri::command]
 pub fn open_note_link(
     target: String,
@@ -222,16 +244,10 @@ pub fn open_note_link(
         .map_err(|_| CommandError::new("state", "Vault state is unavailable."))?;
     let root = vault_root(&guard)?;
     let persistence = NotePersistence::new(&root);
-    let normalized = normalize_key(&target);
-    let matches = persistence
-        .scan()?
-        .into_iter()
-        .filter(|note| normalize_key(&note.key) == normalized)
-        .collect::<Vec<_>>();
-    let note = match matches.len() {
-        0 => persistence.create(&target)?,
-        1 => matches.into_iter().next().unwrap(),
-        _ => {
+    let note = match persistence.resolve_link(&target)? {
+        LinkResolution::Missing => persistence.create(&target)?,
+        LinkResolution::Found(note) => note,
+        LinkResolution::Ambiguous => {
             return Err(CommandError::new(
                 "ambiguous_link",
                 "More than one note matches this link.",
@@ -243,6 +259,26 @@ pub fn open_note_link(
         canonical_target: key_stem(&note.key).to_owned(),
         note,
     })
+}
+
+#[tauri::command]
+pub fn resolve_note_preview(
+    target: String,
+    state: State<'_, VaultState>,
+) -> CommandResult<Option<NotePreview>> {
+    let target = validate_link_target(&target)?;
+    let guard = state
+        .0
+        .lock()
+        .map_err(|_| CommandError::new("state", "Vault state is unavailable."))?;
+    let root = vault_root(&guard)?;
+    let persistence = NotePersistence::new(&root);
+    match persistence.resolve_link_key(&target)? {
+        LinkKeyResolution::Found(key) => Ok(Some(note_preview(
+            persistence.read_preview(&key, NOTE_PREVIEW_CHARACTER_LIMIT)?,
+        ))),
+        LinkKeyResolution::Missing | LinkKeyResolution::Ambiguous => Ok(None),
+    }
 }
 
 #[tauri::command]
@@ -308,6 +344,17 @@ pub fn read_note(key: String, state: State<'_, VaultState>) -> CommandResult<Not
         .map_err(|_| CommandError::new("state", "Vault state is unavailable."))?;
     let root = vault_root(&guard)?;
     NotePersistence::new(&root).read(&key).map_err(Into::into)
+}
+
+#[tauri::command]
+pub fn read_note_preview(key: String, state: State<'_, VaultState>) -> CommandResult<NotePreview> {
+    let guard = state
+        .0
+        .lock()
+        .map_err(|_| CommandError::new("state", "Vault state is unavailable."))?;
+    let root = vault_root(&guard)?;
+    let note = NotePersistence::new(&root).read_preview(&key, NOTE_PREVIEW_CHARACTER_LIMIT)?;
+    Ok(note_preview(note))
 }
 
 #[tauri::command]

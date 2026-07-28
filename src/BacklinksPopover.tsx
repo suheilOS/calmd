@@ -2,12 +2,16 @@ import { Popover } from '@base-ui/react/popover'
 import { Tooltip } from '@base-ui/react/tooltip'
 import { useEffect, useRef, useState } from 'react'
 import type { NoteReference } from './notes'
+import type { NotePreviewCandidate } from './notePreview'
 import { getStorageError, getStoredBacklinks } from './storage'
 
 type BacklinksPopoverProps = {
   noteKey: string
   open: boolean
   onOpenChange: (open: boolean) => void
+  onPreviewCandidateEnter: (candidate: NotePreviewCandidate) => void
+  onPreviewCandidateLeave: () => void
+  onPreviewDismiss: () => void
   onSelect: (key: string) => void
 }
 
@@ -21,7 +25,15 @@ function InfoIcon() {
   )
 }
 
-export function BacklinksPopover({ noteKey, open, onOpenChange, onSelect }: BacklinksPopoverProps) {
+export function BacklinksPopover({
+  noteKey,
+  open,
+  onOpenChange,
+  onPreviewCandidateEnter,
+  onPreviewCandidateLeave,
+  onPreviewDismiss,
+  onSelect,
+}: BacklinksPopoverProps) {
   const [backlinks, setBacklinks] = useState<NoteReference[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const requestGenerationRef = useRef(0)
@@ -75,7 +87,25 @@ export function BacklinksPopover({ noteKey, open, onOpenChange, onSelect }: Back
             ) : backlinks.length === 0 ? (
               <p className="p-2 text-small text-secondary">No backlinks</p>
             ) : backlinks.map((link) => (
-              <button className="block min-h-10 w-full rounded-lg px-3 py-2 text-left text-small hover:bg-hover focus-visible:bg-active focus-visible:text-active-ink focus-visible:outline-2 focus-visible:outline-faint" key={link.key} onClick={() => onSelect(link.key)} type="button">
+              <button
+                className="block min-h-10 w-full rounded-lg px-3 py-2 text-left text-small hover:bg-hover focus-visible:bg-active focus-visible:text-active-ink focus-visible:outline-2 focus-visible:outline-faint"
+                key={link.key}
+                onClick={() => onSelect(link.key)}
+                onPointerEnter={(event) => {
+                  if (event.pointerType !== 'mouse') return
+                  onPreviewCandidateEnter({
+                    source: 'backlink',
+                    id: `backlink:${link.key}`,
+                    key: link.key,
+                    anchor: event.currentTarget,
+                  })
+                }}
+                onPointerLeave={(event) => {
+                  if (event.pointerType === 'mouse') onPreviewCandidateLeave()
+                }}
+                onPointerDown={onPreviewDismiss}
+                type="button"
+              >
                 {link.title}
               </button>
             ))}

@@ -4,6 +4,7 @@ import {
   type Note,
   type NoteReference,
   type NoteDraft,
+  type NotePreview,
   type OpenNoteLinkResponse,
   type SearchResponse,
 } from './notes'
@@ -58,6 +59,14 @@ export function createUntitledStoredNote() {
 
 export function openStoredNoteLink(target: string) {
   return invoke<OpenNoteLinkResponse>('open_note_link', { target })
+}
+
+export function resolveStoredNotePreview(target: string) {
+  return invoke<NotePreview | null>('resolve_note_preview', { target })
+}
+
+export function readStoredNotePreview(key: string) {
+  return invoke<NotePreview>('read_note_preview', { key })
 }
 
 export function getStoredBacklinks(key: string) {

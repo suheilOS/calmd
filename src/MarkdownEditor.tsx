@@ -45,6 +45,7 @@ import { insertNewlineContinueBlockquote } from './markdownBlockquote'
 import { markdownHighlight } from './markdownHighlight'
 import { toggleLink, toggleMarkdown } from './markdownCommands'
 import type { NoteReference } from './notes'
+import { navigationPlatform, type NotePreviewCandidate } from './notePreview'
 import { wikiLinkCompletion } from './wikiLinkCompletion'
 import {
   canonicalResolvedWikiLink,
@@ -70,6 +71,9 @@ export type MarkdownEditorHandle = {
 type MarkdownEditorProps = {
   value: string
   onChange: (value: string) => void
+  onPreviewCandidateEnter: (candidate: NotePreviewCandidate) => void
+  onPreviewCandidateLeave: () => void
+  onPreviewDismiss: () => void
   onWikiLinkActivate: (activation: WikiLinkActivation) => void
   suggestWikiLinks: (query: string) => Promise<NoteReference[]>
 }
@@ -330,27 +334,95 @@ const editorTheme = EditorView.theme({
   },
 })
 
-function wikiLinkInteraction(onActivate: (activation: WikiLinkActivation) => void) {
+function wikiLinkInteraction(
+  onActivate: (activation: WikiLinkActivation) => void,
+  onPreviewCandidateEnter: (candidate: NotePreviewCandidate) => void,
+  onPreviewCandidateLeave: () => void,
+  onPreviewDismiss: () => void,
+) {
   return ViewPlugin.fromClass(class {
     active = new Set<{ from: number; to: number; original: string; target: string }>()
+    hoveredCandidateId: string | null = null
+    hoveredAnchor: Element | null = null
+
+    clearHoveredCandidate() {
+      if (this.hoveredCandidateId === null) return
+      this.hoveredCandidateId = null
+      this.hoveredAnchor = null
+      onPreviewCandidateLeave()
+    }
 
     update(update: ViewUpdate) {
-      if (!update.docChanged) return
-      for (const occurrence of this.active) {
-        occurrence.from = update.changes.mapPos(occurrence.from, 1)
-        occurrence.to = update.changes.mapPos(occurrence.to, -1)
+      if (update.docChanged) {
+        for (const occurrence of this.active) {
+          occurrence.from = update.changes.mapPos(occurrence.from, 1)
+          occurrence.to = update.changes.mapPos(occurrence.to, -1)
+        }
+      }
+      if (update.docChanged || update.viewportChanged || update.selectionSet) {
+        this.clearHoveredCandidate()
       }
     }
 
+    pointerMove(view: EditorView, event: PointerEvent) {
+      if (event.pointerType !== 'mouse') return false
+      const eventElement = event.target instanceof Element
+        ? event.target
+        : event.target instanceof Node
+          ? event.target.parentElement
+          : null
+      const hoveredElement = eventElement?.closest('.cm-wiki-link') ?? null
+      if (!hoveredElement || !view.dom.contains(hoveredElement)) {
+        this.clearHoveredCandidate()
+        return false
+      }
+      const position = view.posAtCoords({ x: event.clientX, y: event.clientY })
+      if (position === null) {
+        this.clearHoveredCandidate()
+        return false
+      }
+      let node = syntaxTree(view.state).resolveInner(position, -1)
+      while (node.name !== 'WikiLink' && node.parent) node = node.parent
+      if (node.name !== 'WikiLink') {
+        this.clearHoveredCandidate()
+        return false
+      }
+      const original = view.state.sliceDoc(node.from, node.to)
+      const parsed = parseWikiLinkText(original)
+      if (!parsed) {
+        this.clearHoveredCandidate()
+        return false
+      }
+
+      const id = `wiki-link:${node.from}:${node.to}:${original}`
+      if (this.hoveredCandidateId === id && this.hoveredAnchor === hoveredElement) return false
+      this.hoveredCandidateId = id
+      this.hoveredAnchor = hoveredElement
+      onPreviewCandidateEnter({
+        source: 'wiki-link',
+        id,
+        target: parsed.target,
+        anchor: hoveredElement,
+      })
+      return false
+    }
+
+    pointerLeave(event: PointerEvent) {
+      if (event.pointerType !== 'mouse') return false
+      this.clearHoveredCandidate()
+      return false
+    }
+
     activate(view: EditorView, event: MouseEvent) {
-      if (!isWikiLinkNavigationClick(navigator.platform || navigator.userAgent, event)) return false
+      if (!isWikiLinkNavigationClick(navigationPlatform(), event)) return false
       const position = view.posAtDOM(event.target as Node)
       let node = syntaxTree(view.state).resolveInner(position, -1)
-      while (node && node.name !== 'WikiLink') node = node.parent!
-      if (!node) return false
+      while (node.name !== 'WikiLink' && node.parent) node = node.parent
+      if (node.name !== 'WikiLink') return false
       const original = view.state.sliceDoc(node.from, node.to)
       const parsed = parseWikiLinkText(original)
       if (!parsed) return false
+      onPreviewDismiss()
       event.preventDefault()
       const occurrence = { from: node.from, to: node.to, original, target: parsed.target }
       this.active.add(occurrence)
@@ -378,6 +450,8 @@ function wikiLinkInteraction(onActivate: (activation: WikiLinkActivation) => voi
   }, {
     eventHandlers: {
       mousedown(event, view) { return this.activate(view, event) },
+      pointerleave(event) { return this.pointerLeave(event) },
+      pointermove(event, view) { return this.pointerMove(view, event) },
     },
   })
 }
@@ -431,6 +505,9 @@ const editorExtensions = [
 export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(function MarkdownEditor({
   value,
   onChange,
+  onPreviewCandidateEnter,
+  onPreviewCandidateLeave,
+  onPreviewDismiss,
   onWikiLinkActivate,
   suggestWikiLinks,
 }, ref) {
@@ -447,14 +524,27 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
     },
   }), [])
   const onChangeRef = useRef(onChange)
+  const onPreviewCandidateEnterRef = useRef(onPreviewCandidateEnter)
+  const onPreviewCandidateLeaveRef = useRef(onPreviewCandidateLeave)
+  const onPreviewDismissRef = useRef(onPreviewDismiss)
   const onWikiLinkActivateRef = useRef(onWikiLinkActivate)
   const suggestWikiLinksRef = useRef(suggestWikiLinks)
 
   useEffect(() => {
     onChangeRef.current = onChange
+    onPreviewCandidateEnterRef.current = onPreviewCandidateEnter
+    onPreviewCandidateLeaveRef.current = onPreviewCandidateLeave
+    onPreviewDismissRef.current = onPreviewDismiss
     onWikiLinkActivateRef.current = onWikiLinkActivate
     suggestWikiLinksRef.current = suggestWikiLinks
-  }, [onChange, onWikiLinkActivate, suggestWikiLinks])
+  }, [
+    onChange,
+    onPreviewCandidateEnter,
+    onPreviewCandidateLeave,
+    onPreviewDismiss,
+    onWikiLinkActivate,
+    suggestWikiLinks,
+  ])
 
   useLayoutEffect(() => {
     if (!containerRef.current) return
@@ -470,7 +560,12 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
           maxRenderedOptions: 8,
           override: [wikiLinkCompletion((query) => suggestWikiLinksRef.current(query))],
         }),
-        wikiLinkInteraction((activation) => onWikiLinkActivateRef.current(activation)),
+        wikiLinkInteraction(
+          (activation) => onWikiLinkActivateRef.current(activation),
+          (candidate) => onPreviewCandidateEnterRef.current(candidate),
+          () => onPreviewCandidateLeaveRef.current(),
+          () => onPreviewDismissRef.current(),
+        ),
         EditorView.updateListener.of((update) => {
           const isExternalSync = update.transactions.some((transaction) =>
             transaction.annotation(externalSync),

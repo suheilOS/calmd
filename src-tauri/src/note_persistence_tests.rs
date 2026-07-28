@@ -6,6 +6,93 @@ fn persistence(root: &Path) -> NotePersistence<'_> {
 }
 
 #[test]
+fn resolves_link_keys_without_filesystem_case_assumptions() {
+    assert!(matches!(
+        resolve_matching_key(vec!["Other.md".to_owned()], "Missing"),
+        KeyResolution::Missing
+    ));
+    assert!(matches!(
+        resolve_matching_key(vec!["Target.md".to_owned()], "target.md"),
+        KeyResolution::Found(key) if key == "Target.md"
+    ));
+    assert!(matches!(
+        resolve_matching_key(
+            vec!["Target.md".to_owned(), "target.md".to_owned()],
+            "TARGET"
+        ),
+        KeyResolution::Ambiguous
+    ));
+}
+
+#[test]
+fn resolves_existing_links_without_creating_missing_notes() {
+    let vault = tempdir().unwrap();
+    let persistence = persistence(vault.path());
+    let created = persistence.create("Target").unwrap();
+
+    match persistence.resolve_link("target.md").unwrap() {
+        LinkResolution::Found(note) => assert_eq!(note.key, created.key),
+        _ => panic!("expected the existing note"),
+    }
+    assert!(matches!(
+        persistence.resolve_link("Missing").unwrap(),
+        LinkResolution::Missing
+    ));
+    assert_eq!(persistence.scan().unwrap().len(), 1);
+}
+
+#[test]
+fn reads_bounded_previews_without_splitting_utf8_or_reading_the_tail() {
+    let vault = tempdir().unwrap();
+    let exact_body = "é".repeat(4_000);
+    fs::write(
+        vault.path().join("Exact.md"),
+        serialize_markdown("Exact", &exact_body),
+    )
+    .unwrap();
+
+    let mut long_content = serialize_markdown("Long", &"🙂".repeat(4_001)).into_bytes();
+    long_content.push(0xff);
+    fs::write(vault.path().join("Long.md"), long_content).unwrap();
+    fs::write(vault.path().join("External.md"), "plain body").unwrap();
+    let mut external_long = "x".repeat(4_000).into_bytes();
+    external_long.push(0xff);
+    fs::write(vault.path().join("ExternalLong.md"), external_long).unwrap();
+    fs::write(
+        vault.path().join("Unicode.md"),
+        "\u{feff}\r\n# عنوان\r\n\r\nالمحتوى",
+    )
+    .unwrap();
+
+    let persistence = persistence(vault.path());
+    let exact = persistence.read_preview("Exact.md", 4_000).unwrap();
+    assert_eq!(exact.title, "Exact");
+    assert_eq!(exact.body.chars().count(), 4_000);
+    assert!(!exact.truncated);
+
+    let long = persistence.read_preview("Long.md", 4_000).unwrap();
+    assert_eq!(long.title, "Long");
+    assert_eq!(long.body.chars().count(), 4_000);
+    assert!(long.body.ends_with('🙂'));
+    assert!(long.truncated);
+    assert!(persistence.read("Long.md").is_err());
+
+    let external = persistence.read_preview("External.md", 4_000).unwrap();
+    assert_eq!(external.title, "External");
+    assert_eq!(external.body, "plain body");
+    assert!(!external.truncated);
+
+    let external_long = persistence.read_preview("ExternalLong.md", 4_000).unwrap();
+    assert_eq!(external_long.body.len(), 4_000);
+    assert!(external_long.truncated);
+
+    let unicode = persistence.read_preview("Unicode.md", 4_000).unwrap();
+    assert_eq!(unicode.title, "عنوان");
+    assert_eq!(unicode.body, "المحتوى");
+    assert!(!unicode.truncated);
+}
+
+#[test]
 fn reads_canonical_and_external_markdown_through_the_interface() {
     let vault = tempdir().unwrap();
     fs::write(

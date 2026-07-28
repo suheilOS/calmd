@@ -19,6 +19,8 @@ pub fn run() {
             storage::create_note,
             storage::create_untitled_note,
             storage::open_note_link,
+            storage::resolve_note_preview,
+            storage::read_note_preview,
             storage::get_backlinks,
             storage::read_note,
             storage::save_note,
