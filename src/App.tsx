@@ -27,6 +27,7 @@ import {
   readStoredNote,
   searchStoredNotes,
   selectVault,
+  storedWikiLinkExists,
   suggestStoredNotes,
   tauriNotePersistence,
 } from './storage'
@@ -413,6 +414,7 @@ function App() {
         onConflictReload={noteEditing.snapshot?.conflict ? reloadConflictedNote : null}
         onWikiLinkActivate={(activation) => void activateWikiLink(activation)}
         onBacklinkSelect={(key) => void openNote({ key })}
+        resolveWikiLink={storedWikiLinkExists}
         suggestWikiLinks={suggestStoredNotes}
         saveMessage={noteEditing.snapshot?.failure?.message ?? storageMessage}
       />

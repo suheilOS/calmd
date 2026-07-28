@@ -51,6 +51,7 @@ type NoteEditorProps = {
   onConflictReload: (() => void) | null
   onWikiLinkActivate: (activation: WikiLinkActivation) => void
   onBacklinkSelect: (key: string) => void
+  resolveWikiLink: (target: string) => Promise<boolean | null>
   suggestWikiLinks: (query: string) => Promise<NoteReference[]>
   saveMessage: string | null
 }
@@ -64,6 +65,7 @@ export function NoteEditor({
   onConflictReload,
   onWikiLinkActivate,
   onBacklinkSelect,
+  resolveWikiLink,
   suggestWikiLinks,
   saveMessage,
 }: NoteEditorProps) {
@@ -129,6 +131,7 @@ export function NoteEditor({
               onPreviewCandidateLeave={previewController.leaveSource}
               onPreviewDismiss={previewController.dismiss}
               onWikiLinkActivate={onWikiLinkActivate}
+              resolveWikiLink={resolveWikiLink}
               suggestWikiLinks={suggestWikiLinks}
               value={draft.body}
             />

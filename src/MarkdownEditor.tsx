@@ -25,7 +25,7 @@ import {
   markdownKeymap,
 } from '@codemirror/lang-markdown'
 import { highlightSelectionMatches, searchKeymap } from '@codemirror/search'
-import { Annotation, EditorState, type Range } from '@codemirror/state'
+import { Annotation, EditorState, StateEffect, type Range } from '@codemirror/state'
 import {
   Decoration,
   type DecorationSet,
@@ -75,6 +75,7 @@ type MarkdownEditorProps = {
   onPreviewCandidateLeave: () => void
   onPreviewDismiss: () => void
   onWikiLinkActivate: (activation: WikiLinkActivation) => void
+  resolveWikiLink: (target: string) => Promise<boolean | null>
   suggestWikiLinks: (query: string) => Promise<NoteReference[]>
 }
 
@@ -187,13 +188,20 @@ function selectionTouchesRange(
   )
 }
 
-function inlineMarkdownDecorations(view: EditorView) {
+function inlineMarkdownDecorations(
+  view: EditorView,
+  resolvedTargets: ReadonlyMap<string, boolean | null>,
+) {
   const decorations: Range<Decoration>[] = []
 
   syntaxTree(view.state).iterate({
     enter: (node) => {
       if (node.name === 'WikiLink') {
-        decorations.push(Decoration.mark({ class: 'cm-wiki-link' }).range(node.from, node.to))
+        const parsed = parseWikiLinkText(view.state.sliceDoc(node.from, node.to))
+        const missing = parsed && resolvedTargets.get(parsed.target) === false
+        decorations.push(Decoration.mark({
+          class: missing ? 'cm-wiki-link cm-wiki-link-missing' : 'cm-wiki-link',
+        }).range(node.from, node.to))
 
         const children: { name: string; from: number; to: number }[] = []
         const cursor = node.node.cursor()
@@ -251,21 +259,63 @@ function inlineMarkdownDecorations(view: EditorView) {
   return Decoration.set(decorations, true)
 }
 
-const inlineMarkdown = ViewPlugin.fromClass(class {
-  decorations: DecorationSet
+const wikiLinkResolutionChanged = StateEffect.define<null>()
 
-  constructor(view: EditorView) {
-    this.decorations = inlineMarkdownDecorations(view)
-  }
+function wikiLinkTargets(view: EditorView) {
+  const targets = new Set<string>()
+  syntaxTree(view.state).iterate({
+    enter: (node) => {
+      if (node.name !== 'WikiLink') return
+      const parsed = parseWikiLinkText(view.state.sliceDoc(node.from, node.to))
+      if (parsed) targets.add(parsed.target)
+    },
+  })
+  return targets
+}
 
-  update(update: ViewUpdate) {
-    if (update.docChanged || update.viewportChanged || update.selectionSet) {
-      this.decorations = inlineMarkdownDecorations(update.view)
+function inlineMarkdown(
+  resolveWikiLink: (target: string) => Promise<boolean | null>,
+) {
+  return ViewPlugin.fromClass(class {
+    decorations: DecorationSet
+    resolvedTargets = new Map<string, boolean | null>()
+    pendingTargets = new Set<string>()
+
+    constructor(view: EditorView) {
+      this.decorations = inlineMarkdownDecorations(view, this.resolvedTargets)
+      this.resolveTargets(view)
     }
-  }
-}, {
-  decorations: (plugin) => plugin.decorations,
-})
+
+    update(update: ViewUpdate) {
+      if (update.docChanged) this.resolveTargets(update.view)
+      const resolutionChanged = update.transactions.some((transaction) =>
+        transaction.effects.some((effect) => effect.is(wikiLinkResolutionChanged)),
+      )
+      if (update.docChanged || update.viewportChanged || update.selectionSet || resolutionChanged) {
+        this.decorations = inlineMarkdownDecorations(update.view, this.resolvedTargets)
+      }
+    }
+
+    resolveTargets(view: EditorView) {
+      for (const target of wikiLinkTargets(view)) {
+        if (this.resolvedTargets.has(target) || this.pendingTargets.has(target)) continue
+        this.pendingTargets.add(target)
+        void resolveWikiLink(target).then(
+          (exists) => this.finishTarget(view, target, exists),
+          () => this.finishTarget(view, target, null),
+        )
+      }
+    }
+
+    finishTarget(view: EditorView, target: string, exists: boolean | null) {
+      this.pendingTargets.delete(target)
+      this.resolvedTargets.set(target, exists)
+      if (view.dom.isConnected) view.dispatch({ effects: wikiLinkResolutionChanged.of(null) })
+    }
+  }, {
+    decorations: (plugin) => plugin.decorations,
+  })
+}
 
 const editorTheme = EditorView.theme({
   '&': {
@@ -469,7 +519,6 @@ const editorExtensions = [
   syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
   markdownHighlighting,
   hangingMarkdown,
-  inlineMarkdown,
   markdown({
     addKeymap: false,
     base: commonmarkLanguage,
@@ -509,6 +558,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
   onPreviewCandidateLeave,
   onPreviewDismiss,
   onWikiLinkActivate,
+  resolveWikiLink,
   suggestWikiLinks,
 }, ref) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -528,6 +578,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
   const onPreviewCandidateLeaveRef = useRef(onPreviewCandidateLeave)
   const onPreviewDismissRef = useRef(onPreviewDismiss)
   const onWikiLinkActivateRef = useRef(onWikiLinkActivate)
+  const resolveWikiLinkRef = useRef(resolveWikiLink)
   const suggestWikiLinksRef = useRef(suggestWikiLinks)
 
   useEffect(() => {
@@ -536,6 +587,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
     onPreviewCandidateLeaveRef.current = onPreviewCandidateLeave
     onPreviewDismissRef.current = onPreviewDismiss
     onWikiLinkActivateRef.current = onWikiLinkActivate
+    resolveWikiLinkRef.current = resolveWikiLink
     suggestWikiLinksRef.current = suggestWikiLinks
   }, [
     onChange,
@@ -543,6 +595,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
     onPreviewCandidateLeave,
     onPreviewDismiss,
     onWikiLinkActivate,
+    resolveWikiLink,
     suggestWikiLinks,
   ])
 
@@ -554,6 +607,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
       selection: { anchor: initialValueRef.current.length },
       extensions: [
         editorExtensions,
+        inlineMarkdown((target) => resolveWikiLinkRef.current(target)),
         autocompletion({
           activateOnTyping: true,
           icons: false,

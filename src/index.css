@@ -39,6 +39,7 @@
   --color-selection-ink: oklch(1 0 89.876);
   --color-highlight: oklch(0.951 0.022 83.264);
   --color-accent: oklch(0.57 0.131 38.756);
+  --color-missing-link: oklch(0.68 0.09 38.756);
   --color-accent-ink: oklch(1 0 89.876);
 }
 
@@ -102,6 +103,7 @@ html {
     --color-selection-ink: oklch(0.982 0.005 95.099);
     --color-highlight: oklch(0.354 0.062 90.470);
     --color-accent: oklch(0.70 0.131 38.756);
+    --color-missing-link: oklch(0.80 0.09 38.756);
     --color-accent-ink: oklch(0.191 0.002 106.586);
   }
 }

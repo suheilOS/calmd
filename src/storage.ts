@@ -65,6 +65,15 @@ export function resolveStoredNotePreview(target: string) {
   return invoke<NotePreview | null>('resolve_note_preview', { target })
 }
 
+export async function storedWikiLinkExists(target: string): Promise<boolean | null> {
+  try {
+    return (await resolveStoredNotePreview(target)) !== null
+  } catch (reason) {
+    const error = getStorageError(reason)
+    return error.code === 'not_found' || error.code === 'invalid_link' ? false : null
+  }
+}
+
 export function readStoredNotePreview(key: string) {
   return invoke<NotePreview>('read_note_preview', { key })
 }

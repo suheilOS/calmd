@@ -213,6 +213,10 @@
   text-underline-offset: 0.16em;
 }
 
+.markdown-editor .cm-wiki-link-missing {
+  color: var(--color-missing-link);
+}
+
 .markdown-editor .cm-wiki-link:hover {
   color: var(--color-ink);
 }
@@ -263,12 +267,6 @@
 @media (max-width: 45rem) {
   .note-editor-page {
     padding-inline-start: calc(1.5rem + 5ch);
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  .markdown-editor .cm-wiki-link {
-    color: var(--color-accent);
   }
 }
 
