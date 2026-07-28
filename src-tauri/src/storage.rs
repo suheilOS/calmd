@@ -195,6 +195,21 @@ pub fn create_note(
 }
 
 #[tauri::command]
+pub fn create_untitled_note(
+    state: State<'_, VaultState>,
+    search: State<'_, SearchState>,
+) -> CommandResult<Note> {
+    let guard = state
+        .0
+        .lock()
+        .map_err(|_| CommandError::new("state", "Vault state is unavailable."))?;
+    let root = vault_root(&guard)?;
+    let note = NotePersistence::new(&root).create_untitled()?;
+    best_effort_index(&search, &root, None, &note);
+    Ok(note)
+}
+
+#[tauri::command]
 pub fn open_note_link(
     target: String,
     state: State<'_, VaultState>,

@@ -93,18 +93,36 @@ impl<'a> NotePersistence<'a> {
     }
 
     pub fn find_or_create(&self, title: &str) -> PersistenceResult<Note> {
-        let normalized_title = canonicalize_title(title)?.to_lowercase();
-        if let Some(note) = self.scan()?.into_iter().find(|note| {
-            note.title
-                .split_whitespace()
-                .collect::<Vec<_>>()
-                .join(" ")
-                .to_lowercase()
-                == normalized_title
-        }) {
+        let canonical_title = canonicalize_title(title)?;
+        let identity = title_identity(&canonical_title);
+        if let Some(note) = self
+            .scan()?
+            .into_iter()
+            .find(|note| title_identity(&note.title) == identity)
+        {
             return Ok(note);
         }
-        self.create(title)
+        self.create(&canonical_title)
+    }
+
+    pub fn create_untitled(&self) -> PersistenceResult<Note> {
+        let existing = self
+            .scan()?
+            .into_iter()
+            .map(|note| title_identity(&note.title))
+            .collect::<HashSet<_>>();
+
+        for number in 0.. {
+            let title = if number == 0 {
+                "Untitled".to_owned()
+            } else {
+                format!("Untitled {number}")
+            };
+            if !existing.contains(&title_identity(&title)) {
+                return self.create(&title);
+            }
+        }
+        unreachable!()
     }
 
     pub fn create(&self, title: &str) -> PersistenceResult<Note> {
@@ -650,6 +668,14 @@ fn canonicalize_title(title: &str) -> PersistenceResult<String> {
         ));
     }
     Ok(canonical)
+}
+
+fn title_identity(title: &str) -> String {
+    title
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
 }
 
 fn available_filename(

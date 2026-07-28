@@ -1,7 +1,11 @@
 import { Button } from '@base-ui/react/button'
 import { Input } from '@base-ui/react/input'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
 import { ComposerScreen } from './ComposerScreen'
+import {
+  createUntitledNote,
+  isCreateUntitledShortcut,
+} from './createUntitledNote'
 import { NoteEditor } from './NoteEditor'
 import type { WikiLinkActivation } from './MarkdownEditor'
 import { NoteNavigation } from './noteNavigation'
@@ -15,6 +19,7 @@ import {
 } from './notes'
 import {
   createStoredNote,
+  createUntitledStoredNote,
   getStorageError,
   openVault,
   openStoredNoteLink,
@@ -57,6 +62,20 @@ function App() {
     setNavigationRevision((revision) => revision + 1)
   })
   const editorDraft = noteEditing.snapshot?.draft ?? null
+  const handleCreateUntitledNote = useEffectEvent(async () => {
+    try {
+      await createUntitledNote({
+        navigation,
+        prepare: async () => (
+          noteEditing.snapshot === null || Boolean(await noteEditing.flush())
+        ),
+        create: createUntitledStoredNote,
+        open: beginEditing,
+      })
+    } catch (error) {
+      setStorageMessage(getStorageError(error).message)
+    }
+  })
 
   const searchQuery = canonicalizeTitle(thought)
   const isEditing = editorDraft !== null
@@ -95,6 +114,18 @@ function App() {
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
   }, [refreshVault])
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (!isCreateUntitledShortcut(event)) return
+
+      event.preventDefault()
+      void handleCreateUntitledNote()
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   useEffect(() => {
     const requestId = ++searchRequestRef.current

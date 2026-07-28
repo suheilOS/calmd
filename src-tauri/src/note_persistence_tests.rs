@@ -397,6 +397,54 @@ fn find_or_create_returns_an_exact_title_without_a_duplicate() {
 }
 
 #[test]
+fn creates_sequential_untitled_notes_using_visible_titles() {
+    let vault = tempdir().unwrap();
+    let store = persistence(vault.path());
+
+    let first = store.create_untitled().unwrap();
+    let second = store.create_untitled().unwrap();
+    let third = store.create_untitled().unwrap();
+
+    assert_eq!(
+        (first.title.as_str(), first.key.as_str()),
+        ("Untitled", "Untitled.md")
+    );
+    assert_eq!(
+        (second.title.as_str(), second.key.as_str()),
+        ("Untitled 1", "Untitled 1.md")
+    );
+    assert_eq!(
+        (third.title.as_str(), third.key.as_str()),
+        ("Untitled 2", "Untitled 2.md")
+    );
+}
+
+#[test]
+fn untitled_creation_reuses_gaps_and_compares_titles_case_insensitively() {
+    let vault = tempdir().unwrap();
+    let store = persistence(vault.path());
+    store.create("untitled").unwrap();
+    store.create("UNTITLED 2").unwrap();
+
+    let first_gap = store.create_untitled().unwrap();
+    let next = store.create_untitled().unwrap();
+
+    assert_eq!(first_gap.title, "Untitled 1");
+    assert_eq!(next.title, "Untitled 3");
+}
+
+#[test]
+fn untitled_creation_delegates_filename_collisions_without_changing_the_title() {
+    let vault = tempdir().unwrap();
+    fs::write(vault.path().join("Untitled.md"), "# Existing title\n").unwrap();
+
+    let note = persistence(vault.path()).create_untitled().unwrap();
+
+    assert_eq!(note.title, "Untitled");
+    assert_eq!(note.key, "Untitled (2).md");
+}
+
+#[test]
 fn rename_uses_a_collision_suffix_without_overwriting() {
     let vault = tempdir().unwrap();
     let store = persistence(vault.path());

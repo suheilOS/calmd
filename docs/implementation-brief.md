@@ -48,7 +48,7 @@ The search database stores note keys, normalized filename identities, titles, bo
 
 ## Current experience
 
-The app opens to a single composer. As the user types, it searches existing notes, shows relevant matches, and offers to create a new note. There is no sidebar, file tree, dashboard, graph, note count, or recent-notes feed.
+The app opens to a single composer. As the user types, it searches existing notes, shows relevant matches, and offers to create a new note. While Calmd is focused, `Ctrl+N` safely flushes the active note and creates the first available visible title in the sequence `Untitled`, `Untitled 1`, `Untitled 2`, and so on. There is no sidebar, file tree, dashboard, graph, note count, or recent-notes feed.
 
 ## Current navigation
 

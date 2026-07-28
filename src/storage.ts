@@ -52,6 +52,10 @@ export function createStoredNote(title: string) {
   return invoke<Note>('create_note', { title: canonicalizeTitle(title) })
 }
 
+export function createUntitledStoredNote() {
+  return invoke<Note>('create_untitled_note')
+}
+
 export function openStoredNoteLink(target: string) {
   return invoke<OpenNoteLinkResponse>('open_note_link', { target })
 }
