@@ -1,6 +1,7 @@
 import { Button } from '@base-ui/react/button'
+import { Tooltip } from '@base-ui/react/tooltip'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, type ReactElement, type ReactNode } from 'react'
 
 const appWindow = getCurrentWindow()
 
@@ -67,6 +68,21 @@ const controlClassName =
 const navigationControlClassName =
   `${controlClassName} disabled:cursor-default disabled:text-faint disabled:hover:bg-transparent disabled:hover:text-faint disabled:active:scale-100`
 
+function TitleBarTooltip({ children, label }: { children: ReactElement; label: string }) {
+  return (
+    <Tooltip.Root>
+      <Tooltip.Trigger render={children} />
+      <Tooltip.Portal>
+        <Tooltip.Positioner className="z-50" side="bottom" sideOffset={6}>
+          <Tooltip.Popup className="origin-[var(--transform-origin)] rounded-lg bg-ink px-2 py-1 text-small text-canvas shadow-[0_4px_12px_oklch(0_0_0/0.16)] transition-[opacity,scale] duration-100 ease-out data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
+            {label}
+          </Tooltip.Popup>
+        </Tooltip.Positioner>
+      </Tooltip.Portal>
+    </Tooltip.Root>
+  )
+}
+
 export function TitleBar({ navigation }: { navigation?: TitleBarNavigation }) {
   useEffect(() => {
     if (!navigation) return
@@ -96,53 +112,64 @@ export function TitleBar({ navigation }: { navigation?: TitleBarNavigation }) {
       <span className="pointer-events-none absolute inset-0 flex items-center justify-center" data-tauri-drag-region>
         calmd
       </span>
-      {navigation ? (
-        <div className="flex" role="group" aria-label="Navigation controls">
-          <Button
-            aria-keyshortcuts="Control+[ Meta+["
-            aria-label="Back"
-            className={navigationControlClassName}
-            disabled={!navigation.canGoBack}
-            onClick={navigation.onBack}
-            title="Back (Ctrl+[)"
-            type="button"
-          >
-            <BackIcon />
-          </Button>
-          <Button
-            aria-keyshortcuts="Control+] Meta+]"
-            aria-label="Forward"
-            className={navigationControlClassName}
-            disabled={!navigation.canGoForward}
-            onClick={navigation.onForward}
-            title="Forward (Ctrl+])"
-            type="button"
-          >
-            <ForwardIcon />
-          </Button>
-          <Button
-            aria-label="Home"
-            className={navigationControlClassName}
-            disabled={!navigation.canGoHome}
-            onClick={navigation.onHome}
-            title="Home"
-            type="button"
-          >
-            <HomeIcon />
-          </Button>
+      <Tooltip.Provider delay={500} timeout={300}>
+        {navigation ? (
+          <div className="flex" role="group" aria-label="Navigation controls">
+            <TitleBarTooltip label="Back (Ctrl+[)">
+              <Button
+                aria-keyshortcuts="Control+[ Meta+["
+                aria-label="Back"
+                className={navigationControlClassName}
+                disabled={!navigation.canGoBack}
+                onClick={navigation.onBack}
+                type="button"
+              >
+                <BackIcon />
+              </Button>
+            </TitleBarTooltip>
+            <TitleBarTooltip label="Forward (Ctrl+])">
+              <Button
+                aria-keyshortcuts="Control+] Meta+]"
+                aria-label="Forward"
+                className={navigationControlClassName}
+                disabled={!navigation.canGoForward}
+                onClick={navigation.onForward}
+                type="button"
+              >
+                <ForwardIcon />
+              </Button>
+            </TitleBarTooltip>
+            <TitleBarTooltip label="Home">
+              <Button
+                aria-label="Home"
+                className={navigationControlClassName}
+                disabled={!navigation.canGoHome}
+                onClick={navigation.onHome}
+                type="button"
+              >
+                <HomeIcon />
+              </Button>
+            </TitleBarTooltip>
+          </div>
+        ) : null}
+        <div className="ml-auto flex" role="group" aria-label="Window controls">
+          <TitleBarTooltip label="Minimize">
+            <Button aria-label="Minimize window" className={controlClassName} onClick={() => void appWindow.minimize()} type="button">
+              <MinimizeIcon />
+            </Button>
+          </TitleBarTooltip>
+          <TitleBarTooltip label="Maximize or restore">
+            <Button aria-label="Maximize or restore window" className={controlClassName} onClick={() => void appWindow.toggleMaximize()} type="button">
+              <MaximizeIcon />
+            </Button>
+          </TitleBarTooltip>
+          <TitleBarTooltip label="Close">
+            <Button aria-label="Close window" className={`${controlClassName} hover:bg-red-500 hover:text-white`} onClick={() => void appWindow.close()} type="button">
+              <CloseIcon />
+            </Button>
+          </TitleBarTooltip>
         </div>
-      ) : null}
-      <div className="ml-auto flex" role="group" aria-label="Window controls">
-        <Button aria-label="Minimize window" className={controlClassName} onClick={() => void appWindow.minimize()} type="button">
-          <MinimizeIcon />
-        </Button>
-        <Button aria-label="Maximize or restore window" className={controlClassName} onClick={() => void appWindow.toggleMaximize()} type="button">
-          <MaximizeIcon />
-        </Button>
-        <Button aria-label="Close window" className={`${controlClassName} hover:bg-red-500 hover:text-white`} onClick={() => void appWindow.close()} type="button">
-          <CloseIcon />
-        </Button>
-      </div>
+      </Tooltip.Provider>
     </header>
   )
 }

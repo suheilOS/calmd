@@ -1,4 +1,5 @@
 import { Popover } from '@base-ui/react/popover'
+import { Tooltip } from '@base-ui/react/tooltip'
 import { useEffect, useRef, useState } from 'react'
 import type { NoteReference } from './notes'
 import { getStorageError, getStoredBacklinks } from './storage'
@@ -49,9 +50,23 @@ export function BacklinksPopover({ noteKey, open, onOpenChange, onSelect }: Back
 
   return (
     <Popover.Root open={open} onOpenChange={handleOpenChange}>
-      <Popover.Trigger aria-label="Show backlinks" className="fixed bottom-5 right-5 z-10 inline-flex size-9 items-center justify-center rounded-xl bg-surface text-muted transition-[background-color,color,transform] duration-150 ease-out hover:bg-hover hover:text-ink focus-visible:bg-active focus-visible:text-active-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-faint active:scale-[0.97] sm:bottom-8 sm:right-8">
-        <InfoIcon />
-      </Popover.Trigger>
+      <Tooltip.Root>
+        <Tooltip.Trigger
+          delay={500}
+          render={(
+            <Popover.Trigger aria-label="Show backlinks" className="fixed bottom-5 right-5 z-10 inline-flex size-9 items-center justify-center rounded-xl bg-surface text-muted transition-[background-color,color,transform] duration-150 ease-out hover:bg-hover hover:text-ink focus-visible:bg-active focus-visible:text-active-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-faint active:scale-[0.97] sm:bottom-8 sm:right-8">
+              <InfoIcon />
+            </Popover.Trigger>
+          )}
+        />
+        <Tooltip.Portal>
+          <Tooltip.Positioner className="z-50" side="top" sideOffset={6}>
+            <Tooltip.Popup className="origin-[var(--transform-origin)] rounded-lg bg-ink px-2 py-1 text-small text-canvas shadow-[0_4px_12px_oklch(0_0_0/0.16)] transition-[opacity,scale] duration-100 ease-out data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
+              Links
+            </Tooltip.Popup>
+          </Tooltip.Positioner>
+        </Tooltip.Portal>
+      </Tooltip.Root>
       <Popover.Portal>
         <Popover.Positioner align="end" positionMethod="fixed" side="top" sideOffset={8}>
           <Popover.Popup className="backlinks-popover w-64 max-w-[calc(100vw-2.5rem)] rounded-xl bg-surface p-2 text-ink shadow-[0_8px_24px_oklch(0_0_0/0.18)] outline-none">
