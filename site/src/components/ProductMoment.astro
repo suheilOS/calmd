@@ -1,0 +1,225 @@
+---
+const slides = [
+  {
+    src: '/media/calmd-composer.png',
+    alt: 'Calmd’s empty composer with a prompt to find a note or start a thought.',
+  },
+  {
+    src: '/media/calmd-retrieval.png',
+    alt: 'Calmd retrieving two relevant notes for the search term Prescription.',
+  },
+  {
+    src: '/media/calmd-editor.png',
+    alt: 'A full-page note open in Calmd’s focused Markdown editor.',
+  },
+  {
+    src: '/media/calmd-link-preview.png',
+    alt: 'Calmd showing a linked-note preview above the current note.',
+  },
+]
+---
+
+<figure class="product-moment" aria-label="Calmd product screenshots">
+  <div class="media-frame">
+    <button
+      class="media-expand"
+      type="button"
+      aria-expanded="false"
+      aria-label="Expand product screenshots"
+    >
+      <span class="media-slides">
+        {slides.map((slide, index) => (
+          <img
+            class:list={['media-slide', { 'is-active': index === 0 }]}
+            src={slide.src}
+            alt={slide.alt}
+            width="1898"
+            height="1144"
+            loading={index === 0 ? 'eager' : 'lazy'}
+            decoding="async"
+            fetchpriority={index === 0 ? 'high' : 'auto'}
+            aria-hidden={index === 0 ? 'false' : 'true'}
+            draggable="false"
+          />
+        ))}
+      </span>
+    </button>
+
+    <div class="carousel-dots" role="tablist" aria-label="Choose a product screenshot">
+      {slides.map((_, index) => (
+        <button
+          class:list={['carousel-dot', { 'is-active': index === 0 }]}
+          type="button"
+          role="tab"
+          aria-label={`Show screenshot ${index + 1} of ${slides.length}`}
+          aria-selected={index === 0 ? 'true' : 'false'}
+          tabindex={index === 0 ? '0' : '-1'}
+          data-slide={index}
+        ></button>
+      ))}
+    </div>
+  </div>
+</figure>
+
+<script>
+  const animations = new WeakMap<Element, Animation>()
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+
+  document.querySelectorAll<HTMLElement>('.product-moment').forEach((figure) => {
+    const expandButton = figure.querySelector<HTMLButtonElement>('.media-expand')
+    const track = figure.querySelector<HTMLElement>('.media-slides')
+    const slides = Array.from(figure.querySelectorAll<HTMLElement>('.media-slide'))
+    const dots = Array.from(figure.querySelectorAll<HTMLButtonElement>('.carousel-dot'))
+    if (!expandButton || !track || slides.length === 0 || slides.length !== dots.length) return
+
+    let activeIndex = 0
+    let dragStartX = 0
+    let dragStartTime = 0
+    let dragDelta = 0
+    let dragging = false
+    let suppressNextClick = false
+
+    const positionTrack = (animate = true) => {
+      track.classList.toggle('is-dragging', !animate)
+      track.style.transform = `translate3d(${-activeIndex * expandButton.clientWidth}px, 0, 0)`
+
+      if (!animate) {
+        requestAnimationFrame(() => track.classList.remove('is-dragging'))
+      }
+    }
+
+    const showSlide = (nextIndex: number, animate = true) => {
+      activeIndex = (nextIndex + slides.length) % slides.length
+      positionTrack(animate)
+
+      slides.forEach((slide, index) => {
+        const active = index === activeIndex
+        slide.classList.toggle('is-active', active)
+        slide.setAttribute('aria-hidden', String(!active))
+      })
+
+      dots.forEach((dot, index) => {
+        const active = index === activeIndex
+        dot.classList.toggle('is-active', active)
+        dot.setAttribute('aria-selected', String(active))
+        dot.tabIndex = active ? 0 : -1
+      })
+    }
+
+    const finishDrag = (event: PointerEvent, cancelled = false) => {
+      if (!expandButton.hasPointerCapture(event.pointerId)) return
+      expandButton.releasePointerCapture(event.pointerId)
+
+      if (!dragging || cancelled) {
+        dragging = false
+        dragDelta = 0
+        positionTrack()
+        return
+      }
+
+      const elapsed = Math.max(performance.now() - dragStartTime, 1)
+      const velocity = dragDelta / elapsed
+      const distanceThreshold = expandButton.clientWidth * 0.15
+      const shouldAdvance = Math.abs(dragDelta) > distanceThreshold || Math.abs(velocity) > 0.35
+
+      if (shouldAdvance) {
+        showSlide(activeIndex + (dragDelta < 0 ? 1 : -1))
+      } else {
+        positionTrack()
+      }
+
+      dragging = false
+      dragDelta = 0
+      suppressNextClick = true
+      setTimeout(() => {
+        suppressNextClick = false
+      }, 0)
+    }
+
+    expandButton.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0) return
+      expandButton.setPointerCapture(event.pointerId)
+      dragStartX = event.clientX
+      dragStartTime = performance.now()
+      dragDelta = 0
+      dragging = false
+      track.classList.add('is-dragging')
+    })
+
+    expandButton.addEventListener('pointermove', (event) => {
+      if (!expandButton.hasPointerCapture(event.pointerId)) return
+      dragDelta = event.clientX - dragStartX
+
+      if (!dragging && Math.abs(dragDelta) < 8) return
+      dragging = true
+
+      const atStart = activeIndex === 0 && dragDelta > 0
+      const atEnd = activeIndex === slides.length - 1 && dragDelta < 0
+      const resistedDelta = atStart || atEnd ? dragDelta * 0.25 : dragDelta
+      const offset = -activeIndex * expandButton.clientWidth + resistedDelta
+      track.style.transform = `translate3d(${offset}px, 0, 0)`
+    })
+
+    expandButton.addEventListener('pointerup', (event) => finishDrag(event))
+    expandButton.addEventListener('pointercancel', (event) => finishDrag(event, true))
+
+    dots.forEach((dot, index) => {
+      dot.addEventListener('click', () => showSlide(index))
+    })
+
+    expandButton.addEventListener('keydown', (event) => {
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+      event.preventDefault()
+      showSlide(activeIndex + (event.key === 'ArrowRight' ? 1 : -1))
+      dots[activeIndex]?.focus()
+    })
+
+    dots.forEach((dot) => {
+      dot.addEventListener('keydown', (event) => {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+        event.preventDefault()
+        showSlide(activeIndex + (event.key === 'ArrowRight' ? 1 : -1))
+        dots[activeIndex]?.focus()
+      })
+    })
+
+    expandButton.addEventListener('click', () => {
+      if (suppressNextClick) return
+
+      const first = figure.getBoundingClientRect()
+      animations.get(figure)?.cancel()
+
+      const expanded = figure.classList.toggle('is-expanded')
+      document.documentElement.classList.toggle('media-expanded', expanded)
+      expandButton.setAttribute('aria-expanded', String(expanded))
+      expandButton.setAttribute(
+        'aria-label',
+        expanded ? 'Collapse product screenshots' : 'Expand product screenshots',
+      )
+      positionTrack(false)
+
+      if (reducedMotion.matches) return
+
+      const last = figure.getBoundingClientRect()
+      const animation = figure.animate(
+        [
+          {
+            transform: `translate(${first.left - last.left}px, ${first.top - last.top}px) scale(${first.width / last.width}, ${first.height / last.height})`,
+          },
+          { transform: 'translate(0, 0) scale(1)' },
+        ],
+        {
+          duration: 450,
+          easing: 'cubic-bezier(0.23, 1, 0.32, 1)',
+        },
+      )
+
+      animations.set(figure, animation)
+      animation.addEventListener('finish', () => animations.delete(figure), { once: true })
+      animation.addEventListener('cancel', () => animations.delete(figure), { once: true })
+    })
+
+    window.addEventListener('resize', () => positionTrack(false), { passive: true })
+    positionTrack(false)
+  })
+</script>
