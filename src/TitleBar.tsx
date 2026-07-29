@@ -74,7 +74,7 @@ function TitleBarTooltip({ children, label }: { children: ReactElement; label: s
       <Tooltip.Trigger render={children} />
       <Tooltip.Portal>
         <Tooltip.Positioner className="z-50" side="bottom" sideOffset={6}>
-          <Tooltip.Popup className="origin-[var(--transform-origin)] rounded-lg bg-ink px-2 py-1 text-small text-canvas shadow-[0_4px_12px_oklch(0_0_0/0.16)] transition-[opacity,scale] duration-100 ease-out data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
+          <Tooltip.Popup className="origin-[var(--transform-origin)] rounded-lg bg-surface px-2 py-1 text-small text-ink shadow-[0_4px_12px_oklch(0_0_0/0.16)] transition-[opacity,scale] duration-100 ease-out data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
             {label}
           </Tooltip.Popup>
         </Tooltip.Positioner>
