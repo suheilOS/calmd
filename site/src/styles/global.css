@@ -489,7 +489,11 @@ html.media-expanded .table-of-contents {
   .product-moment,
   .product-moment.is-expanded {
     width: calc(100% - 2rem);
-    aspect-ratio: 1;
+    aspect-ratio: 8 / 5;
+  }
+
+  .media-viewport {
+    width: 94%;
   }
 
   .media-expand {
