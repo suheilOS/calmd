@@ -65,6 +65,17 @@ body {
   color: var(--color-selection-ink);
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 :where(a) {
   color: inherit;
   text-decoration: none;
@@ -208,19 +219,42 @@ html.media-expanded .table-of-contents {
 }
 
 .table-of-contents a {
-  display: inline-block;
-  transform-origin: left center;
-  transition: color 150ms ease, transform 160ms var(--ease-out);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  transition: color 150ms ease;
+}
+
+.table-of-contents a::before {
+  width: 2rem;
+  height: 2px;
+  flex: none;
+  background: currentColor;
+  content: '';
+  opacity: 0.6;
+  transform: scaleX(0.375);
+  transform-origin: right center;
+  transition: opacity 150ms ease, transform 180ms var(--ease-out);
 }
 
 .table-of-contents a:hover {
   color: var(--color-ink);
 }
 
+.table-of-contents a:hover::before {
+  opacity: 0.8;
+  transform: scaleX(0.625);
+}
+
 .table-of-contents a.is-active,
 .table-of-contents a.is-active:hover {
   color: var(--color-accent);
-  transform: scale(1.06);
+}
+
+.table-of-contents a.is-active::before,
+.table-of-contents a.is-active:hover::before {
+  opacity: 1;
+  transform: scaleX(1);
 }
 
 .story-section h2,
@@ -368,7 +402,6 @@ html.media-expanded .table-of-contents {
     scroll-behavior: auto;
   }
 
-  .table-of-contents a.is-active,
   html.media-expanded .table-of-contents {
     transform: none;
   }

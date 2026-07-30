@@ -49,13 +49,15 @@ Every interface decision should answer:
 
 ## UI
 
-Use Base UI primitives and style them directly with Tailwind.
+Use Base UI primitives and style them directly with Tailwind in the desktop application.
 
 Base UI reference:
 
 https://base-ui.com/llms.txt
 
 Do not introduce another component library without explicit approval.
+
+The standalone Astro landing page under `site/` intentionally uses native HTML controls and scoped/global CSS without React, Base UI, or Tailwind. Keep it dependency-light unless a migration is explicitly approved.
 
 ## Documentation
 

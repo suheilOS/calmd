@@ -45,19 +45,20 @@ const slides = [
       </span>
     </button>
 
-    <div class="carousel-dots" role="tablist" aria-label="Choose a product screenshot">
-      {slides.map((_, index) => (
+    <div class="carousel-dots" role="group" aria-label="Choose a product screenshot">
+      {slides.map((slide, index) => (
         <button
           class:list={['carousel-dot', { 'is-active': index === 0 }]}
           type="button"
-          role="tab"
-          aria-label={`Show screenshot ${index + 1} of ${slides.length}`}
-          aria-selected={index === 0 ? 'true' : 'false'}
-          tabindex={index === 0 ? '0' : '-1'}
+          aria-label={`Show screenshot ${index + 1} of ${slides.length}: ${slide.alt}`}
+          aria-pressed={index === 0 ? 'true' : 'false'}
           data-slide={index}
         ></button>
       ))}
     </div>
+    <p class="sr-only carousel-status" aria-live="polite" aria-atomic="true">
+      {slides[0].alt}
+    </p>
   </div>
 </figure>
 
@@ -70,7 +71,9 @@ const slides = [
     const track = figure.querySelector<HTMLElement>('.media-slides')
     const slides = Array.from(figure.querySelectorAll<HTMLElement>('.media-slide'))
     const dots = Array.from(figure.querySelectorAll<HTMLButtonElement>('.carousel-dot'))
-    if (!expandButton || !track || slides.length === 0 || slides.length !== dots.length) return
+    const status = figure.querySelector<HTMLElement>('.carousel-status')
+    const mobileViewport = window.matchMedia('(max-width: 40rem)')
+    if (!expandButton || !track || !status || slides.length === 0 || slides.length !== dots.length) return
 
     let activeIndex = 0
     let dragStartX = 0
@@ -89,7 +92,7 @@ const slides = [
     }
 
     const showSlide = (nextIndex: number, animate = true) => {
-      activeIndex = (nextIndex + slides.length) % slides.length
+      activeIndex = Math.max(0, Math.min(nextIndex, slides.length - 1))
       positionTrack(animate)
 
       slides.forEach((slide, index) => {
@@ -101,9 +104,10 @@ const slides = [
       dots.forEach((dot, index) => {
         const active = index === activeIndex
         dot.classList.toggle('is-active', active)
-        dot.setAttribute('aria-selected', String(active))
-        dot.tabIndex = active ? 0 : -1
+        dot.setAttribute('aria-pressed', String(active))
       })
+
+      status.textContent = slides[activeIndex]?.getAttribute('alt') ?? ''
     }
 
     const finishDrag = (event: PointerEvent, cancelled = false) => {
@@ -184,7 +188,7 @@ const slides = [
     })
 
     expandButton.addEventListener('click', () => {
-      if (suppressNextClick) return
+      if (suppressNextClick || mobileViewport.matches) return
 
       const first = figure.getBoundingClientRect()
       animations.get(figure)?.cancel()
@@ -219,7 +223,27 @@ const slides = [
       animation.addEventListener('cancel', () => animations.delete(figure), { once: true })
     })
 
-    window.addEventListener('resize', () => positionTrack(false), { passive: true })
-    positionTrack(false)
+    const syncExpansionAvailability = () => {
+      if (mobileViewport.matches && figure.classList.contains('is-expanded')) {
+        figure.classList.remove('is-expanded')
+        document.documentElement.classList.remove('media-expanded')
+        expandButton.setAttribute('aria-expanded', 'false')
+      }
+
+      expandButton.setAttribute('aria-disabled', String(mobileViewport.matches))
+      expandButton.setAttribute(
+        'aria-label',
+        mobileViewport.matches
+          ? 'Product screenshots; swipe or use the controls to change screenshot'
+          : figure.classList.contains('is-expanded')
+            ? 'Collapse product screenshots'
+            : 'Expand product screenshots',
+      )
+      positionTrack(false)
+    }
+
+    window.addEventListener('resize', syncExpansionAvailability, { passive: true })
+    mobileViewport.addEventListener('change', syncExpansionAvailability)
+    syncExpansionAvailability()
   })
 </script>
