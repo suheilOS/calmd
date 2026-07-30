@@ -114,6 +114,38 @@ import SiteLayout from '../layouts/SiteLayout.astro'
       return heading ? [{ link, heading }] : []
     })
 
+    const revealSections = Array.from(
+      document.querySelectorAll<HTMLElement>('.story-section, .product-section'),
+    )
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+
+    if (revealSections.length > 0 && !reducedMotion.matches) {
+      const revealLine = window.innerHeight * 0.82
+      const pendingSections = revealSections.filter((section) => {
+        if (section.getBoundingClientRect().top <= revealLine) {
+          section.classList.add('is-revealed')
+          return false
+        }
+
+        return true
+      })
+
+      document.querySelector('.case-study')?.classList.add('is-reveal-ready')
+
+      const revealObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return
+            entry.target.classList.add('is-revealed')
+            revealObserver.unobserve(entry.target)
+          })
+        },
+        { rootMargin: '0px 0px -18% 0px' },
+      )
+
+      pendingSections.forEach((section) => revealObserver.observe(section))
+    }
+
     if (sections.length > 0) {
       let framePending = false
 

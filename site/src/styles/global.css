@@ -267,6 +267,24 @@ html.media-expanded .table-of-contents {
   padding-block: 1.75rem;
 }
 
+.case-study.is-reveal-ready :where(.story-section, .product-section) {
+  opacity: 0;
+  filter: blur(2px);
+  transform: translateY(0.75rem);
+  transition:
+    opacity 500ms ease,
+    filter 500ms ease,
+    transform 500ms var(--ease-out);
+  will-change: opacity, filter, transform;
+}
+
+.case-study.is-reveal-ready :where(.story-section, .product-section).is-revealed {
+  opacity: 1;
+  filter: blur(0);
+  transform: translateY(0);
+  will-change: auto;
+}
+
 .story-section + .story-section,
 .product-section {
   border-block-start: 1px solid var(--color-divider);
@@ -435,6 +453,12 @@ html.media-expanded .table-of-contents {
   }
 
   html.media-expanded .table-of-contents {
+    transform: none;
+  }
+
+  .case-study.is-reveal-ready :where(.story-section, .product-section) {
+    opacity: 1;
+    filter: none;
     transform: none;
   }
 
