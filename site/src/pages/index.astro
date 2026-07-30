@@ -118,6 +118,48 @@ import SiteLayout from '../layouts/SiteLayout.astro'
       document.querySelectorAll<HTMLElement>('.story-section, .product-section'),
     )
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const siteHeader = document.querySelector<HTMLElement>('.site-header')
+
+    if (siteHeader) {
+      const scrollThreshold = 12
+      let lastScrollY = window.scrollY
+      let direction: 'up' | 'down' | null = null
+      let directionDistance = 0
+      let headerFramePending = false
+
+      const updateHeader = () => {
+        const currentScrollY = Math.max(window.scrollY, 0)
+        const delta = currentScrollY - lastScrollY
+        const nextDirection = delta > 0 ? 'down' : delta < 0 ? 'up' : direction
+
+        if (currentScrollY <= scrollThreshold) {
+          siteHeader.removeAttribute('data-scroll-hidden')
+          directionDistance = 0
+        } else if (nextDirection && nextDirection !== direction) {
+          direction = nextDirection
+          directionDistance = Math.abs(delta)
+        } else {
+          directionDistance += Math.abs(delta)
+        }
+
+        if (directionDistance >= scrollThreshold && nextDirection) {
+          siteHeader.toggleAttribute('data-scroll-hidden', nextDirection === 'down')
+          directionDistance = 0
+        }
+
+        direction = nextDirection
+        lastScrollY = currentScrollY
+        headerFramePending = false
+      }
+
+      const scheduleHeaderUpdate = () => {
+        if (headerFramePending) return
+        headerFramePending = true
+        requestAnimationFrame(updateHeader)
+      }
+
+      window.addEventListener('scroll', scheduleHeaderUpdate, { passive: true })
+    }
 
     if (revealSections.length > 0 && !reducedMotion.matches) {
       const revealLine = window.innerHeight * 0.82
