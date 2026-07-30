@@ -309,19 +309,51 @@ html.media-expanded .table-of-contents {
   background: var(--color-surface);
 }
 
-.media-expand {
-  display: block;
+.media-viewport {
   width: 82%;
-  padding: 0;
   overflow: hidden;
-  border: 0;
   border-radius: 0.5rem;
-  background: transparent;
-  color: inherit;
-  cursor: zoom-in;
   touch-action: pan-y;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
+}
+
+.media-expand {
+  position: absolute;
+  inset-block-start: 1.25rem;
+  inset-inline-end: 1.25rem;
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 9999px;
+  background: var(--color-canvas);
+  color: var(--color-muted);
+  cursor: zoom-in;
+  transition: color 150ms ease, transform 180ms var(--ease-out);
+}
+
+.media-expand:hover {
+  color: var(--color-ink);
+  transform: scale(1.05);
+}
+
+.media-expand:focus-visible {
+  outline: 2px solid var(--color-muted);
+  outline-offset: 2px;
+}
+
+.media-expand svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
 }
 
 .product-moment.is-expanded .media-expand {
@@ -434,6 +466,10 @@ html.media-expanded .table-of-contents {
   .product-moment.is-expanded {
     width: calc(100% - 2rem);
     aspect-ratio: 1;
+  }
+
+  .media-expand {
+    display: none;
   }
 
   .story-section,

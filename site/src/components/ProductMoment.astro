@@ -21,12 +21,7 @@ const slides = [
 
 <figure class="product-moment" aria-label="Calmd product screenshots">
   <div class="media-frame">
-    <button
-      class="media-expand"
-      type="button"
-      aria-expanded="false"
-      aria-label="Expand product screenshots"
-    >
+    <div class="media-viewport">
       <span class="media-slides">
         {slides.map((slide, index) => (
           <img
@@ -43,6 +38,13 @@ const slides = [
           />
         ))}
       </span>
+    </div>
+
+    <button class="media-expand" type="button" aria-expanded="false">
+      <span class="sr-only">Expand product screenshots</span>
+      <svg viewBox="0 0 16 16" aria-hidden="true">
+        <path d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4" />
+      </svg>
     </button>
 
     <div class="carousel-dots" role="group" aria-label="Choose a product screenshot">
@@ -52,7 +54,6 @@ const slides = [
           type="button"
           aria-label={`Show screenshot ${index + 1} of ${slides.length}: ${slide.alt}`}
           aria-pressed={index === 0 ? 'true' : 'false'}
-          data-slide={index}
         ></button>
       ))}
     </div>
@@ -63,187 +64,156 @@ const slides = [
 </figure>
 
 <script>
-  const animations = new WeakMap<Element, Animation>()
-  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+  const figure = document.querySelector<HTMLElement>('.product-moment')
 
-  document.querySelectorAll<HTMLElement>('.product-moment').forEach((figure) => {
+  if (figure) {
+    const viewport = figure.querySelector<HTMLElement>('.media-viewport')
     const expandButton = figure.querySelector<HTMLButtonElement>('.media-expand')
+    const expandLabel = expandButton?.querySelector<HTMLElement>('.sr-only')
     const track = figure.querySelector<HTMLElement>('.media-slides')
     const slides = Array.from(figure.querySelectorAll<HTMLElement>('.media-slide'))
     const dots = Array.from(figure.querySelectorAll<HTMLButtonElement>('.carousel-dot'))
     const status = figure.querySelector<HTMLElement>('.carousel-status')
-    const mobileViewport = window.matchMedia('(max-width: 40rem)')
-    if (!expandButton || !track || !status || slides.length === 0 || slides.length !== dots.length) return
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
 
-    let activeIndex = 0
-    let dragStartX = 0
-    let dragStartTime = 0
-    let dragDelta = 0
-    let dragging = false
-    let suppressNextClick = false
+    if (viewport && expandButton && expandLabel && track && status && slides.length === dots.length) {
+      let activeIndex = 0
+      let dragStartX = 0
+      let dragStartTime = 0
+      let dragDelta = 0
+      let dragging = false
+      let expansionAnimation: Animation | undefined
 
-    const positionTrack = (animate = true) => {
-      track.classList.toggle('is-dragging', !animate)
-      track.style.transform = `translate3d(${-activeIndex * expandButton.clientWidth}px, 0, 0)`
+      const positionTrack = (animate = true) => {
+        track.classList.toggle('is-dragging', !animate)
+        track.style.transform = `translate3d(${-activeIndex * viewport.clientWidth}px, 0, 0)`
 
-      if (!animate) {
-        requestAnimationFrame(() => track.classList.remove('is-dragging'))
+        if (!animate) {
+          requestAnimationFrame(() => track.classList.remove('is-dragging'))
+        }
       }
-    }
 
-    const showSlide = (nextIndex: number, animate = true) => {
-      activeIndex = Math.max(0, Math.min(nextIndex, slides.length - 1))
-      positionTrack(animate)
+      const showSlide = (nextIndex: number, animate = true) => {
+        activeIndex = Math.max(0, Math.min(nextIndex, slides.length - 1))
+        positionTrack(animate)
 
-      slides.forEach((slide, index) => {
-        const active = index === activeIndex
-        slide.classList.toggle('is-active', active)
-        slide.setAttribute('aria-hidden', String(!active))
-      })
+        slides.forEach((slide, index) => {
+          const active = index === activeIndex
+          slide.classList.toggle('is-active', active)
+          slide.setAttribute('aria-hidden', String(!active))
+        })
 
-      dots.forEach((dot, index) => {
-        const active = index === activeIndex
-        dot.classList.toggle('is-active', active)
-        dot.setAttribute('aria-pressed', String(active))
-      })
+        dots.forEach((dot, index) => {
+          const active = index === activeIndex
+          dot.classList.toggle('is-active', active)
+          dot.setAttribute('aria-pressed', String(active))
+        })
 
-      status.textContent = slides[activeIndex]?.getAttribute('alt') ?? ''
-    }
+        status.textContent = slides[activeIndex]?.getAttribute('alt') ?? ''
+      }
 
-    const finishDrag = (event: PointerEvent, cancelled = false) => {
-      if (!expandButton.hasPointerCapture(event.pointerId)) return
-      expandButton.releasePointerCapture(event.pointerId)
+      const finishDrag = (event: PointerEvent, cancelled = false) => {
+        if (!viewport.hasPointerCapture(event.pointerId)) return
+        viewport.releasePointerCapture(event.pointerId)
 
-      if (!dragging || cancelled) {
+        if (!dragging || cancelled) {
+          dragging = false
+          dragDelta = 0
+          positionTrack()
+          return
+        }
+
+        const elapsed = Math.max(performance.now() - dragStartTime, 1)
+        const velocity = dragDelta / elapsed
+        const distanceThreshold = viewport.clientWidth * 0.15
+        const shouldAdvance = Math.abs(dragDelta) > distanceThreshold || Math.abs(velocity) > 0.35
+
+        if (shouldAdvance) {
+          showSlide(activeIndex + (dragDelta < 0 ? 1 : -1))
+        } else {
+          positionTrack()
+        }
+
         dragging = false
         dragDelta = 0
-        positionTrack()
-        return
       }
 
-      const elapsed = Math.max(performance.now() - dragStartTime, 1)
-      const velocity = dragDelta / elapsed
-      const distanceThreshold = expandButton.clientWidth * 0.15
-      const shouldAdvance = Math.abs(dragDelta) > distanceThreshold || Math.abs(velocity) > 0.35
-
-      if (shouldAdvance) {
-        showSlide(activeIndex + (dragDelta < 0 ? 1 : -1))
-      } else {
-        positionTrack()
-      }
-
-      dragging = false
-      dragDelta = 0
-      suppressNextClick = true
-      setTimeout(() => {
-        suppressNextClick = false
-      }, 0)
-    }
-
-    expandButton.addEventListener('pointerdown', (event) => {
-      if (event.button !== 0) return
-      expandButton.setPointerCapture(event.pointerId)
-      dragStartX = event.clientX
-      dragStartTime = performance.now()
-      dragDelta = 0
-      dragging = false
-      track.classList.add('is-dragging')
-    })
-
-    expandButton.addEventListener('pointermove', (event) => {
-      if (!expandButton.hasPointerCapture(event.pointerId)) return
-      dragDelta = event.clientX - dragStartX
-
-      if (!dragging && Math.abs(dragDelta) < 8) return
-      dragging = true
-
-      const atStart = activeIndex === 0 && dragDelta > 0
-      const atEnd = activeIndex === slides.length - 1 && dragDelta < 0
-      const resistedDelta = atStart || atEnd ? dragDelta * 0.25 : dragDelta
-      const offset = -activeIndex * expandButton.clientWidth + resistedDelta
-      track.style.transform = `translate3d(${offset}px, 0, 0)`
-    })
-
-    expandButton.addEventListener('pointerup', (event) => finishDrag(event))
-    expandButton.addEventListener('pointercancel', (event) => finishDrag(event, true))
-
-    dots.forEach((dot, index) => {
-      dot.addEventListener('click', () => showSlide(index))
-    })
-
-    expandButton.addEventListener('keydown', (event) => {
-      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
-      event.preventDefault()
-      showSlide(activeIndex + (event.key === 'ArrowRight' ? 1 : -1))
-      dots[activeIndex]?.focus()
-    })
-
-    dots.forEach((dot) => {
-      dot.addEventListener('keydown', (event) => {
-        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
-        event.preventDefault()
-        showSlide(activeIndex + (event.key === 'ArrowRight' ? 1 : -1))
-        dots[activeIndex]?.focus()
+      viewport.addEventListener('pointerdown', (event) => {
+        if (event.button !== 0) return
+        viewport.setPointerCapture(event.pointerId)
+        dragStartX = event.clientX
+        dragStartTime = performance.now()
+        dragDelta = 0
+        dragging = false
+        track.classList.add('is-dragging')
       })
-    })
 
-    expandButton.addEventListener('click', () => {
-      if (suppressNextClick || mobileViewport.matches) return
+      viewport.addEventListener('pointermove', (event) => {
+        if (!viewport.hasPointerCapture(event.pointerId)) return
+        dragDelta = event.clientX - dragStartX
 
-      const first = figure.getBoundingClientRect()
-      animations.get(figure)?.cancel()
+        if (!dragging && Math.abs(dragDelta) < 8) return
+        dragging = true
 
-      const expanded = figure.classList.toggle('is-expanded')
-      document.documentElement.classList.toggle('media-expanded', expanded)
-      expandButton.setAttribute('aria-expanded', String(expanded))
-      expandButton.setAttribute(
-        'aria-label',
-        expanded ? 'Collapse product screenshots' : 'Expand product screenshots',
-      )
-      positionTrack(false)
+        const atStart = activeIndex === 0 && dragDelta > 0
+        const atEnd = activeIndex === slides.length - 1 && dragDelta < 0
+        const resistedDelta = atStart || atEnd ? dragDelta * 0.25 : dragDelta
+        const offset = -activeIndex * viewport.clientWidth + resistedDelta
+        track.style.transform = `translate3d(${offset}px, 0, 0)`
+      })
 
-      if (reducedMotion.matches) return
+      viewport.addEventListener('pointerup', (event) => finishDrag(event))
+      viewport.addEventListener('pointercancel', (event) => finishDrag(event, true))
 
-      const last = figure.getBoundingClientRect()
-      const animation = figure.animate(
-        [
+      dots.forEach((dot, index) => {
+        dot.addEventListener('click', () => showSlide(index))
+        dot.addEventListener('keydown', (event) => {
+          if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+          event.preventDefault()
+          showSlide(activeIndex + (event.key === 'ArrowRight' ? 1 : -1))
+          dots[activeIndex]?.focus()
+        })
+      })
+
+      expandButton.addEventListener('click', () => {
+        const first = figure.getBoundingClientRect()
+        expansionAnimation?.cancel()
+
+        const expanded = figure.classList.toggle('is-expanded')
+        document.documentElement.classList.toggle('media-expanded', expanded)
+        expandButton.setAttribute('aria-expanded', String(expanded))
+        expandLabel.textContent = expanded
+          ? 'Collapse product screenshots'
+          : 'Expand product screenshots'
+        positionTrack(false)
+
+        if (reducedMotion.matches) return
+
+        const last = figure.getBoundingClientRect()
+        const animation = figure.animate(
+          [
+            {
+              transform: `translate(${first.left - last.left}px, ${first.top - last.top}px) scale(${first.width / last.width}, ${first.height / last.height})`,
+            },
+            { transform: 'translate(0, 0) scale(1)' },
+          ],
           {
-            transform: `translate(${first.left - last.left}px, ${first.top - last.top}px) scale(${first.width / last.width}, ${first.height / last.height})`,
+            duration: 450,
+            easing: 'cubic-bezier(0.23, 1, 0.32, 1)',
           },
-          { transform: 'translate(0, 0) scale(1)' },
-        ],
-        {
-          duration: 450,
-          easing: 'cubic-bezier(0.23, 1, 0.32, 1)',
-        },
-      )
+        )
 
-      animations.set(figure, animation)
-      animation.addEventListener('finish', () => animations.delete(figure), { once: true })
-      animation.addEventListener('cancel', () => animations.delete(figure), { once: true })
-    })
+        const clearCompletedAnimation = () => {
+          if (expansionAnimation === animation) expansionAnimation = undefined
+        }
 
-    const syncExpansionAvailability = () => {
-      if (mobileViewport.matches && figure.classList.contains('is-expanded')) {
-        figure.classList.remove('is-expanded')
-        document.documentElement.classList.remove('media-expanded')
-        expandButton.setAttribute('aria-expanded', 'false')
-      }
+        expansionAnimation = animation
+        animation.addEventListener('finish', clearCompletedAnimation, { once: true })
+        animation.addEventListener('cancel', clearCompletedAnimation, { once: true })
+      })
 
-      expandButton.setAttribute('aria-disabled', String(mobileViewport.matches))
-      expandButton.setAttribute(
-        'aria-label',
-        mobileViewport.matches
-          ? 'Product screenshots; swipe or use the controls to change screenshot'
-          : figure.classList.contains('is-expanded')
-            ? 'Collapse product screenshots'
-            : 'Expand product screenshots',
-      )
+      window.addEventListener('resize', () => positionTrack(false), { passive: true })
       positionTrack(false)
     }
-
-    window.addEventListener('resize', syncExpansionAvailability, { passive: true })
-    mobileViewport.addEventListener('change', syncExpansionAvailability)
-    syncExpansionAvailability()
-  })
+  }
 </script>
