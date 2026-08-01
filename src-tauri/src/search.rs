@@ -1,4 +1,7 @@
-use crate::links::{NoteReference, extract_links, normalize_key};
+use crate::{
+    links::{NoteReference, extract_links, normalize_key},
+    unlinked_mentions::{UnlinkedMention, excerpt, first_occurrence},
+};
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::Serialize;
 use std::{
@@ -235,6 +238,10 @@ impl SearchState {
 
     pub fn backlinks(&self, key: &str) -> Result<Vec<NoteReference>, SearchError> {
         self.query(|connection| backlinks_connection(connection, key))
+    }
+
+    pub fn unlinked_mentions(&self, key: &str) -> Result<Vec<UnlinkedMention>, SearchError> {
+        self.query(|connection| unlinked_mentions_connection(connection, key))
     }
 
     pub fn search(&self, query: &str) -> Result<SearchResponse, SearchError> {
@@ -673,6 +680,76 @@ fn backlinks_connection(
         .map_err(|error| SearchError::sqlite("Could not query backlinks", error))?;
     rows.collect::<Result<Vec<_>, _>>()
         .map_err(|error| SearchError::sqlite("Could not read backlinks", error))
+}
+
+fn unlinked_mentions_connection(
+    connection: &Connection,
+    key: &str,
+) -> Result<Vec<UnlinkedMention>, SearchError> {
+    let normalized_key = normalize_key(key);
+    let target: Option<(String, String)> = connection
+        .query_row(
+            "SELECT key, title FROM notes
+             WHERE normalized_key = ?1
+               AND (SELECT count(*) FROM notes WHERE normalized_key = ?1) = 1",
+            [&normalized_key],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()
+        .map_err(|error| SearchError::sqlite("Could not resolve unlinked mention target", error))?;
+    let Some((target_key, title)) = target else {
+        return Ok(Vec::new());
+    };
+    let normalized_title = normalize_title(&title);
+    let title_count: i64 = connection
+        .query_row(
+            "SELECT count(*) FROM notes WHERE normalized_title = ?1",
+            [&normalized_title],
+            |row| row.get(0),
+        )
+        .map_err(|error| SearchError::sqlite("Could not resolve unlinked mention title", error))?;
+    if title_count != 1 || title.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let query = if title.chars().count() >= 3 {
+        "SELECT notes.key, notes.title, notes.body
+         FROM note_fts JOIN notes ON notes.id = note_fts.rowid
+         WHERE note_fts MATCH ?1 AND notes.key <> ?2
+         ORDER BY notes.normalized_title, notes.key"
+    } else {
+        "SELECT key, title, body FROM notes
+         WHERE key <> ?2 ORDER BY normalized_title, key"
+    };
+    let expression = format!("body : \"{}\"", title.replace('"', "\"\""));
+    let mut statement = connection
+        .prepare(query)
+        .map_err(|error| SearchError::sqlite("Could not prepare unlinked mentions", error))?;
+    let rows = statement
+        .query_map(params![expression, target_key], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+            ))
+        })
+        .map_err(|error| SearchError::sqlite("Could not query unlinked mentions", error))?;
+    let mut mentions = Vec::new();
+    for row in rows {
+        let (key, source_title, body) =
+            row.map_err(|error| SearchError::sqlite("Could not read an unlinked mention", error))?;
+        if let Some(range) = first_occurrence(&body, &title) {
+            let excerpt = excerpt(&body, range);
+            mentions.push(UnlinkedMention {
+                key,
+                title: source_title,
+                excerpt: excerpt.text,
+                match_start: excerpt.match_start,
+                match_end: excerpt.match_end,
+            });
+        }
+    }
+    Ok(mentions)
 }
 
 fn suggest_notes_connection(

@@ -7,6 +7,7 @@ import {
   type NotePreview,
   type OpenNoteLinkResponse,
   type SearchResponse,
+  type UnlinkedMention,
 } from './notes'
 import type { NotePersistenceAdapter } from './noteEditing'
 
@@ -80,6 +81,10 @@ export function readStoredNotePreview(key: string) {
 
 export function getStoredBacklinks(key: string) {
   return invoke<NoteReference[]>('get_backlinks', { key })
+}
+
+export function getStoredUnlinkedMentions(key: string) {
+  return invoke<UnlinkedMention[]>('get_unlinked_mentions', { key })
 }
 
 export function readStoredNote(key: string) {

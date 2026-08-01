@@ -265,6 +265,117 @@ fn backlinks_are_deduplicated_and_ambiguity_resolves_to_neither_note() {
 }
 
 #[test]
+fn unlinked_mentions_filter_markdown_ranges_and_deduplicate_sources() {
+    let data = tempdir().unwrap();
+    let vault = tempdir().unwrap();
+    let search = state(data.path());
+    search
+        .reconcile(
+            vault.path(),
+            &[
+                note("target-file.md", "Visible Target", "Visible Target", "one"),
+                note(
+                    "Source.md",
+                    "Source",
+                    "A visible target appears here and Visible Target repeats.\n\n[[target-file|Visible Target]] `Visible Target`\n```\nVisible Target\n```",
+                    "two",
+                ),
+                note("Linked.md", "Linked", "[[target-file|Visible Target]]", "three"),
+                note("Token.md", "Token", "NotVisible Targeted", "four"),
+            ],
+        )
+        .unwrap();
+
+    let mentions = search.unlinked_mentions("target-file.md").unwrap();
+    assert_eq!(mentions.len(), 1);
+    assert_eq!(mentions[0].key, "Source.md");
+    assert_eq!(
+        search.backlinks("target-file.md").unwrap(),
+        vec![
+            NoteReference {
+                key: "Linked.md".to_owned(),
+                title: "Linked".to_owned(),
+            },
+            NoteReference {
+                key: "Source.md".to_owned(),
+                title: "Source".to_owned(),
+            },
+        ]
+    );
+    assert!(
+        mentions[0]
+            .excerpt
+            .to_lowercase()
+            .contains("visible target")
+    );
+    assert!(!mentions[0].excerpt.contains("[["));
+}
+
+#[test]
+fn unlinked_mentions_support_short_titles_and_reject_ambiguous_titles() {
+    let data = tempdir().unwrap();
+    let vault = tempdir().unwrap();
+    let search = state(data.path());
+    search
+        .reconcile(
+            vault.path(),
+            &[
+                note("AI.md", "AI", "", "one"),
+                note("Source.md", "Source", "Using ai calmly", "two"),
+            ],
+        )
+        .unwrap();
+    assert_eq!(
+        search.unlinked_mentions("AI.md").unwrap()[0].key,
+        "Source.md"
+    );
+
+    search
+        .reconcile(
+            vault.path(),
+            &[
+                note("AI.md", "AI", "", "one"),
+                note("Other.md", "ai", "", "three"),
+                note("Source.md", "Source", "Using AI calmly", "two"),
+            ],
+        )
+        .unwrap();
+    assert!(search.unlinked_mentions("AI.md").unwrap().is_empty());
+}
+
+#[test]
+fn unlinked_mentions_handle_fts_quotes_and_ambiguous_keys() {
+    let data = tempdir().unwrap();
+    let vault = tempdir().unwrap();
+    let search = state(data.path());
+    search
+        .reconcile(
+            vault.path(),
+            &[
+                note("Quote.md", "Say \"Hello\"", "", "one"),
+                note("Source.md", "Source", "Please say \"hello\" now.", "two"),
+            ],
+        )
+        .unwrap();
+    assert_eq!(
+        search.unlinked_mentions("Quote.md").unwrap()[0].key,
+        "Source.md"
+    );
+
+    search
+        .reconcile(
+            vault.path(),
+            &[
+                note("Quote.md", "Say \"Hello\"", "", "one"),
+                note("quote.MD", "Different", "", "three"),
+                note("Source.md", "Source", "Please say \"hello\" now.", "two"),
+            ],
+        )
+        .unwrap();
+    assert!(search.unlinked_mentions("Quote.md").unwrap().is_empty());
+}
+
+#[test]
 fn replace_removes_a_renamed_key_transactionally() {
     let data = tempdir().unwrap();
     let vault = tempdir().unwrap();

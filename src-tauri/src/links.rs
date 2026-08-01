@@ -41,11 +41,22 @@ pub fn canonical_link(target: &str, display: Option<&str>) -> String {
 
 pub fn extract_links(markdown: &str) -> Vec<WikiLink> {
     let code_ranges = markdown_code_ranges(markdown);
+    extract_links_outside(markdown, &code_ranges)
+}
+
+pub fn non_prose_ranges(markdown: &str) -> Vec<Range<usize>> {
+    let mut ranges = markdown_code_ranges(markdown);
+    let links = extract_links_outside(markdown, &ranges);
+    ranges.extend(links.into_iter().map(|link| link.from..link.to));
+    ranges
+}
+
+fn extract_links_outside(markdown: &str, code_ranges: &[Range<usize>]) -> Vec<WikiLink> {
     let mut links = Vec::new();
     let mut offset = 0;
     for line_with_end in markdown.split_inclusive('\n') {
         let line = line_with_end.trim_end_matches(['\r', '\n']);
-        parse_inline(line, offset, &code_ranges, &mut links);
+        parse_inline(line, offset, code_ranges, &mut links);
         offset += line_with_end.len();
     }
     links

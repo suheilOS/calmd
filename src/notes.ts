@@ -13,6 +13,12 @@ export type SearchHit = Pick<Note, 'key' | 'title'> & {
 
 export type NoteReference = Pick<Note, 'key' | 'title'>
 
+export type UnlinkedMention = NoteReference & {
+  excerpt: string
+  matchStart: number
+  matchEnd: number
+}
+
 export type NotePreview = Pick<Note, 'key' | 'title'> & {
   excerpt: string
   truncated: boolean

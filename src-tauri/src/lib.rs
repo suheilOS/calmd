@@ -2,6 +2,7 @@ mod links;
 mod note_persistence;
 mod search;
 mod storage;
+mod unlinked_mentions;
 
 use tauri::Manager;
 
@@ -22,6 +23,7 @@ pub fn run() {
             storage::resolve_note_preview,
             storage::read_note_preview,
             storage::get_backlinks,
+            storage::get_unlinked_mentions,
             storage::read_note,
             storage::save_note,
             storage::rename_note,

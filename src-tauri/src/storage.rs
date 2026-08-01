@@ -5,6 +5,7 @@ use crate::{
         PersistenceError, recover_operation,
     },
     search::{IndexedNote, SearchResponse, SearchState},
+    unlinked_mentions::UnlinkedMention,
 };
 use serde::Serialize;
 use std::{
@@ -319,6 +320,33 @@ fn get_backlinks_in(app: &AppHandle, key: &str) -> CommandResult<Vec<NoteReferen
     let root = vault_root(&guard)?;
     reconcile_search_if_needed(&search, &root)?;
     search.backlinks(key).map_err(search_command_error)
+}
+
+#[tauri::command]
+pub async fn get_unlinked_mentions(
+    key: String,
+    app: AppHandle,
+) -> CommandResult<Vec<UnlinkedMention>> {
+    tauri::async_runtime::spawn_blocking(move || get_unlinked_mentions_in(&app, &key))
+        .await
+        .map_err(|error| {
+            CommandError::new(
+                "search",
+                format!("Could not load unlinked mentions: {error}"),
+            )
+        })?
+}
+
+fn get_unlinked_mentions_in(app: &AppHandle, key: &str) -> CommandResult<Vec<UnlinkedMention>> {
+    let state = app.state::<VaultState>();
+    let search = app.state::<SearchState>();
+    let guard = state
+        .0
+        .lock()
+        .map_err(|_| CommandError::new("state", "Vault state is unavailable."))?;
+    let root = vault_root(&guard)?;
+    reconcile_search_if_needed(&search, &root)?;
+    search.unlinked_mentions(key).map_err(search_command_error)
 }
 
 fn validate_link_target(target: &str) -> CommandResult<String> {
