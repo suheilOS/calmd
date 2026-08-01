@@ -19,28 +19,29 @@
   --text-editor-heading-2: 1.1875rem;
   --text-editor-heading-3: 1rem;
 
-  --color-canvas: oklch(1 0 89.876);
-  --color-page: oklch(1 0 89.876);
-  --color-ink: oklch(0.191 0.002 106.586);
-  --color-body: oklch(0.359 0.005 106.652);
-  --color-secondary: oklch(0.359 0.005 106.652);
-  --color-muted: oklch(0.551 0.009 98.996);
-  --color-faint: oklch(0.551 0.009 98.996);
-  --color-placeholder: oklch(0.551 0.009 98.996);
-  --color-syntax: oklch(0.551 0.009 98.996);
-  --color-border: oklch(0.236 0.002 67.708 / 0.18);
-  --color-divider: oklch(0.236 0.002 67.708 / 0.10);
-  --color-surface: oklch(0.966 0.009 99.984);
-  --color-hover: oklch(0.966 0.009 99.984);
-  --color-active: oklch(0.925 0.009 99.984);
-  --color-active-ink: oklch(0.191 0.002 106.586);
-  --color-active-muted: oklch(0.359 0.005 106.652);
-  --color-selection: oklch(0.360 0.065 255.824);
-  --color-selection-ink: oklch(1 0 89.876);
-  --color-highlight: oklch(0.951 0.022 83.264);
-  --color-accent: oklch(0.57 0.131 38.756);
-  --color-missing-link: oklch(0.68 0.09 38.756);
-  --color-accent-ink: oklch(1 0 89.876);
+  /* Flexoki light: paper, ink, and warm interface neutrals. */
+  --color-canvas: oklch(0.990 0.016 95.219);
+  --color-page: oklch(0.990 0.016 95.219);
+  --color-ink: oklch(0.170 0.002 17.321);
+  --color-body: oklch(0.365 0.004 67.689);
+  --color-secondary: oklch(0.538 0.008 97.449);
+  --color-muted: oklch(0.617 0.008 88.674);
+  --color-faint: oklch(0.772 0.013 96.470);
+  --color-placeholder: oklch(0.772 0.013 96.470);
+  --color-syntax: oklch(0.772 0.013 96.470);
+  --color-border: oklch(0.917 0.015 98.298);
+  --color-divider: oklch(0.917 0.015 98.298 / 0.7);
+  --color-surface: oklch(0.954 0.015 98.288);
+  --color-hover: oklch(0.881 0.014 97.463);
+  --color-active: oklch(0.846 0.014 102.053);
+  --color-active-ink: oklch(0.170 0.002 17.321);
+  --color-active-muted: oklch(0.538 0.008 97.449);
+  --color-selection: oklch(0.482 0.131 254.789);
+  --color-selection-ink: oklch(0.990 0.016 95.219);
+  --color-highlight: oklch(0.914 0.087 93.228);
+  --color-accent: oklch(0.554 0.086 186.744);
+  --color-missing-link: color-mix(in oklab, var(--color-accent) 65%, var(--color-canvas));
+  --color-accent-ink: oklch(0.990 0.016 95.219);
 }
 
 * {
@@ -83,28 +84,29 @@ html {
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-canvas: oklch(0.308 0.004 106.604);
-    --color-page: oklch(0.308 0.004 106.604);
-    --color-ink: oklch(0.982 0.005 95.099);
-    --color-body: oklch(0.807 0.014 97.486);
-    --color-secondary: oklch(0.807 0.014 97.486);
-    --color-muted: oklch(0.686 0.012 95.229);
-    --color-faint: oklch(0.686 0.012 95.229);
-    --color-placeholder: oklch(0.686 0.012 95.229);
-    --color-syntax: oklch(0.686 0.012 95.229);
-    --color-border: oklch(0.893 0.015 98.305 / 0.18);
-    --color-divider: oklch(0.893 0.015 98.305 / 0.10);
-    --color-surface: oklch(0.268 0.004 106.643);
-    --color-hover: oklch(0.359 0.005 106.652);
-    --color-active: oklch(0.359 0.005 106.652);
-    --color-active-ink: oklch(0.982 0.005 95.099);
-    --color-active-muted: oklch(0.807 0.014 97.486);
-    --color-selection: oklch(0.360 0.065 255.824);
-    --color-selection-ink: oklch(0.982 0.005 95.099);
-    --color-highlight: oklch(0.354 0.062 90.470);
-    --color-accent: oklch(0.70 0.131 38.756);
-    --color-missing-link: oklch(0.80 0.09 38.756);
-    --color-accent-ink: oklch(0.191 0.002 106.586);
+    /* Flexoki dark: black, paper, and the dark interface neutrals. */
+    --color-canvas: oklch(0.170 0.002 17.321);
+    --color-page: oklch(0.170 0.002 17.321);
+    --color-ink: oklch(0.990 0.016 95.219);
+    --color-body: oklch(0.846 0.014 102.053);
+    --color-secondary: oklch(0.772 0.013 96.470);
+    --color-muted: oklch(0.617 0.008 88.674);
+    --color-faint: oklch(0.453 0.005 91.503);
+    --color-placeholder: oklch(0.453 0.005 91.503);
+    --color-syntax: oklch(0.453 0.005 91.503);
+    --color-border: oklch(0.273 0.002 67.727);
+    --color-divider: oklch(0.273 0.002 67.727 / 0.7);
+    --color-surface: oklch(0.223 0.002 67.699);
+    --color-hover: oklch(0.321 0.004 84.578);
+    --color-active: oklch(0.365 0.004 67.689);
+    --color-active-ink: oklch(0.990 0.016 95.219);
+    --color-active-muted: oklch(0.772 0.013 96.470);
+    --color-selection: oklch(0.599 0.110 246.996);
+    --color-selection-ink: oklch(0.170 0.002 17.321);
+    --color-highlight: oklch(0.370 0.074 88.380);
+    --color-accent: oklch(0.670 0.100 186.578);
+    --color-missing-link: color-mix(in oklab, var(--color-accent) 65%, var(--color-ink));
+    --color-accent-ink: oklch(0.170 0.002 17.321);
   }
 }
 

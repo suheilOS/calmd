@@ -5,15 +5,16 @@
   --text-base: 1rem;
   --text-small: 0.8125rem;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  --color-canvas: oklch(1 0 89.876);
-  --color-ink: oklch(0.191 0.002 106.586);
-  --color-body: oklch(0.359 0.005 106.652);
-  --color-muted: oklch(0.551 0.009 98.996);
-  --color-divider: oklch(0.236 0.002 67.708 / 0.10);
-  --color-surface: oklch(0.966 0.009 99.984);
-  --color-selection: oklch(0.360 0.065 255.824);
-  --color-selection-ink: oklch(1 0 89.876);
-  --color-accent: oklch(0.57 0.131 38.756);
+  /* Flexoki light: paper, ink, and warm interface neutrals. */
+  --color-canvas: oklch(0.990 0.016 95.219);
+  --color-ink: oklch(0.170 0.002 17.321);
+  --color-body: oklch(0.365 0.004 67.689);
+  --color-muted: oklch(0.538 0.008 97.449);
+  --color-divider: oklch(0.917 0.015 98.298 / 0.7);
+  --color-surface: oklch(0.954 0.015 98.288);
+  --color-selection: oklch(0.482 0.131 254.789);
+  --color-selection-ink: oklch(0.990 0.016 95.219);
+  --color-accent: oklch(0.554 0.086 186.744);
 }
 
 * {
@@ -35,14 +36,16 @@ html {
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-canvas: oklch(0.205 0.004 106.604);
-    --color-ink: oklch(0.982 0.005 95.099);
-    --color-body: oklch(0.807 0.014 97.486);
-    --color-muted: oklch(0.625 0.012 95.229);
-    --color-divider: oklch(0.893 0.015 98.305 / 0.10);
-    --color-surface: oklch(0.245 0.004 106.643);
-    --color-selection-ink: oklch(0.982 0.005 95.099);
-    --color-accent: oklch(0.70 0.131 38.756);
+    /* Flexoki dark: black, paper, and the dark interface neutrals. */
+    --color-canvas: oklch(0.170 0.002 17.321);
+    --color-ink: oklch(0.990 0.016 95.219);
+    --color-body: oklch(0.846 0.014 102.053);
+    --color-muted: oklch(0.617 0.008 88.674);
+    --color-divider: oklch(0.273 0.002 67.727 / 0.7);
+    --color-surface: oklch(0.223 0.002 67.699);
+    --color-selection: oklch(0.599 0.110 246.996);
+    --color-selection-ink: oklch(0.170 0.002 17.321);
+    --color-accent: oklch(0.670 0.100 186.578);
   }
 }
 
