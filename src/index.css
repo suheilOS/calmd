@@ -5,7 +5,7 @@
 @theme {
   --text-large: clamp(1.5rem, 3vw, 1.75rem);
   --text-large--font-weight: 500;
-  --text-large--line-height: 1.1;
+  --text-large--line-height: 1.15;
   --text-large--letter-spacing: -0.04em;
 
   --text-base: 1rem;

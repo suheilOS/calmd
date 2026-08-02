@@ -238,6 +238,12 @@
   color: var(--color-syntax);
 }
 
+.markdown-editor .cm-hanging-markdown-prefix {
+  display: inline-block;
+  white-space: nowrap;
+  width: 0;
+}
+
 .markdown-editor .cm-hanging-markdown-prefix,
 .markdown-editor .cm-hanging-markdown-prefix * {
   font-size: var(--text-base);

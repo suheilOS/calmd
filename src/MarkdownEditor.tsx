@@ -155,7 +155,7 @@ function hangingMarkdownMarkers(view: EditorView) {
           prefix.heading && 'cm-heading-line',
           prefix.quote && 'cm-quote-line',
         ].filter(Boolean).join(' '),
-        style: `--markdown-prefix-width: ${prefixLength}ch; text-indent: -${prefixLength}ch`,
+        style: `--markdown-prefix-width: ${prefixLength}ch`,
       },
     }).range(line.from))
   }
