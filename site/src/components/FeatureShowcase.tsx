@@ -283,16 +283,14 @@ export default function FeatureShowcase() {
     const updateActiveFeature = () => {
       frame = 0
       const isCarouselLayout = carouselLayout.matches
+      const viewportRect = cardsContainer.getBoundingClientRect()
       const viewportCenter = isCarouselLayout
-        ? (() => {
-            const rect = cardsContainer.getBoundingClientRect()
-            return rect.left + rect.width / 2
-          })()
+        ? viewportRect.left + viewportRect.width / 2
         : window.innerHeight / 2
       const visibleCards = cards.flatMap((card) => {
         const rect = card.getBoundingClientRect()
         const isVisible = isCarouselLayout
-          ? rect.right > 0 && rect.left < window.innerWidth
+          ? rect.right > viewportRect.left && rect.left < viewportRect.right
           : rect.bottom > 0 && rect.top < window.innerHeight
         const cardCenter = isCarouselLayout
           ? rect.left + rect.width / 2
@@ -340,8 +338,11 @@ export default function FeatureShowcase() {
     if (!cardsContainer || !card || !firstCard) return
 
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const targetLeft = card.offsetLeft - firstCard.offsetLeft
+    const maxScrollLeft = cardsContainer.scrollWidth - cardsContainer.clientWidth
+
     cardsContainer.scrollTo({
-      left: card.offsetLeft - firstCard.offsetLeft,
+      left: Math.max(0, Math.min(targetLeft, maxScrollLeft)),
       behavior: reducedMotion ? 'auto' : 'smooth',
     })
   }
@@ -413,7 +414,7 @@ export default function FeatureShowcase() {
           </button>
         </div>
 
-        <div className="feature-mobile-copy">
+        <div aria-atomic="true" aria-live="polite" className="feature-mobile-copy">
           <strong>{activeFeature.title}</strong>
           <p>{activeFeature.description}</p>
         </div>

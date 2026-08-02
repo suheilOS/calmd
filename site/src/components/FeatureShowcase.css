@@ -1,6 +1,6 @@
 .feature-showcase {
   display: grid;
-  width: min(calc(100% - 3rem), 64rem);
+  width: min(calc(100% - var(--page-gutter) - var(--page-gutter)), 64rem);
   margin: clamp(5rem, 12vh, 9rem) auto 8rem;
   grid-template-columns: minmax(24rem, 1.2fr) minmax(14rem, 0.85fr);
   gap: clamp(2rem, 5vw, 6rem);
@@ -405,7 +405,7 @@
 
 @media (max-width: 64rem) {
   .feature-showcase {
-    width: min(calc(100% - 3rem), 64rem);
+    width: min(calc(100% - var(--page-gutter) - var(--page-gutter)), 64rem);
     grid-template-columns: 1fr;
     gap: 0;
   }
@@ -415,14 +415,17 @@
   }
 
   .feature-cards {
+    --feature-card-peek: 2.75rem;
+    --feature-card-end-space: calc(var(--page-gutter) + var(--feature-card-peek));
     display: flex;
     order: 1;
     gap: 0.75rem;
-    padding-inline: 1.5rem;
+    padding-inline-start: var(--page-gutter);
+    padding-inline-end: var(--feature-card-end-space);
     overflow-x: auto;
     overscroll-behavior-inline: contain;
     scrollbar-width: none;
-    scroll-padding-inline: 1.5rem;
+    scroll-padding-inline: var(--page-gutter);
     scroll-snap-type: inline mandatory;
     -webkit-overflow-scrolling: touch;
   }
@@ -435,7 +438,7 @@
   .feature-card + .feature-card {
     min-height: 0;
     padding-block-start: 0;
-    flex: 0 0 calc(100% - 2.75rem);
+    flex: 0 0 100%;
     align-items: stretch;
     scroll-snap-align: start;
     scroll-snap-stop: always;
@@ -444,7 +447,7 @@
   .feature-mobile-meta {
     display: grid;
     order: 2;
-    padding-inline: 1.5rem;
+    padding-inline: var(--page-gutter);
     justify-items: center;
   }
 
@@ -561,8 +564,22 @@
 
 @media (max-width: 40rem) {
   .feature-showcase {
-    width: 100%;
     margin-block: 5rem;
+  }
+
+  .feature-cards {
+    /* Keep the leading page gutter while extending the scrollport to the edge. */
+    width: calc(100% + var(--page-gutter));
+    margin-inline-start: 0;
+    margin-inline-end: calc(0rem - var(--page-gutter));
+    padding-inline-start: 0;
+    padding-inline-end: var(--feature-card-end-space);
+    scroll-padding-inline: 0;
+  }
+
+  .feature-card,
+  .feature-card + .feature-card {
+    flex-basis: 100%;
   }
 
   .mock-surface {
@@ -591,7 +608,7 @@
 
   .product-crop-content--composer,
   .product-crop-content--retrieval {
-    padding-inline: 1.5rem;
+    padding-inline: var(--page-gutter);
   }
 
   .product-editor {

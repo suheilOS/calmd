@@ -4,6 +4,7 @@
 :root {
   --text-base: 1rem;
   --text-small: 0.8125rem;
+  --page-gutter: 1.5rem;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   /* Flexoki light: paper, ink, and warm interface neutrals. */
   --color-canvas: oklch(0.990 0.016 95.219);
@@ -32,6 +33,7 @@
 html,
 body {
   min-height: 100%;
+  overflow-x: clip;
 }
 
 html {
@@ -64,7 +66,6 @@ html {
 body {
   min-width: 320px;
   margin: 0;
-  overflow-x: hidden;
   background: var(--color-canvas);
   color: var(--color-body);
   font-family: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -116,12 +117,12 @@ p {
 }
 
 .shell {
-  width: min(calc(100% - 3rem), 40rem);
+  width: min(calc(100% - var(--page-gutter) - var(--page-gutter)), 40rem);
   margin-inline: auto;
 }
 
 .landing-shell {
-  width: min(calc(100% - 3rem), 64rem);
+  width: min(calc(100% - var(--page-gutter) - var(--page-gutter)), 64rem);
 }
 
 .skip-link {
@@ -460,7 +461,7 @@ html.media-expanded .table-of-contents {
 }
 
 .product-moment {
-  width: min(calc(100% - 3rem), 40rem);
+  width: min(calc(100% - var(--page-gutter) - var(--page-gutter)), 40rem);
   aspect-ratio: 1;
   margin: 0 auto 3rem;
   transform-origin: top left;
@@ -689,14 +690,6 @@ html.media-expanded .table-of-contents {
     height: 2.75rem;
   }
 
-  .shell {
-    width: min(calc(100% - 2rem), 40rem);
-  }
-
-  .landing-shell {
-    width: calc(100% - 3rem);
-  }
-
   .hero {
     padding-block: 5rem 1.5rem;
   }
@@ -728,7 +721,7 @@ html.media-expanded .table-of-contents {
 
   .product-moment,
   .product-moment.is-expanded {
-    width: calc(100% - 2rem);
+    width: min(calc(100% - var(--page-gutter) - var(--page-gutter)), 40rem);
     aspect-ratio: 8 / 5;
   }
 
