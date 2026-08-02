@@ -1,4 +1,4 @@
-@import '@fontsource-variable/geist/wght.css';
+@import '@fontsource-variable/figtree/wght.css';
 
 :root {
   --text-base: 0.9375rem;
@@ -67,7 +67,7 @@ body {
   margin: 0;
   background: var(--color-canvas);
   color: var(--color-body);
-  font-family: "Geist Variable", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Figtree Variable", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: var(--text-base);
   font-synthesis: none;
   line-height: 1.7;

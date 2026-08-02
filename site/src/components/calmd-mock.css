@@ -18,7 +18,7 @@
   overflow: hidden;
   background: var(--mock-canvas);
   color: var(--mock-ink);
-  font-family: "Geist Variable", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Figtree Variable", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 1.05cqw;
   font-synthesis: none;
   line-height: 1.6;
