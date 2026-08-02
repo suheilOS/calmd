@@ -1,5 +1,4 @@
 ---
-import ProductMoment from '../components/ProductMoment.astro'
 import SiteLayout from '../layouts/SiteLayout.astro'
 ---
 
@@ -11,8 +10,7 @@ import SiteLayout from '../layouts/SiteLayout.astro'
     <a class="wordmark" href="/" translate="no" aria-label="Calmd home">calmd</a>
     <div class="header-meta">
       <nav class="header-nav" aria-label="Primary">
-        <a href="/docs/">docs</a>
-        <a href="/case-study/">case study</a>
+        <a href="/case-study/" aria-current="page">case study</a>
       </nav>
       <span class="header-separator" aria-hidden="true"></span>
       <a
@@ -43,8 +41,6 @@ import SiteLayout from '../layouts/SiteLayout.astro'
     <header class="hero shell">
       <h1>notes should help with the thought in front of you.</h1>
     </header>
-
-    <ProductMoment />
 
     <article class="case-study shell" aria-label="Why I built Calmd">
       <section class="story-section" aria-labelledby="pattern-title">
@@ -115,7 +111,6 @@ import SiteLayout from '../layouts/SiteLayout.astro'
         <div class="footer-meta">
           <div class="footer-links">
             <nav class="footer-nav" aria-label="Footer">
-              <a href="/docs/">docs</a>
               <a href="https://github.com/suheilOS/calmd" target="_blank" rel="noreferrer">github</a>
             </nav>
           </div>

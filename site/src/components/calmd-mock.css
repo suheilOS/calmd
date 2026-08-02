@@ -1,0 +1,189 @@
+.calmd-mock {
+  --mock-canvas: oklch(0.990 0.016 95.219);
+  --mock-ink: oklch(0.170 0.002 17.321);
+  --mock-body: oklch(0.365 0.004 67.689);
+  --mock-secondary: oklch(0.538 0.008 97.449);
+  --mock-muted: oklch(0.617 0.008 88.674);
+  --mock-faint: oklch(0.772 0.013 96.470);
+  --mock-placeholder: oklch(0.772 0.013 96.470);
+  --mock-surface: oklch(0.954 0.015 98.288);
+  --mock-active: oklch(0.846 0.014 102.053);
+  --mock-selection: oklch(0.482 0.131 254.789);
+  --mock-selection-ink: oklch(0.990 0.016 95.219);
+  --mock-accent: oklch(0.554 0.086 186.744);
+  position: relative;
+  container-type: inline-size;
+  width: 100%;
+  aspect-ratio: 1898 / 1144;
+  overflow: hidden;
+  background: var(--mock-canvas);
+  color: var(--mock-ink);
+  font-family: "Geist Variable", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 1.05cqw;
+  font-synthesis: none;
+  line-height: 1.6;
+  text-align: initial;
+  text-transform: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.calmd-mock *,
+.calmd-mock *::before,
+.calmd-mock *::after { box-sizing: border-box; }
+.calmd-mock :where(p, h2, h3) { margin: 0; }
+
+.calmd-titlebar {
+  position: absolute;
+  z-index: 5;
+  inset: 0 0 auto;
+  display: flex;
+  height: 3.5%;
+  align-items: center;
+  color: var(--mock-secondary);
+  font-size: 0.65em;
+}
+.calmd-title { position: absolute; inset-inline: 0; text-align: center; }
+.calmd-navigation,
+.calmd-window-controls { display: flex; height: 100%; align-items: center; }
+.calmd-navigation > span,
+.calmd-window-controls > span { display: grid; width: 3.08em; height: 100%; place-items: center; }
+.calmd-navigation svg { width: 1.23em; height: 1.23em; }
+.calmd-window-controls { margin-inline-start: auto; }
+.calmd-window-controls svg { width: 1.08em; height: 1.08em; }
+
+.calmd-composer {
+  position: absolute;
+  inset-inline-start: 50%;
+  width: 65ch;
+  transform: translateX(-50%);
+  font-size: 1em;
+}
+
+.calmd-mock--composer { font-size: 1.2cqw; }
+.calmd-mock--composer .calmd-composer { inset-block-start: 44%; text-align: center; }
+
+.calmd-mock--retrieval { font-size: 1.02cqw; }
+.calmd-mock--retrieval .calmd-composer { inset-block-start: 17%; }
+
+.calmd-placeholder { color: var(--mock-placeholder); }
+.calmd-query { color: var(--mock-ink); }
+.calmd-results { display: grid; margin-block-start: 1em; gap: 0.5em; }
+.calmd-result { padding: 0.75em; border-radius: 0.75em; background: var(--mock-surface); color: var(--mock-ink); }
+.calmd-result.is-selected { background: var(--mock-active); }
+.calmd-result-title { font-weight: 600; }
+.calmd-result small { display: block; margin-block-start: 0.3em; overflow: hidden; color: var(--mock-faint); font: inherit; font-size: 0.8125em; text-overflow: ellipsis; white-space: nowrap; }
+.calmd-result.is-selected small { color: var(--mock-secondary); }
+.calmd-result mark { padding: 0 0.1em; border-radius: 0.12em; background: var(--mock-selection); color: var(--mock-selection-ink); }
+
+.calmd-editor {
+  position: absolute;
+  width: 65ch;
+  color: var(--mock-body);
+}
+
+.calmd-mock--editor { font-size: 1.15cqw; }
+.calmd-mock--editor .calmd-editor { inset-block-start: 11%; inset-inline-start: 12%; }
+
+.calmd-mock--preview { font-size: 1.05cqw; }
+.calmd-mock--preview .calmd-editor { inset-block-start: 7.8%; inset-inline-start: 50%; max-width: 62%; transform: translateX(-50%); }
+.calmd-mock--preview .calmd-preview-card { inset-block-start: calc(15em + 8px); }
+
+.calmd-mock--wiki-preview { font-size: 1.28cqw; }
+.calmd-mock--wiki-preview .calmd-editor { inset-block-start: -33%; inset-inline-start: -23%; }
+
+.calmd-mock--backlinks { font-size: 1.45cqw; }
+.calmd-mock--backlinks .calmd-editor { inset-block-start: 7%; inset-inline-start: 7%; }
+
+.calmd-editor h2 { margin-block-end: 1.4em; color: var(--mock-ink); font-size: 1.75em; font-weight: 500; letter-spacing: -0.04em; line-height: 1.1; }
+.calmd-note-body { display: grid; gap: 1.45em; }
+.calmd-note-body p { line-height: 1.6; }
+.calmd-wiki-link { color: var(--mock-accent); text-decoration: underline; text-decoration-color: color-mix(in oklab, var(--mock-faint) 55%, transparent); text-underline-offset: 0.16em; }
+
+.calmd-preview-card {
+  position: absolute;
+  z-index: 2;
+  inset-block-start: calc(10.7em + 8px);
+  inset-inline-start: 19.16em;
+  width: 26em;
+  max-height: 22em;
+  padding: 0.8em 1em;
+  overflow: hidden;
+  border-radius: 1em;
+  background: var(--mock-surface);
+  color: var(--mock-secondary);
+  box-shadow: 0 0.6em 1.8em oklch(0 0 0 / 0.22);
+}
+.calmd-preview-card h3 { color: var(--mock-ink); font-size: 1em; font-weight: 600; letter-spacing: -0.02em; line-height: 1.25; }
+.calmd-preview-content { margin-block-start: 0.75em; font-size: 0.8125em; line-height: 1.55; overflow-wrap: anywhere; }
+.calmd-preview-content p + p { margin-block-start: 0.8em; }
+.calmd-preview-more { margin-block-start: 1em !important; color: var(--mock-faint); font-size: 0.8125em; }
+
+.calmd-backlinks-card {
+  position: absolute;
+  z-index: 3;
+  inset-inline-end: 3.5%;
+  inset-block-end: calc(5% + 2.4em);
+  width: 14.4em;
+  max-height: 22.4em;
+  padding: 0.4em;
+  overflow: hidden;
+  border-radius: 1em;
+  background: var(--mock-surface);
+  color: var(--mock-ink);
+  box-shadow: 0 0.4em 1.2em oklch(0 0 0 / 0.18);
+  font-size: 1em;
+}
+.calmd-backlinks-card h3 { padding: 0.4em 0.6em; color: var(--mock-secondary); font-size: 0.8125em; font-weight: 500; line-height: 1.35; }
+.calmd-backlink-item { min-height: 2em; padding: 0.4em 0.6em; border-radius: 0.5em; font-size: 0.8125em; line-height: 1.5; }
+.calmd-backlink-item strong { display: block; color: var(--mock-ink); font-weight: 500; line-height: 1.35; }
+.calmd-backlink-item p { margin-block-start: 0.3em; color: var(--mock-secondary); line-height: 1.5; }
+.calmd-mentions .calmd-backlink-item p { font-size: 0.9em; }
+.calmd-mentions mark { background: var(--mock-active); color: inherit; }
+.calmd-mentions { margin-block-start: 0.4em; padding-block-start: 0.4em; border-block-start: 1px solid color-mix(in oklab, var(--mock-faint) 30%, transparent); }
+
+.calmd-info {
+  position: absolute;
+  inset-inline-end: 3.5%;
+  inset-block-end: 5%;
+  display: grid;
+  width: 2em;
+  aspect-ratio: 1;
+  place-items: center;
+  border-radius: 0.6em;
+  background: var(--mock-surface);
+  color: var(--mock-muted);
+}
+.calmd-info svg { width: 1em; height: 1em; }
+
+@media (max-width: 47.999rem) {
+  .calmd-mock--composer { font-size: 1.8cqw; }
+
+  .calmd-mock--retrieval { font-size: 1.45cqw; }
+  .calmd-mock--retrieval .calmd-composer { width: 55ch; }
+
+  .calmd-mock--editor { font-size: 1.55cqw; }
+  .calmd-mock--editor .calmd-editor { inset-block-start: 8%; inset-inline-start: 5%; }
+
+  .calmd-mock--wiki-preview { font-size: 1.65cqw; }
+  .calmd-mock--wiki-preview .calmd-editor { inset-block-start: -25%; inset-inline-start: -22%; }
+
+  .calmd-mock--backlinks { font-size: 2.1cqw; }
+  .calmd-mock--backlinks .calmd-editor { inset-block-start: 6%; inset-inline-start: 5%; }
+}
+
+@media (prefers-color-scheme: dark) {
+  .calmd-mock {
+    --mock-canvas: oklch(0.170 0.002 17.321);
+    --mock-ink: oklch(0.990 0.016 95.219);
+    --mock-body: oklch(0.846 0.014 102.053);
+    --mock-secondary: oklch(0.772 0.013 96.470);
+    --mock-muted: oklch(0.617 0.008 88.674);
+    --mock-faint: oklch(0.453 0.005 91.503);
+    --mock-placeholder: oklch(0.453 0.005 91.503);
+    --mock-surface: oklch(0.223 0.002 67.699);
+    --mock-active: oklch(0.365 0.004 67.689);
+    --mock-selection: oklch(0.599 0.110 246.996);
+    --mock-selection-ink: oklch(0.170 0.002 17.321);
+    --mock-accent: oklch(0.670 0.100 186.578);
+  }
+}

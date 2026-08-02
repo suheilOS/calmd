@@ -1,6 +1,50 @@
 ---
-import FeatureShowcase from '../components/FeatureShowcase'
+import CalmdMock from '../components/CalmdMock'
 import SiteLayout from '../layouts/SiteLayout.astro'
+import '../styles/landing.css'
+
+const features = [
+  {
+    title: 'Start with the thought',
+    description: 'Open Calmd to a quiet composer—not a dashboard, file tree, or collection asking to be managed.',
+    mock: 'composer' as const,
+  },
+  {
+    title: 'Retrieve what matters',
+    description: 'Search brings relevant notes close to the words you are already using, so you can continue without browsing the vault.',
+    mock: 'retrieval' as const,
+  },
+  {
+    title: 'Give the idea room',
+    description: 'A focused Markdown editor keeps attention on the current note while links and backlinks reveal context only when requested.',
+    mock: 'editor' as const,
+  },
+  {
+    title: 'Preview without leaving',
+    description: 'Hover over a wiki link to read the connected idea in place, without losing your position or opening another view.',
+    mock: 'wiki-preview' as const,
+  },
+  {
+    title: 'Follow the thought backward',
+    description: 'Backlinks and unlinked mentions stay collapsed until you need to see where the current idea appears elsewhere.',
+    mock: 'backlinks' as const,
+  },
+]
+
+const principles = [
+  {
+    title: 'Portable by default',
+    description: 'Every note is a plain Markdown file in a vault you choose.',
+  },
+  {
+    title: 'Retrieval over browsing',
+    description: 'Find the useful note without exposing the scale of the collection.',
+  },
+  {
+    title: 'Context on demand',
+    description: 'Wiki links and backlinks stay quiet until they help the current thought.',
+  },
+]
 ---
 
 <SiteLayout
@@ -11,7 +55,6 @@ import SiteLayout from '../layouts/SiteLayout.astro'
     <a class="wordmark" href="/" translate="no" aria-label="Calmd home">calmd</a>
     <div class="header-meta">
       <nav class="header-nav" aria-label="Primary">
-        <a href="/docs/">docs</a>
         <a href="/case-study/">case study</a>
       </nav>
       <span class="header-separator" aria-hidden="true"></span>
@@ -30,21 +73,71 @@ import SiteLayout from '../layouts/SiteLayout.astro'
   </header>
 
   <main id="main-content">
-    <header class="hero shell landing-shell">
-      <a class="hero-eyebrow" href="/case-study/">read the case study</a>
-      <h1>notes should help with the thought in front of you.</h1>
-      <a class="open-source-action open-source-action--primary hero-download" href="#" aria-disabled="true">download</a>
-    </header>
-
-    <FeatureShowcase client:load />
-
-    <section class="open-source shell landing-shell" aria-labelledby="open-source-title">
-      <div class="open-source-copy">
-        <h2 id="open-source-title">free and open source</h2>
-        <p>Look through the code on GitHub.</p>
+    <section class="landing-hero landing-shell" aria-labelledby="landing-title">
+      <div class="landing-hero-heading">
+        <h1 id="landing-title">Stay with the thought in front of you.</h1>
       </div>
-      <div class="open-source-actions">
-        <a class="open-source-action" href="https://github.com/suheilOS/calmd" target="_blank" rel="noreferrer">view source</a>
+
+      <div class="landing-hero-details">
+        <p class="landing-intro">
+          Calmd helps you begin, retrieve what you already know, and keep writing—without turning your notes into another system to manage.
+        </p>
+        <div class="landing-actions">
+          <a class="landing-action landing-action--primary" href="https://github.com/suheilOS/calmd" target="_blank" rel="noreferrer">
+            <svg viewBox="0 0 1024 1024" aria-hidden="true">
+              <path fill-rule="evenodd" clip-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8C0 11.54 2.29 14.53 5.47 15.59C5.87 15.66 6.02 15.42 6.02 15.21C6.02 15.02 6.01 14.39 6.01 13.72C4 14.09 3.48 13.23 3.32 12.78C3.23 12.55 2.84 11.84 2.5 11.65C2.22 11.5 1.82 11.13 2.49 11.12C3.12 11.11 3.57 11.7 3.72 11.94C4.44 13.15 5.59 12.81 6.05 12.6C6.12 12.08 6.33 11.73 6.56 11.53C4.78 11.33 2.92 10.64 2.92 7.58C2.92 6.71 3.23 5.99 3.74 5.43C3.66 5.23 3.38 4.41 3.82 3.31C3.82 3.31 4.49 3.1 6.02 4.13C6.66 3.95 7.34 3.86 8.02 3.86C8.7 3.86 9.38 3.95 10.02 4.13C11.55 3.09 12.22 3.31 12.22 3.31C12.66 4.41 12.38 5.23 12.3 5.43C12.81 5.99 13.12 6.7 13.12 7.58C13.12 10.65 11.25 11.33 9.47 11.53C9.76 11.78 10.01 12.26 10.01 13.01C10.01 14.08 10 14.94 10 15.21C10 15.42 10.15 15.67 10.55 15.59C13.71 14.53 16 11.53 16 8C16 3.58 12.42 0 8 0Z" transform="scale(64)" />
+            </svg>
+            <span>View on GitHub</span>
+          </a>
+          <a class="landing-action" href="/case-study/">Read the case study</a>
+        </div>
+      </div>
+
+      <figure class="landing-hero-media">
+        <CalmdMock kind="preview" />
+      </figure>
+    </section>
+
+    <section class="landing-features landing-shell" aria-labelledby="features-title">
+      <div class="landing-section-heading">
+        <h2 id="features-title">From first words to useful context.</h2>
+      </div>
+
+      <ol class="landing-feature-list">
+        {features.map((feature) => (
+          <li class="landing-feature">
+            <div class="landing-feature-copy">
+              <h3>{feature.title}</h3>
+              <p>{feature.description}</p>
+            </div>
+            <figure class="landing-feature-media">
+              <CalmdMock kind={feature.mock} />
+            </figure>
+          </li>
+        ))}
+      </ol>
+    </section>
+
+    <section class="landing-principles landing-shell" aria-labelledby="principles-title">
+      <div class="landing-section-heading">
+        <p class="landing-kicker">Calm by design</p>
+        <h2 id="principles-title">Your notes remain yours.</h2>
+      </div>
+      <ul class="landing-principle-list">
+        {principles.map((principle) => (
+          <li>
+            <h3>{principle.title}</h3>
+            <p>{principle.description}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
+
+    <section class="landing-source landing-shell" aria-labelledby="source-title">
+      <div class="landing-source-copy">
+        <h2 id="source-title">Free & open source</h2>
+        <p>See exactly how Calmd works.</p>
+        <a class="landing-action" href="https://github.com/suheilOS/calmd" target="_blank" rel="noreferrer">View the source</a>
       </div>
     </section>
   </main>
@@ -56,15 +149,12 @@ import SiteLayout from '../layouts/SiteLayout.astro'
         <span class="footer-year">2026</span>
       </div>
       <div class="footer-details">
-        <p>portable Markdown notes for the thought in front of you.</p>
+        <p>Portable Markdown notes for the thought in front of you.</p>
         <div class="footer-meta">
-          <div class="footer-links">
-            <nav class="footer-nav" aria-label="Footer">
-              <a href="/docs/">docs</a>
-              <a href="/case-study/">case study</a>
-              <a href="https://github.com/suheilOS/calmd" target="_blank" rel="noreferrer">github</a>
-            </nav>
-          </div>
+          <nav class="footer-nav" aria-label="Footer">
+            <a href="/case-study/">case study</a>
+            <a href="https://github.com/suheilOS/calmd" target="_blank" rel="noreferrer">github</a>
+          </nav>
         </div>
       </div>
     </div>

@@ -110,7 +110,7 @@ export function ComposerScreen({
                 role="option"
                 type="button"
               >
-                <span className="block break-words">{highlightedText(note.title, thought)}</span>
+                <span className="block break-words font-semibold">{highlightedText(note.title, thought)}</span>
                 {note.excerpt ? <span className="mt-1 block truncate text-small text-faint group-aria-selected:text-active-muted group-focus-visible:text-active-muted">{highlightedText(note.excerpt, thought)}</span> : null}
               </Button>
             ))}
