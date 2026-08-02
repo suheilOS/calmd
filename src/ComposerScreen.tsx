@@ -21,7 +21,7 @@ const RESULT_CLASS_NAME =
 function highlightedText(text: string, query: string): ReactNode {
   return segmentSearchMatches(text, query).map((segment, index) => (
     segment.kind === 'match'
-      ? <mark className="rounded-[2px] bg-highlight text-inherit" key={index}>{segment.text}</mark>
+      ? <mark className="rounded-[2px] bg-selection text-selection-ink" key={index}>{segment.text}</mark>
       : segment.text
   ))
 }

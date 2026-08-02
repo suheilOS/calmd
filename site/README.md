@@ -1,6 +1,6 @@
 # Calmd landing page
 
-A dependency-light Astro site for the Calmd product story. It uses native HTML controls and global CSS without React, Base UI, or Tailwind.
+A dependency-light Astro site for the Calmd product story. It uses native HTML controls and global CSS, with isolated React islands for interactive product mocks; it does not use Base UI or Tailwind.
 
 ## Development
 

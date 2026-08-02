@@ -1,0 +1,257 @@
+---
+import ProductMoment from '../components/ProductMoment.astro'
+import SiteLayout from '../layouts/SiteLayout.astro'
+---
+
+<SiteLayout
+  title="calmd — why i built a notes app"
+  description="A case study about note-taking, cognitive load, and why i built calmd."
+>
+  <header class="site-header shell" aria-label="Site header">
+    <a class="wordmark" href="/" translate="no" aria-label="Calmd home">calmd</a>
+    <div class="header-meta">
+      <nav class="header-nav" aria-label="Primary">
+        <a href="/docs/">docs</a>
+        <a href="/case-study/">case study</a>
+      </nav>
+      <span class="header-separator" aria-hidden="true"></span>
+      <a
+        class="github-link"
+        href="https://github.com/suheilOS/calmd"
+        aria-label="View Calmd on GitHub"
+        target="_blank"
+        rel="noreferrer"
+      >
+        <svg viewBox="0 0 1024 1024" aria-hidden="true">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8C0 11.54 2.29 14.53 5.47 15.59C5.87 15.66 6.02 15.42 6.02 15.21C6.02 15.02 6.01 14.39 6.01 13.72C4 14.09 3.48 13.23 3.32 12.78C3.23 12.55 2.84 11.84 2.5 11.65C2.22 11.5 1.82 11.13 2.49 11.12C3.12 11.11 3.57 11.7 3.72 11.94C4.44 13.15 5.59 12.81 6.05 12.6C6.12 12.08 6.33 11.73 6.56 11.53C4.78 11.33 2.92 10.64 2.92 7.58C2.92 6.71 3.23 5.99 3.74 5.43C3.66 5.23 3.38 4.41 3.82 3.31C3.82 3.31 4.49 3.1 6.02 4.13C6.66 3.95 7.34 3.86 8.02 3.86C8.7 3.86 9.38 3.95 10.02 4.13C11.55 3.09 12.22 3.31 12.22 3.31C12.66 4.41 12.38 5.23 12.3 5.43C12.81 5.99 13.12 6.7 13.12 7.58C13.12 10.65 11.25 11.33 9.47 11.53C9.76 11.78 10.01 12.26 10.01 13.01C10.01 14.08 10 14.94 10 15.21C10 15.42 10.15 15.67 10.55 15.59C13.71 14.53 16 11.53 16 8C16 3.58 12.42 0 8 0Z" transform="scale(64)" />
+        </svg>
+      </a>
+    </div>
+  </header>
+
+  <main id="main-content">
+    <nav class="table-of-contents" aria-label="On this page">
+      <ol>
+        <li><a href="#pattern-title">the pattern</a></li>
+        <li><a href="#failed-solution-title">the failed solution</a></li>
+        <li><a href="#realization-title">the realization</a></li>
+        <li><a href="#medium-title">the medium</a></li>
+        <li><a href="#result-title">the result</a></li>
+      </ol>
+    </nav>
+
+    <header class="hero shell">
+      <h1>notes should help with the thought in front of you.</h1>
+    </header>
+
+    <ProductMoment />
+
+    <article class="case-study shell" aria-label="Why I built Calmd">
+      <section class="story-section" aria-labelledby="pattern-title">
+        <h2 id="pattern-title">the pattern</h2>
+        <p>
+          i noticed a recurring pattern in how i took and managed notes. every system began with possibility, then slowly became another thing to manage.
+        </p>
+        <p>
+          whenever i opened a fresh book, vault, or database, there was this exhilarating feeling. i could summon the energy to research a complex topic or write about any random topic for hours.
+        </p>
+        <p>
+          then i would finish and close it. the next time i returned, i would be greeted by a complex interface, open my note, find something very long, and immediately feel mentally taxed.
+        </p>
+      </section>
+
+      <section class="story-section" aria-labelledby="failed-solution-title">
+        <h2 id="failed-solution-title">the failed solution</h2>
+        <p>
+          i read about atomic notes. each idea that stands on its own lives in a separate note. it seemed interesting, so i tried it.
+        </p>
+        <p>
+          the next time i opened the app, i was greeted by a number of notes. the source of cognitive load had moved from the size of one note to the number of notes around it.
+        </p>
+        <p>
+          now i had to worry about how to organise them before everything became messy. i tried all sorts of systems and ended up maintaining a system instead of actually learning.
+        </p>
+      </section>
+
+      <section class="story-section" aria-labelledby="realization-title">
+        <h2 id="realization-title">the realization</h2>
+        <p>
+          i don’t learn by writing everything down. writing is a way of getting whatever is in my mind onto paper or a screen. i know people are different, but recording everything while consuming knowledge has never been useful to me.
+        </p>
+        <p>
+          i would rather read or listen, then write a reflection on the key takeaways. reaching that conclusion took time, but it gave me a clear idea of how my notes should work. i just didn’t have the right medium.
+        </p>
+      </section>
+
+      <section class="story-section" aria-labelledby="medium-title">
+        <h2 id="medium-title">the medium</h2>
+        <p>
+          paper is calm, but it is not easily indexed. finding something means manually returning to each page and skimming until it appears.
+        </p>
+        <p>
+          computers happen to be very fast at this exact thing. the problem is that note-taking software often makes the collection—and the work of maintaining it—the main interface.
+        </p>
+      </section>
+
+      <section class="product-section" aria-labelledby="result-title">
+        <div class="section-intro">
+          <h2 id="result-title">the result</h2>
+          <p>
+            i built calmd to keep the calmness of writing while using the computer for what it is good at. start with a thought, let the computer retrieve the relevant notes, and keep everything as portable Markdown files without turning the collection into another system to maintain.
+          </p>
+        </div>
+      </section>
+    </article>
+  </main>
+
+  <footer class="site-footer shell">
+    <div class="footer-brand">
+      <div class="footer-heading">
+        <span translate="no">calmd</span>
+        <span class="footer-year">2026</span>
+      </div>
+      <div class="footer-details">
+        <p>portable Markdown notes for the thought in front of you.</p>
+        <div class="footer-meta">
+          <div class="footer-links">
+            <nav class="footer-nav" aria-label="Footer">
+              <a href="/docs/">docs</a>
+              <a href="https://github.com/suheilOS/calmd" target="_blank" rel="noreferrer">github</a>
+            </nav>
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const links = Array.from(
+      document.querySelectorAll<HTMLAnchorElement>('.table-of-contents a[href^="#"]'),
+    )
+
+    const sections = links.flatMap((link) => {
+      const heading = document.querySelector<HTMLElement>(link.hash)
+      return heading ? [{ link, heading }] : []
+    })
+
+    const revealSections = Array.from(
+      document.querySelectorAll<HTMLElement>('.story-section, .product-section'),
+    )
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const siteHeader = document.querySelector<HTMLElement>('.site-header')
+
+    if (siteHeader) {
+      const scrollThreshold = 12
+      let lastScrollY = window.scrollY
+      let direction: 'up' | 'down' | null = null
+      let directionDistance = 0
+      let headerFramePending = false
+
+      const updateHeader = () => {
+        const currentScrollY = Math.max(window.scrollY, 0)
+        const delta = currentScrollY - lastScrollY
+        const nextDirection = delta > 0 ? 'down' : delta < 0 ? 'up' : direction
+
+        if (currentScrollY <= scrollThreshold) {
+          siteHeader.removeAttribute('data-scroll-hidden')
+          directionDistance = 0
+        } else if (nextDirection && nextDirection !== direction) {
+          direction = nextDirection
+          directionDistance = Math.abs(delta)
+        } else {
+          directionDistance += Math.abs(delta)
+        }
+
+        if (directionDistance >= scrollThreshold && nextDirection) {
+          siteHeader.toggleAttribute('data-scroll-hidden', nextDirection === 'down')
+          directionDistance = 0
+        }
+
+        direction = nextDirection
+        lastScrollY = currentScrollY
+        headerFramePending = false
+      }
+
+      const scheduleHeaderUpdate = () => {
+        if (headerFramePending) return
+        headerFramePending = true
+        requestAnimationFrame(updateHeader)
+      }
+
+      window.addEventListener('scroll', scheduleHeaderUpdate, { passive: true })
+    }
+
+    if (revealSections.length > 0 && !reducedMotion.matches) {
+      const revealLine = window.innerHeight * 0.82
+      const pendingSections = revealSections.filter((section) => {
+        if (section.getBoundingClientRect().top <= revealLine) {
+          section.classList.add('is-revealed')
+          return false
+        }
+
+        return true
+      })
+
+      document.querySelector('.case-study')?.classList.add('is-reveal-ready')
+
+      const revealObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return
+            entry.target.classList.add('is-revealed')
+            revealObserver.unobserve(entry.target)
+          })
+        },
+        { rootMargin: '0px 0px -18% 0px' },
+      )
+
+      pendingSections.forEach((section) => revealObserver.observe(section))
+    }
+
+    if (sections.length > 0) {
+      let framePending = false
+
+      const setActiveLink = () => {
+        const readingLine = window.innerHeight * 0.35
+        const atDocumentEnd =
+          window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2
+        let activeIndex = 0
+
+        if (atDocumentEnd) {
+          activeIndex = sections.length - 1
+        } else {
+          sections.forEach(({ heading }, index) => {
+            if (heading.getBoundingClientRect().top <= readingLine) {
+              activeIndex = index
+            }
+          })
+        }
+
+        sections.forEach(({ link }, index) => {
+          const isActive = index === activeIndex
+          link.classList.toggle('is-active', isActive)
+
+          if (isActive) {
+            link.setAttribute('aria-current', 'location')
+          } else {
+            link.removeAttribute('aria-current')
+          }
+        })
+      }
+
+      const scheduleUpdate = () => {
+        if (framePending) return
+        framePending = true
+
+        requestAnimationFrame(() => {
+          setActiveLink()
+          framePending = false
+        })
+      }
+
+      setActiveLink()
+      window.addEventListener('scroll', scheduleUpdate, { passive: true })
+      window.addEventListener('resize', scheduleUpdate, { passive: true })
+    }
+  </script>
+</SiteLayout>

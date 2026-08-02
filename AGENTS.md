@@ -57,7 +57,7 @@ https://base-ui.com/llms.txt
 
 Do not introduce another component library without explicit approval.
 
-The standalone Astro landing page under `site/` intentionally uses native HTML controls and scoped/global CSS without React, Base UI, or Tailwind. Keep it dependency-light unless a migration is explicitly approved.
+The standalone Astro landing page under `site/` uses native HTML controls and scoped/global CSS without Base UI or Tailwind. Focused interactive product mocks may use isolated React islands; keep the rest dependency-light.
 
 ## Documentation
 
