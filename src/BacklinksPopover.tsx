@@ -50,7 +50,7 @@ function LinkButton({
 }: LinkButtonProps) {
   return (
     <button
-      className="block min-h-10 w-full select-none rounded-lg px-3 py-2 text-left text-small transition-[background-color,color,transform] duration-150 ease-out hover:bg-hover focus-visible:bg-active focus-visible:text-active-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-faint active:scale-[0.96]"
+      className="block min-h-10 w-full select-none rounded-lg px-2 py-2 text-left text-small transition-[background-color,color,transform] duration-150 ease-out hover:bg-hover focus-visible:bg-active focus-visible:text-active-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-faint active:scale-[0.96]"
       onClick={() => onSelect(note.key)}
       onPointerEnter={(event) => {
         if (event.pointerType !== 'mouse') return
@@ -144,6 +144,11 @@ export function BacklinksPopover({
     )
   }
 
+  const hasNoLinksOrMentions = backlinks.status === 'ready'
+    && mentions.status === 'ready'
+    && backlinks.data.length === 0
+    && mentions.data.length === 0
+
   const buttonProps = {
     onPreviewCandidateEnter,
     onPreviewCandidateLeave,
@@ -173,33 +178,39 @@ export function BacklinksPopover({
       <Popover.Portal>
         <Popover.Positioner align="end" positionMethod="fixed" side="top" sideOffset={8}>
           <Popover.Popup className="backlinks-popover max-h-[min(28rem,calc(100vh-5rem))] w-72 max-w-[calc(100vw-2.5rem)] overflow-y-auto rounded-2xl bg-surface p-2 text-ink shadow-[0_8px_24px_oklch(0_0_0/0.18)] outline-none">
-            <section aria-labelledby="backlinks-heading">
-              <h2 className="px-2 py-1 text-small font-medium leading-snug text-secondary" id="backlinks-heading">Backlinks</h2>
-              {backlinks.status === 'error' ? <p className="px-3 py-2 text-small leading-normal text-secondary" role="alert">Could not load backlinks: {backlinks.message}</p> : backlinks.status === 'loading' ? (
-                <p className="px-3 py-2 text-small leading-normal text-secondary">Loading backlinks…</p>
-              ) : backlinks.data.length === 0 ? (
-                <p className="px-3 py-2 text-small leading-normal text-secondary">No backlinks</p>
-              ) : backlinks.data.map((link) => (
-                <LinkButton {...buttonProps} id={`backlink:${link.key}`} key={link.key} note={link}>
-                  <span className="block break-words font-medium leading-snug text-pretty text-ink">{link.title}</span>
-                </LinkButton>
-              ))}
-            </section>
-            <section aria-labelledby="mentions-heading" className="mt-2 border-t border-divider pt-2">
-              <h2 className="px-2 py-1 text-small font-medium leading-snug text-secondary" id="mentions-heading">Unlinked mentions</h2>
-              {mentions.status === 'error' ? <p className="px-3 py-2 text-small leading-normal text-secondary" role="alert">Could not load unlinked mentions: {mentions.message}</p> : mentions.status === 'loading' ? (
-                <p className="px-3 py-2 text-small leading-normal text-secondary">Loading unlinked mentions…</p>
-              ) : mentions.data.length === 0 ? (
-                <p className="px-3 py-2 text-small leading-normal text-secondary">No unlinked mentions</p>
-              ) : mentions.data.map((mention) => (
-                <LinkButton {...buttonProps} id={`unlinked-mention:${mention.key}`} key={mention.key} note={mention}>
-                  <span className="block break-words font-medium leading-snug text-pretty text-ink">{mention.title}</span>
-                  <span className="mt-1.5 block line-clamp-3 break-words leading-normal text-secondary">
-                    {highlightedExcerpt(mention)}
-                  </span>
-                </LinkButton>
-              ))}
-            </section>
+            {hasNoLinksOrMentions ? (
+              <p className="px-2 py-2 text-small leading-normal text-secondary">No links or mentions</p>
+            ) : (
+              <>
+                <section aria-labelledby="backlinks-heading">
+                  <h2 className="px-2 py-1 text-small font-medium leading-snug text-secondary" id="backlinks-heading">Backlinks</h2>
+                  {backlinks.status === 'error' ? <p className="px-2 py-2 text-small leading-normal text-secondary" role="alert">Could not load backlinks: {backlinks.message}</p> : backlinks.status === 'loading' ? (
+                    <p className="px-2 py-2 text-small leading-normal text-secondary">Loading backlinks…</p>
+                  ) : backlinks.data.length === 0 ? (
+                    <p className="px-2 py-2 text-small leading-normal text-secondary">No backlinks</p>
+                  ) : backlinks.data.map((link) => (
+                    <LinkButton {...buttonProps} id={`backlink:${link.key}`} key={link.key} note={link}>
+                      <span className="block break-words font-medium leading-snug text-pretty text-ink">{link.title}</span>
+                    </LinkButton>
+                  ))}
+                </section>
+                <section aria-labelledby="mentions-heading" className="mt-2 border-t border-divider pt-2">
+                  <h2 className="px-2 py-1 text-small font-medium leading-snug text-secondary" id="mentions-heading">Unlinked mentions</h2>
+                  {mentions.status === 'error' ? <p className="px-2 py-2 text-small leading-normal text-secondary" role="alert">Could not load unlinked mentions: {mentions.message}</p> : mentions.status === 'loading' ? (
+                    <p className="px-2 py-2 text-small leading-normal text-secondary">Loading unlinked mentions…</p>
+                  ) : mentions.data.length === 0 ? (
+                    <p className="px-2 py-2 text-small leading-normal text-secondary">No unlinked mentions</p>
+                  ) : mentions.data.map((mention) => (
+                    <LinkButton {...buttonProps} id={`unlinked-mention:${mention.key}`} key={mention.key} note={mention}>
+                      <span className="block break-words font-medium leading-snug text-pretty text-ink">{mention.title}</span>
+                      <span className="mt-1.5 block line-clamp-3 break-words leading-normal text-secondary">
+                        {highlightedExcerpt(mention)}
+                      </span>
+                    </LinkButton>
+                  ))}
+                </section>
+              </>
+            )}
           </Popover.Popup>
         </Popover.Positioner>
       </Popover.Portal>

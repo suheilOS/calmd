@@ -258,6 +258,10 @@
   color: transparent;
 }
 
+.markdown-editor .cm-heading-line .cm-hanging-markdown-prefix {
+  transform: translateX(calc(0ch - var(--markdown-prefix-width)));
+}
+
 .markdown-editor .cm-quote-line {
   position: relative;
 }
