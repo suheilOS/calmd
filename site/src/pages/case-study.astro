@@ -4,7 +4,7 @@ import SiteLayout from '../layouts/SiteLayout.astro'
 
 <SiteLayout
   title="calmd — why i built a notes app"
-  description="A case study about note-taking, cognitive load, and why i built calmd."
+  description="Why I built Calmd around retrieval, links, and portable Markdown notes."
 >
   <header class="site-header shell" aria-label="Site header">
     <a class="wordmark" href="/" translate="no" aria-label="Calmd home">calmd</a>
@@ -30,70 +30,112 @@ import SiteLayout from '../layouts/SiteLayout.astro'
   <main id="main-content">
     <nav class="table-of-contents" aria-label="On this page">
       <ol>
-        <li><a href="#pattern-title">the pattern</a></li>
-        <li><a href="#failed-solution-title">the failed solution</a></li>
-        <li><a href="#realization-title">the realization</a></li>
-        <li><a href="#medium-title">the medium</a></li>
-        <li><a href="#result-title">the result</a></li>
+        <li><a href="#starting-point-title">the starting point</a></li>
+        <li><a href="#diagnosis-title">the diagnosis</a></li>
+        <li><a href="#atomic-notes-title">atomic notes</a></li>
+        <li><a href="#search-title">search first</a></li>
+        <li><a href="#links-title">links for discovery</a></li>
+        <li><a href="#file-over-app-title">file over app</a></li>
       </ol>
     </nav>
 
-    <header class="hero shell">
-      <h1>notes should help with the thought in front of you.</h1>
+    <header class="hero shell" aria-labelledby="case-study-title">
+      <h1 id="case-study-title">why i built calmd</h1>
     </header>
 
-    <article class="case-study shell" aria-label="Why I built Calmd">
-      <section class="story-section" aria-labelledby="pattern-title">
-        <h2 id="pattern-title">the pattern</h2>
+    <article class="case-study shell" aria-labelledby="case-study-title">
+      <section class="story-section" aria-labelledby="starting-point-title">
+        <h2 id="starting-point-title">the starting point</h2>
         <p>
-          i noticed a recurring pattern in how i took and managed notes. every system began with possibility, then slowly became another thing to manage.
+          Writing is an important part of our learning process. This is why I chose to start by addressing this in my experiment, Overhawl.
         </p>
         <p>
-          whenever i opened a fresh book, vault, or database, there was this exhilarating feeling. i could summon the energy to research a complex topic or write about any random topic for hours.
+          I acknowledge that people are different. Personally, I find it counterproductive to write down everything I hear or read when learning or consuming information. I would rather take in what the person is saying or writing, then frame my understanding in my own words. It is a good habit I managed to form, and it improved my listening skills a lot.
         </p>
         <p>
-          then i would finish and close it. the next time i returned, i would be greeted by a complex interface, open my note, find something very long, and immediately feel mentally taxed.
-        </p>
-      </section>
-
-      <section class="story-section" aria-labelledby="failed-solution-title">
-        <h2 id="failed-solution-title">the failed solution</h2>
-        <p>
-          i read about atomic notes. each idea that stands on its own lives in a separate note. it seemed interesting, so i tried it.
-        </p>
-        <p>
-          the next time i opened the app, i was greeted by a number of notes. the source of cognitive load had moved from the size of one note to the number of notes around it.
-        </p>
-        <p>
-          now i had to worry about how to organise them before everything became messy. i tried all sorts of systems and ended up maintaining a system instead of actually learning.
+          My rule of thumb is simple. If I am certain I will need to revisit what I have written later, I type it on my computer and take advantage of the computer's ability to retrieve information. If it is just a passing thought, or I simply want to get something out of my head, I prefer writing it down on paper.
         </p>
       </section>
 
-      <section class="story-section" aria-labelledby="realization-title">
-        <h2 id="realization-title">the realization</h2>
+      <section class="story-section" aria-labelledby="diagnosis-title">
+        <h2 id="diagnosis-title">the diagnosis</h2>
         <p>
-          i don’t learn by writing everything down. writing is a way of getting whatever is in my mind onto paper or a screen. i know people are different, but recording everything while consuming knowledge has never been useful to me.
+          While building Calmd, I had to revisit all the issues I faced with various writing tools, including Notion, Obsidian, Logseq, Capacities, Word, Google Docs, and Apple Notes. Trust me, I have tried most of them, if not all.
         </p>
         <p>
-          i would rather read or listen, then write a reflection on the key takeaways. reaching that conclusion took time, but it gave me a clear idea of how my notes should work. i just didn’t have the right medium.
-        </p>
-      </section>
-
-      <section class="story-section" aria-labelledby="medium-title">
-        <h2 id="medium-title">the medium</h2>
-        <p>
-          paper is calm, but it is not easily indexed. finding something means manually returning to each page and skimming until it appears.
+          With regard to my needs, each of them got one thing right. Some of them more than one. What I did was look at each of them, identify what they were good at, and see what I could borrow.
         </p>
         <p>
-          computers happen to be very fast at this exact thing. the problem is that note-taking software often makes the collection—and the work of maintaining it—the main interface.
+          Across the board, one issue I had was that when you open an app for the first time, writing feels exciting. You are greeted by a blank page with nothing standing between you and your thoughts. I believe most people can relate to that feeling, when a new app or notebook seems like it will solve all your problems.
+        </p>
+        <p>
+          The second time you open it is usually different. Instead of an empty page, you are faced with a long note. Before you can continue writing, you first have to remember where you left off, reread what you wrote, and decide the next sentence. The note slowly becomes harder to approach.
         </p>
       </section>
 
-      <section class="product-section" aria-labelledby="result-title">
+      <section class="story-section" aria-labelledby="atomic-notes-title">
+        <h2 id="atomic-notes-title">atomic notes</h2>
+        <p>
+          I then came across the idea of <a href="https://medium.com/@jeffreywebber_/atomic-notes-are-we-obsessed-e9e0937dcf51" target="_blank" rel="noreferrer">atomic notes</a>. The idea behind them made sense to me. Breaking concepts into separate notes made them easier to write, revisit, and refine. My notes were usually broken down, but they were not always atomic in the strictest sense. Large notes no longer felt intimidating.
+        </p>
+        <p>
+          But after using this approach for a while, I realised I had simply exchanged one problem for another. Instead of worrying about the size of my notes, I started worrying about the number of them. How should I organise them? Which folder should they live in? Should I create another tag, another property, or another link?
+        </p>
+        <p>
+          I found myself spending more time thinking about where information belonged than engaging with the information itself.
+        </p>
+      </section>
+
+      <section class="story-section" aria-labelledby="search-title">
+        <h2 id="search-title">search first</h2>
+        <p>
+          That became the goal behind Calmd.
+        </p>
+        <p>
+          I wanted a writing tool that I could trust to show me what I needed, when I needed it, without asking me to constantly organise it first. If I remembered two or three words from something I had written months ago, that should have been enough to find it again.
+        </p>
+        <p>
+          That is why search became the centre of the application rather than just another feature. Instead of navigating databases, folders, graphs, or long lists of notes, I wanted typing a few words to be the primary way of interacting with everything I had written.
+        </p>
+        <p>
+          It feels intimidating at first. You cannot really see where your files are, and there is a fear that an important thought will disappear. I felt the same way. But after relying on search for long enough, I realised I was not thinking about where I had stored something anymore. I was simply remembering a few words, an idea, or a phrase, and it was there.
+        </p>
+        <p>
+          I could not go back after that. We rarely remember where we put an idea. We remember something about it, and our minds do the rest. I wanted my writing tool to work pretty much the same way.
+        </p>
+      </section>
+
+      <section class="story-section" aria-labelledby="links-title">
+        <h2 id="links-title">links for discovery</h2>
+        <p>
+          The other idea that inspired me a lot was Obsidian's approach to bi-directional linking. A note can point to another note, and that connection exists in both directions. It mirrors our natural learning process. Our thoughts are associative. One idea reminds us of another, even if we did not see the connection at first.
+        </p>
+        <p>
+          Over time, those connections become increasingly valuable. You begin to relate ideas from completely different fields and occasionally discover relationships you never expected. To me, that is where creativity lives. Being able to bring seemingly unrelated fields or ideas together to create something novel.
+        </p>
+        <p>
+          So while search became the primary way of finding information, linking was non-negotiable. Search helps you rediscover what you already know. Links help you discover what you did not know was connected.
+        </p>
+      </section>
+
+      <section class="product-section" aria-labelledby="file-over-app-title">
         <div class="section-intro">
-          <h2 id="result-title">the result</h2>
+          <h2 id="file-over-app-title">file over app</h2>
           <p>
-            i built calmd to keep the calmness of writing while using the computer for what it is good at. start with a thought, let the computer retrieve the relevant notes, and keep everything as portable Markdown files without turning the collection into another system to maintain.
+            While building Calmd, I also had to acknowledge something else. We often use an app for far less time than we think we will. How many times have you bought a new notebook convinced that this would finally be the one? Or discovered a new writing app believing your search was over? A few days or weeks later, you have already moved on.
+          </p>
+          <p>
+            That is why I have always admired Kepano's philosophy of <a href="https://stephango.com/file-over-app" target="_blank" rel="noreferrer">file over app</a>. The application should serve your notes, not own them.
+          </p>
+          <p>
+            In Calmd, just because the system handles the organisation for you and lets you focus on writing does not mean your notes belong to it. At the end of the day, they are just Markdown files on your computer. If one day you decide that Calmd is no longer for you, you should be able to take your notes and leave without asking for permission or exporting them into some proprietary format.
+          </p>
+          <p>
+            Ironically, that is exactly what gave me the confidence to build Calmd. I knew I was not asking myself, or anyone else, to commit to an application. Only to a collection of plain text files that would remain theirs long after the application was gone. The app is only the medium.
+          </p>
+          <p>
+            Sincerely,<br />
+            Suheil.
           </p>
         </div>
       </section>

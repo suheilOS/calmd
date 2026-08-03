@@ -57,8 +57,10 @@ const notes = {
 function Frame({ children, kind, label }: { children: ReactNode; kind: MockKind; label: string }) {
   return (
     <div className={`calmd-mock calmd-mock--${kind}`} role="img" aria-label={label}>
-      {kind === 'preview' ? <TitleBar /> : null}
-      {children}
+      <div aria-hidden="true">
+        {kind === 'preview' ? <TitleBar /> : null}
+        {children}
+      </div>
     </div>
   )
 }

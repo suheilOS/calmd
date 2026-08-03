@@ -1,4 +1,4 @@
-@import '@fontsource-variable/figtree/wght.css';
+@import '@fontsource-variable/rubik/wght.css';
 
 :root {
   --text-base: 0.9375rem;
@@ -67,7 +67,7 @@ body {
   margin: 0;
   background: var(--color-canvas);
   color: var(--color-body);
-  font-family: "Figtree Variable", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Rubik Variable", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: var(--text-base);
   font-synthesis: none;
   line-height: 1.7;
@@ -320,6 +320,10 @@ p {
     color: var(--color-accent);
   }
 
+  .case-study :where(.story-section, .product-section) a:hover {
+    color: var(--color-ink);
+  }
+
   .hero-eyebrow:hover {
     color: var(--color-ink);
   }
@@ -339,6 +343,20 @@ p {
 
 .case-study {
   padding-bottom: 3rem;
+}
+
+.case-study :where(.story-section, .product-section) p {
+  max-width: 68ch;
+}
+
+.case-study :where(.story-section, .product-section) a {
+  color: var(--color-accent);
+  text-decoration-line: underline;
+  text-decoration-color: currentColor;
+  text-decoration-thickness: from-font;
+  text-underline-offset: 0.16em;
+  text-decoration-skip-ink: auto;
+  transition: color 150ms ease;
 }
 
 .table-of-contents {
@@ -437,7 +455,7 @@ p {
   letter-spacing: -0.015em;
 }
 
-.story-section p + p {
+:where(.story-section, .product-section) p + p {
   margin-top: 1rem;
 }
 
@@ -526,6 +544,12 @@ p {
 }
 
 @media (max-width: 40rem) {
+  .wordmark {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+  }
+
   .hero h1 {
     font-size: 2.5rem;
   }

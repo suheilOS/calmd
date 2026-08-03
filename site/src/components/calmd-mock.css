@@ -18,7 +18,7 @@
   overflow: hidden;
   background: var(--mock-canvas);
   color: var(--mock-ink);
-  font-family: "Figtree Variable", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Rubik Variable", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 1.05cqw;
   font-synthesis: none;
   line-height: 1.6;
@@ -82,7 +82,7 @@
 }
 
 .calmd-mock--editor { font-size: 1.15cqw; }
-.calmd-mock--editor .calmd-editor { inset-block-start: 11%; inset-inline-start: 12%; }
+.calmd-mock--editor .calmd-editor { inset-block-start: 11%; inset-inline-start: 12%; width: 58ch; }
 
 .calmd-mock--preview { font-size: 1.05cqw; }
 .calmd-mock--preview .calmd-editor { inset-block-start: 7.8%; inset-inline-start: 50%; max-width: 62%; transform: translateX(-50%); }
