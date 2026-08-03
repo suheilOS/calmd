@@ -1,6 +1,6 @@
 import { Button } from '@base-ui/react/button'
 import { Input } from '@base-ui/react/input'
-import type { FormEvent, KeyboardEvent, ReactNode } from 'react'
+import { useEffect, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { MAX_NOTE_TITLE_LENGTH, type SearchHit } from './notes'
 import { segmentSearchMatches } from './searchHighlight'
 
@@ -17,6 +17,31 @@ type ComposerScreenProps = {
 
 const RESULT_CLASS_NAME =
   'group text-base block w-full rounded-xl bg-surface px-3 py-3 text-left text-ink transition-[background-color,color,transform] duration-150 ease-out aria-selected:bg-active aria-selected:text-active-ink focus-visible:bg-active focus-visible:text-active-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-faint active:scale-[0.97]'
+
+const dateFormatter = new Intl.DateTimeFormat(undefined, {
+  day: 'numeric',
+  month: 'long',
+  weekday: 'long',
+})
+
+function localDateKey(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function useToday(): Date {
+  const [today, setToday] = useState(() => new Date())
+
+  useEffect(() => {
+    const nextDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1)
+    const timeout = window.setTimeout(() => setToday(new Date()), nextDay.getTime() - Date.now())
+    return () => window.clearTimeout(timeout)
+  }, [today])
+
+  return today
+}
 
 function highlightedText(text: string, query: string): ReactNode {
   return segmentSearchMatches(text, query).map((segment, index) => (
@@ -36,6 +61,7 @@ export function ComposerScreen({
   onResultSelect,
   onActiveResultChange,
 }: ComposerScreenProps) {
+  const today = useToday()
   const hasThought = thought.trim().length > 0
   const optionCount = results.length + Number(!hasExactMatch)
 
@@ -75,6 +101,9 @@ export function ComposerScreen({
     <main className="app bg-canvas text-ink">
       <h1 className="sr-only">Calmd</h1>
       <section className="mx-auto w-full max-w-[65ch] px-6 pb-24 pt-[25vh] sm:px-8 sm:pt-[28vh]">
+        <p className="mb-3 text-small text-secondary">
+          <time dateTime={localDateKey(today)}>{dateFormatter.format(today)}</time>
+        </p>
         <form onSubmit={handleSubmit}>
           <label className="sr-only" htmlFor="thought">Begin a thought</label>
           <Input
