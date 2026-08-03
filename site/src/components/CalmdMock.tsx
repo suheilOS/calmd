@@ -156,7 +156,7 @@ function EditorMock({ kind, overlay = 'none' }: { kind: 'editor' | 'preview' | '
   const withPreview = overlay === 'preview'
   const withBacklinks = overlay === 'backlinks'
   const label = withPreview
-    ? 'Calmd showing a wiki-link hover preview above the current note.'
+    ? 'Calmd showing a link hover preview above the current note.'
     : withBacklinks
       ? 'Calmd showing backlinks and unlinked mentions on demand.'
       : 'A full-page note open in Calmd’s focused Markdown editor.'

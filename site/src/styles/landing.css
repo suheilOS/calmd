@@ -23,15 +23,6 @@
   max-width: 30rem;
 }
 
-.landing-kicker {
-  color: var(--color-accent);
-  font-size: var(--text-small);
-  font-weight: 500;
-  letter-spacing: 0.035em;
-  line-height: 1.5;
-  text-transform: uppercase;
-}
-
 .landing-hero h1 {
   max-width: 18ch;
   font-size: 3.25rem;
@@ -175,6 +166,10 @@
   text-wrap: balance;
 }
 
+.landing-principles .landing-section-heading h2 {
+  margin-block-start: 0;
+}
+
 .landing-feature-list,
 .landing-principle-list {
   padding: 0;
@@ -243,8 +238,17 @@
 }
 
 .landing-principle-list li {
-  padding-block-start: 1.25rem;
-  border-block-start: 1px solid var(--color-divider);
+  padding-block-start: 0;
+}
+
+.landing-principle-list li::before {
+  display: block;
+  width: 2.5rem;
+  height: 2px;
+  margin-block-end: 1.25rem;
+  background: var(--color-accent);
+  content: '';
+  opacity: 0.75;
 }
 
 .landing-source {
@@ -344,6 +348,7 @@
   .landing-hero {
     min-height: auto;
     padding-block: 4rem 5rem;
+    row-gap: 2rem;
   }
 
   .landing-hero h1,

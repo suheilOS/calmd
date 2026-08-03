@@ -21,11 +21,11 @@ const features = [
   },
   {
     title: 'Preview without leaving',
-    description: 'Hover over a wiki link to read the connected idea in place, without losing your position or opening another view.',
+    description: 'Hover over a link to read the connected idea in place, without losing your position or opening another view.',
     mock: 'wiki-preview' as const,
   },
   {
-    title: 'Follow the thought backward',
+    title: 'Trace the thought back',
     description: 'Backlinks and unlinked mentions stay collapsed until you need to see where the current idea appears elsewhere.',
     mock: 'backlinks' as const,
   },
@@ -42,7 +42,7 @@ const principles = [
   },
   {
     title: 'Context on demand',
-    description: 'Wiki links and backlinks stay quiet until they help the current thought.',
+    description: 'Links and backlinks stay quiet until they help the current thought.',
   },
 ]
 ---
@@ -100,7 +100,7 @@ const principles = [
 
     <section class="landing-features landing-shell" aria-labelledby="features-title">
       <div class="landing-section-heading">
-        <h2 id="features-title">From first words to useful context.</h2>
+        <h2 id="features-title">No sidebar. No menu. Just the editor.</h2>
       </div>
 
       <ol class="landing-feature-list">
@@ -120,7 +120,6 @@ const principles = [
 
     <section class="landing-principles landing-shell" aria-labelledby="principles-title">
       <div class="landing-section-heading">
-        <p class="landing-kicker">Calm by design</p>
         <h2 id="principles-title">Your notes remain yours.</h2>
       </div>
       <ul class="landing-principle-list">
