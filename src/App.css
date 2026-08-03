@@ -258,7 +258,7 @@
   color: transparent;
 }
 
-.markdown-editor .cm-heading-line .cm-hanging-markdown-prefix {
+.markdown-editor .cm-heading-prefix {
   transform: translateX(calc(0ch - var(--markdown-prefix-width)));
 }
 

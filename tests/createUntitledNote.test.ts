@@ -40,21 +40,24 @@ describe('createUntitledNote', () => {
     expect(isCreateUntitledShortcut({ ...shortcut, repeat: true })).toBe(false)
   })
 
-  test('recognizes only an initial Ctrl+Shift+H press for Home', () => {
+  test('recognizes only an initial Alt+Home press for Home', () => {
     const shortcut = {
-      altKey: false,
-      ctrlKey: true,
-      key: 'h',
+      altKey: true,
+      ctrlKey: false,
+      key: 'Home',
       metaKey: false,
       repeat: false,
-      shiftKey: true,
+      shiftKey: false,
     }
 
     expect(isNavigateHomeShortcut(shortcut)).toBe(true)
-    expect(isNavigateHomeShortcut({ ...shortcut, key: 'H' })).toBe(true)
-    expect(isNavigateHomeShortcut({ ...shortcut, shiftKey: false })).toBe(false)
-    expect(isNavigateHomeShortcut({ ...shortcut, altKey: true })).toBe(false)
+    expect(isNavigateHomeShortcut({ ...shortcut, altKey: false })).toBe(false)
+    expect(isNavigateHomeShortcut({ ...shortcut, ctrlKey: true })).toBe(false)
+    expect(isNavigateHomeShortcut({ ...shortcut, key: 'End' })).toBe(false)
+    expect(isNavigateHomeShortcut({ ...shortcut, altKey: false, ctrlKey: true, key: 'h', shiftKey: true })).toBe(false)
+    expect(isNavigateHomeShortcut({ ...shortcut, metaKey: true })).toBe(false)
     expect(isNavigateHomeShortcut({ ...shortcut, repeat: true })).toBe(false)
+    expect(isNavigateHomeShortcut({ ...shortcut, shiftKey: true })).toBe(false)
   })
 
   test('prepares before creating and opens exactly once', async () => {

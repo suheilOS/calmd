@@ -146,7 +146,10 @@ function hangingMarkdownMarkers(view: EditorView) {
 
     const prefixLength = prefixEnd - line.from
     decorations.push(Decoration.mark({
-      class: 'cm-hanging-markdown-prefix',
+      class: [
+        'cm-hanging-markdown-prefix',
+        prefix.heading && 'cm-heading-prefix',
+      ].filter(Boolean).join(' '),
     }).range(line.from, prefixEnd))
     decorations.push(Decoration.line({
       attributes: {
@@ -171,7 +174,11 @@ const hangingMarkdown = ViewPlugin.fromClass(class {
   }
 
   update(update: ViewUpdate) {
-    if (update.docChanged || update.viewportChanged) {
+    if (
+      update.docChanged
+      || update.viewportChanged
+      || syntaxTree(update.startState) !== syntaxTree(update.state)
+    ) {
       this.decorations = hangingMarkdownMarkers(update.view)
     }
   }

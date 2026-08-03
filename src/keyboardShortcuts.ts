@@ -15,5 +15,10 @@ export function isCreateUntitledShortcut(event: KeyboardShortcut) {
 }
 
 export function isNavigateHomeShortcut(event: KeyboardShortcut) {
-  return isInitialCtrlKey(event, 'h') && event.shiftKey
+  return !event.repeat
+    && event.altKey
+    && !event.ctrlKey
+    && !event.metaKey
+    && !event.shiftKey
+    && event.key === 'Home'
 }

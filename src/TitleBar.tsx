@@ -139,8 +139,9 @@ export function TitleBar({ navigation }: { navigation?: TitleBarNavigation }) {
                 <ForwardIcon />
               </Button>
             </TitleBarTooltip>
-            <TitleBarTooltip label="Home">
+            <TitleBarTooltip label="Home (Alt+Home)">
               <Button
+                aria-keyshortcuts="Alt+Home"
                 aria-label="Home"
                 className={navigationControlClassName}
                 disabled={!navigation.canGoHome}
