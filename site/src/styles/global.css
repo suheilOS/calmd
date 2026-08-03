@@ -347,6 +347,7 @@ p {
 
 .case-study :where(.story-section, .product-section) p {
   max-width: 68ch;
+  text-wrap: wrap;
 }
 
 .case-study :where(.story-section, .product-section) a {
