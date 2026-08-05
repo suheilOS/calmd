@@ -200,6 +200,18 @@ impl<'a> NotePersistence<'a> {
         note_preview_read::read(&path, key, character_limit)
     }
 
+    pub fn delete(&self, key: &str, expected_revision: &str) -> PersistenceResult<()> {
+        let path = validated_note_path_with_missing(self.root, key, MissingNote::Conflict)?;
+        ensure_revision(&path, expected_revision)?;
+        fs::remove_file(path).map_err(|error| {
+            if error.kind() == std::io::ErrorKind::NotFound {
+                PersistenceError::conflict()
+            } else {
+                PersistenceError::io("Could not delete the note", error)
+            }
+        })
+    }
+
     pub fn save(
         &self,
         key: &str,
@@ -624,7 +636,33 @@ fn ensure_revision(path: &Path, expected_revision: &str) -> PersistenceResult<()
     Ok(())
 }
 
+#[derive(Clone, Copy)]
+enum MissingNote {
+    Io,
+    Conflict,
+}
+
+fn missing_note_error(
+    missing: MissingNote,
+    context: &str,
+    error: std::io::Error,
+) -> PersistenceError {
+    if error.kind() == std::io::ErrorKind::NotFound && matches!(missing, MissingNote::Conflict) {
+        PersistenceError::conflict()
+    } else {
+        PersistenceError::io(context, error)
+    }
+}
+
 fn validated_note_path(root: &Path, key: &str) -> PersistenceResult<PathBuf> {
+    validated_note_path_with_missing(root, key, MissingNote::Io)
+}
+
+fn validated_note_path_with_missing(
+    root: &Path,
+    key: &str,
+    missing: MissingNote,
+) -> PersistenceResult<PathBuf> {
     let relative = Path::new(key);
     let mut components = relative.components();
     if key.contains('/')
@@ -641,7 +679,7 @@ fn validated_note_path(root: &Path, key: &str) -> PersistenceResult<PathBuf> {
 
     let joined = root.join(relative);
     let metadata = fs::symlink_metadata(&joined)
-        .map_err(|error| PersistenceError::io("Could not inspect the note", error))?;
+        .map_err(|error| missing_note_error(missing, "Could not inspect the note", error))?;
     if metadata.file_type().is_symlink() || !metadata.is_file() {
         return Err(PersistenceError::new(
             "invalid_key",
@@ -651,7 +689,7 @@ fn validated_note_path(root: &Path, key: &str) -> PersistenceResult<PathBuf> {
 
     let canonical = joined
         .canonicalize()
-        .map_err(|error| PersistenceError::io("Could not resolve the note", error))?;
+        .map_err(|error| missing_note_error(missing, "Could not resolve the note", error))?;
     if canonical.parent() != Some(root) || !canonical.starts_with(root) {
         return Err(PersistenceError::new(
             "invalid_key",

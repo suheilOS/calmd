@@ -27,6 +27,7 @@ pub fn run() {
             storage::read_note,
             storage::save_note,
             storage::rename_note,
+            storage::delete_note,
         ])
         .setup(|app| {
             let search = match app.path().app_data_dir() {

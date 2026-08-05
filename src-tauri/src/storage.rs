@@ -405,6 +405,26 @@ pub fn save_note(
 }
 
 #[tauri::command]
+pub fn delete_note(
+    key: String,
+    expected_revision: String,
+    state: State<'_, VaultState>,
+    search: State<'_, SearchState>,
+) -> CommandResult<()> {
+    let guard = state
+        .0
+        .lock()
+        .map_err(|_| CommandError::new("state", "Vault state is unavailable."))?;
+    let root = vault_root(&guard)?;
+    NotePersistence::new(&root).delete(&key, &expected_revision)?;
+    if let Err(error) = search.remove(&key) {
+        search.mark_dirty();
+        log::warn!("The Markdown note was deleted, but its derived search entry is stale: {error}");
+    }
+    Ok(())
+}
+
+#[tauri::command]
 pub fn rename_note(
     key: String,
     title: String,

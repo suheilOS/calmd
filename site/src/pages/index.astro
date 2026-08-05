@@ -48,7 +48,7 @@ const principles = [
 ---
 
 <SiteLayout
-  title="calmd | notes for the thought in front of you"
+  title="calmd | Notes, without the overhead"
   description="Calmd is a calm, portable Markdown notes app for developing and retrieving the thought in front of you."
 >
   <header class="site-header shell landing-shell" aria-label="Site header">
@@ -72,7 +72,7 @@ const principles = [
     </div>
   </header>
 
-  <main id="main-content">
+  <main id="main-content" transition:animate="slide">
     <section class="landing-hero landing-shell" aria-labelledby="landing-title">
       <div class="landing-hero-heading">
         <h1 id="landing-title">Notes, without the overhead</h1>
@@ -99,18 +99,18 @@ const principles = [
     </section>
 
     <section class="landing-features landing-shell" aria-labelledby="features-title">
-      <div class="landing-section-heading">
+      <div class="landing-section-heading" data-reveal>
         <h2 id="features-title">No sidebar. No menu. Just the editor.</h2>
       </div>
 
       <ol class="landing-feature-list">
-        {features.map((feature) => (
+        {features.map((feature, index) => (
           <li class="landing-feature">
-            <div class="landing-feature-copy">
+            <div class="landing-feature-copy" data-reveal style={`--reveal-delay: ${index * 60}ms`}>
               <h3>{feature.title}</h3>
               <p>{feature.description}</p>
             </div>
-            <figure class="landing-feature-media">
+            <figure class="landing-feature-media" data-reveal style={`--reveal-delay: ${index * 60 + 60}ms`}>
               <CalmdMock kind={feature.mock} />
             </figure>
           </li>
@@ -119,12 +119,12 @@ const principles = [
     </section>
 
     <section class="landing-principles landing-shell" aria-labelledby="principles-title">
-      <div class="landing-section-heading">
+      <div class="landing-section-heading" data-reveal>
         <h2 id="principles-title">Your notes remain yours.</h2>
       </div>
       <ul class="landing-principle-list">
-        {principles.map((principle) => (
-          <li>
+        {principles.map((principle, index) => (
+          <li data-reveal style={`--reveal-delay: ${index * 60}ms`}>
             <h3>{principle.title}</h3>
             <p>{principle.description}</p>
           </li>
@@ -133,7 +133,7 @@ const principles = [
     </section>
 
     <section class="landing-source landing-shell" aria-labelledby="source-title">
-      <div class="landing-source-copy">
+      <div class="landing-source-copy" data-reveal>
         <h2 id="source-title">Free & open source</h2>
         <p>See exactly how Calmd works.</p>
         <a class="landing-action" href="https://github.com/suheilOS/calmd" target="_blank" rel="noreferrer">
@@ -162,4 +162,56 @@ const principles = [
       </div>
     </div>
   </footer>
+
+  <script>
+    let revealObserver: IntersectionObserver | null = null
+
+    const setupLandingReveals = () => {
+      const main = document.querySelector<HTMLElement>('#main-content')
+      if (!main || main.dataset.revealInitialized === 'true') return
+
+      revealObserver?.disconnect()
+      revealObserver = null
+
+      const targets = Array.from(main.querySelectorAll<HTMLElement>('[data-reveal]'))
+      if (targets.length === 0) return
+
+      main.dataset.revealInitialized = 'true'
+
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+      if (reducedMotion.matches) {
+        targets.forEach((target) => target.classList.add('is-revealed'))
+        return
+      }
+
+      main.dataset.revealReady = ''
+      const revealLine = window.innerHeight * 0.86
+      const pendingTargets = targets.filter((target) => {
+        if (target.getBoundingClientRect().top <= revealLine) {
+          target.classList.add('is-revealed')
+          return false
+        }
+
+        return true
+      })
+
+      if (pendingTargets.length === 0) return
+
+      revealObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return
+            entry.target.classList.add('is-revealed')
+            revealObserver?.unobserve(entry.target)
+          })
+        },
+        { rootMargin: '0px 0px -14% 0px' },
+      )
+
+      pendingTargets.forEach((target) => revealObserver?.observe(target))
+    }
+
+    setupLandingReveals()
+    document.addEventListener('astro:page-load', setupLandingReveals)
+  </script>
 </SiteLayout>

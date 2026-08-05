@@ -84,6 +84,17 @@ export class NoteNavigation {
     )
   }
 
+  completeNoteDeletion(key: string) {
+    this.locations = [
+      ...this.locations.filter(
+        (location) => location.type !== 'note' || location.key !== key,
+      ),
+      { type: 'composer', thought: '' },
+    ]
+    this.index = this.locations.length - 1
+    this.generation += 1
+  }
+
   updateComposerThought(thought: string) {
     const composer = this.locations[this.index]
     if (composer?.type === 'composer') composer.thought = thought

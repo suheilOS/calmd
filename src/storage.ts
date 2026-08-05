@@ -91,6 +91,10 @@ export function readStoredNote(key: string) {
   return invoke<Note>('read_note', { key })
 }
 
+export function deleteStoredNote(key: string, expectedRevision: string) {
+  return invoke<void>('delete_note', { key, expectedRevision })
+}
+
 function saveStoredNote(
   key: string,
   draft: NoteDraft,

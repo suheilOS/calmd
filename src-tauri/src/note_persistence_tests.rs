@@ -472,6 +472,45 @@ fn creates_saves_renames_and_detects_conflicts() {
 }
 
 #[test]
+fn deletes_only_the_expected_revision() {
+    let vault = tempdir().unwrap();
+    let store = persistence(vault.path());
+    let note = store.create("Disposable").unwrap();
+
+    store.delete(&note.key, &note.revision).unwrap();
+
+    assert!(!vault.path().join(&note.key).exists());
+}
+
+#[test]
+fn delete_conflict_leaves_the_note_intact() {
+    let vault = tempdir().unwrap();
+    let store = persistence(vault.path());
+    let note = store.create("Keep").unwrap();
+    fs::write(vault.path().join(&note.key), "# Keep\n\nExternal edit").unwrap();
+
+    let error = store.delete(&note.key, &note.revision).unwrap_err();
+
+    assert_eq!(error.code, "conflict");
+    assert!(vault.path().join(&note.key).exists());
+}
+
+#[test]
+fn delete_rejects_invalid_and_missing_keys() {
+    let vault = tempdir().unwrap();
+    let store = persistence(vault.path());
+
+    assert_eq!(
+        store.delete("../Outside.md", "revision").unwrap_err().code,
+        "invalid_key"
+    );
+    assert_eq!(
+        store.delete("Missing.md", "revision").unwrap_err().code,
+        "conflict"
+    );
+}
+
+#[test]
 fn find_or_create_returns_an_exact_title_without_a_duplicate() {
     let vault = tempdir().unwrap();
     let store = persistence(vault.path());

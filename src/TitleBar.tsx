@@ -83,7 +83,13 @@ function TitleBarTooltip({ children, label }: { children: ReactElement; label: s
   )
 }
 
-export function TitleBar({ navigation }: { navigation?: TitleBarNavigation }) {
+export function TitleBar({
+  navigation,
+  noteActions,
+}: {
+  navigation?: TitleBarNavigation
+  noteActions?: ReactNode
+}) {
   useEffect(() => {
     if (!navigation) return
     const activeNavigation = navigation
@@ -153,7 +159,10 @@ export function TitleBar({ navigation }: { navigation?: TitleBarNavigation }) {
             </TitleBarTooltip>
           </div>
         ) : null}
-        <div className="ml-auto flex" role="group" aria-label="Window controls">
+        <div className="ml-auto flex">
+          {noteActions}
+          {noteActions ? <span aria-hidden="true" className="mx-1 h-5 w-px self-center bg-divider" /> : null}
+          <div className="flex" role="group" aria-label="Window controls">
           <TitleBarTooltip label="Minimize">
             <Button aria-label="Minimize window" className={controlClassName} onClick={() => void appWindow.minimize()} type="button">
               <MinimizeIcon />
@@ -169,6 +178,7 @@ export function TitleBar({ navigation }: { navigation?: TitleBarNavigation }) {
               <CloseIcon />
             </Button>
           </TitleBarTooltip>
+          </div>
         </div>
       </Tooltip.Provider>
     </header>
@@ -178,13 +188,15 @@ export function TitleBar({ navigation }: { navigation?: TitleBarNavigation }) {
 export function AppShell({
   children,
   navigation,
+  noteActions,
 }: {
   children: ReactNode
   navigation?: TitleBarNavigation
+  noteActions?: ReactNode
 }) {
   return (
     <div className="flex h-svh flex-col overflow-hidden bg-canvas">
-      <TitleBar navigation={navigation} />
+      <TitleBar navigation={navigation} noteActions={noteActions} />
       <div className="app-scroll-container min-h-0 flex-1 overflow-y-auto">
         {children}
       </div>

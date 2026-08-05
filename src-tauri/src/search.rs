@@ -219,21 +219,11 @@ impl SearchState {
         previous_key: Option<&str>,
         note: &IndexedNote,
     ) -> Result<(), SearchError> {
-        let path = self.database_path()?;
-        let mut inner = self.lock_inner()?;
-        ensure_connection(path, &mut inner)?;
-        let connection = inner
-            .connection
-            .as_mut()
-            .expect("connection was initialized");
-        let result = replace_note(connection, previous_key, note);
-        if let Err(error) = &result {
-            inner.dirty = true;
-            if error.is_recoverable() {
-                inner.connection.take();
-            }
-        }
-        result
+        self.mutate(|connection| replace_note(connection, previous_key, note))
+    }
+
+    pub fn remove(&self, key: &str) -> Result<(), SearchError> {
+        self.mutate(|connection| remove_note(connection, key))
     }
 
     pub fn backlinks(&self, key: &str) -> Result<Vec<NoteReference>, SearchError> {
@@ -255,6 +245,26 @@ impl SearchState {
     pub fn suggest_notes(&self, query: &str) -> Result<Vec<NoteReference>, SearchError> {
         let canonical_query = canonicalize_query(query)?.to_lowercase();
         self.query(|connection| suggest_notes_connection(connection, &canonical_query))
+    }
+
+    fn mutate<T>(
+        &self,
+        run: impl FnOnce(&mut Connection) -> Result<T, SearchError>,
+    ) -> Result<T, SearchError> {
+        let path = self.database_path()?;
+        let mut inner = self.lock_inner()?;
+        ensure_connection(path, &mut inner)?;
+        let result = run(inner
+            .connection
+            .as_mut()
+            .expect("connection was initialized"));
+        if let Err(error) = &result {
+            inner.dirty = true;
+            if error.is_recoverable() {
+                inner.connection.take();
+            }
+        }
+        result
     }
 
     fn query<T>(
@@ -615,6 +625,18 @@ fn replace_note(
             .map_err(|error| SearchError::sqlite("Could not replace a search entry", error))?;
     }
     upsert_note(&transaction, note)?;
+    transaction
+        .commit()
+        .map_err(|error| SearchError::sqlite("Could not finish the search update", error))
+}
+
+fn remove_note(connection: &mut Connection, key: &str) -> Result<(), SearchError> {
+    let transaction = connection
+        .transaction()
+        .map_err(|error| SearchError::sqlite("Could not update the search index", error))?;
+    transaction
+        .execute("DELETE FROM notes WHERE key = ?1", [key])
+        .map_err(|error| SearchError::sqlite("Could not remove a search entry", error))?;
     transaction
         .commit()
         .map_err(|error| SearchError::sqlite("Could not finish the search update", error))

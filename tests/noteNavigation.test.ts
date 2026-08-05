@@ -62,6 +62,24 @@ describe('NoteNavigation', () => {
       .toEqual(['composer', 'Renamed.md', 'B.md', 'Renamed.md'])
   })
 
+  test('removes every deleted-note occurrence while preserving surrounding history', () => {
+    const navigation = new NoteNavigation()
+    navigation.updateComposerThought('starting thought')
+    navigation.beginNote('Deleted.md')
+    navigation.beginNote('Keep.md')
+    navigation.beginNote('Deleted.md')
+
+    navigation.completeNoteDeletion('Deleted.md')
+
+    expect(navigation.entries()).toEqual([
+      { type: 'composer', thought: 'starting thought' },
+      { type: 'note', key: 'Keep.md' },
+      { type: 'composer', thought: '' },
+    ])
+    expect(navigation.current()).toEqual({ type: 'composer', thought: '' })
+    expect(navigation.previous()).toEqual({ type: 'note', key: 'Keep.md' })
+  })
+
   test('serializes transitions and invalidates tokens when the session changes', () => {
     const navigation = new NoteNavigation()
     const token = navigation.startTransition()

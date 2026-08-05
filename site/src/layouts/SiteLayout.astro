@@ -1,4 +1,5 @@
 ---
+import { ClientRouter } from 'astro:transitions'
 import '../styles/global.css'
 
 interface Props {
@@ -23,10 +24,26 @@ const {
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" href="/favicon.ico" />
     <meta name="generator" content={Astro.generator} />
+    <ClientRouter />
     <title>{title}</title>
   </head>
   <body>
     <a class="skip-link" href="#main-content">Skip to content</a>
     <slot />
+
+    <script>
+      const normalizePath = (path: string) => path.replace(/\/+$/, '') || '/'
+
+      document.addEventListener('astro:before-preparation', (event) => {
+        const fromPath = normalizePath(event.from.pathname)
+        const toPath = normalizePath(event.to.pathname)
+
+        if (fromPath === '/' && toPath === '/case-study') {
+          event.direction = 'forward'
+        } else if (fromPath === '/case-study' && toPath === '/') {
+          event.direction = 'back'
+        }
+      })
+    </script>
   </body>
 </html>

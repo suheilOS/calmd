@@ -7,6 +7,7 @@ import {
   isCreateUntitledShortcut,
   isNavigateHomeShortcut,
 } from './keyboardShortcuts'
+import { NoteActions } from './NoteActions'
 import { NoteEditor } from './NoteEditor'
 import type { WikiLinkActivation } from './MarkdownEditor'
 import { NoteNavigation } from './noteNavigation'
@@ -21,6 +22,7 @@ import {
 import {
   createStoredNote,
   createUntitledStoredNote,
+  deleteStoredNote,
   getStorageError,
   openVault,
   openStoredNoteLink,
@@ -52,6 +54,8 @@ function App() {
   const [vaultName, setVaultName] = useState('My vault')
   const [thought, setThought] = useState('')
   const [backlinksOpen, setBacklinksOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [activeResultIndex, setActiveResultIndex] = useState(-1)
   const [storageMessage, setStorageMessage] = useState<string | null>(null)
   const [searchView, setSearchView] = useState<SearchView>(EMPTY_SEARCH_VIEW)
@@ -216,6 +220,36 @@ function App() {
 
   async function reloadConflictedNote() {
     if (await noteEditing.reload()) await refreshVault()
+  }
+
+  async function deleteCurrentNote() {
+    const generation = navigation.startTransition()
+    if (generation === null) return
+    setDeleting(true)
+    try {
+      const saved = await noteEditing.flush()
+      if (!saved) {
+        setDeleteOpen(false)
+        return
+      }
+      if (!navigation.isCurrent(generation)) return
+      await deleteStoredNote(saved.key, saved.revision)
+      if (!navigation.isCurrent(generation)) return
+      navigation.completeNoteDeletion(saved.key)
+      setNavigationRevision((revision) => revision + 1)
+      noteEditing.close()
+      setThought('')
+      setBacklinksOpen(false)
+      setDeleteOpen(false)
+      setStorageMessage(null)
+      setSearchGeneration((searchGeneration) => searchGeneration + 1)
+    } catch (error) {
+      setDeleteOpen(false)
+      setStorageMessage(getStorageError(error).message)
+    } finally {
+      setDeleting(false)
+      navigation.finishTransition()
+    }
   }
 
   async function navigateHistory(direction: NavigationDirection) {
@@ -404,7 +438,17 @@ function App() {
 
   if (editorDraft) {
     return (
-      <AppShell navigation={titleBarNavigation}>
+      <AppShell
+        navigation={titleBarNavigation}
+        noteActions={(
+          <NoteActions
+            deleteOpen={deleteOpen}
+            deleting={deleting}
+            onDelete={() => void deleteCurrentNote()}
+            onDeleteOpenChange={setDeleteOpen}
+          />
+        )}
+      >
       <NoteEditor
         backlinksOpen={backlinksOpen}
         draft={editorDraft}

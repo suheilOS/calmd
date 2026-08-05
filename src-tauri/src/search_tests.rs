@@ -376,6 +376,36 @@ fn unlinked_mentions_handle_fts_quotes_and_ambiguous_keys() {
 }
 
 #[test]
+fn remove_clears_retrieval_and_backlinks_without_removing_other_outgoing_links() {
+    let data = tempdir().unwrap();
+    let vault = tempdir().unwrap();
+    let search = state(data.path());
+    search
+        .reconcile(
+            vault.path(),
+            &[
+                note("Deleted.md", "Deleted", "", "one"),
+                note("Other.md", "Other", "", "two"),
+                note("Source.md", "Source", "[[Deleted]] and [[Other]]", "three"),
+            ],
+        )
+        .unwrap();
+
+    search.remove("Deleted.md").unwrap();
+
+    assert!(
+        search
+            .search("Deleted")
+            .unwrap()
+            .results
+            .iter()
+            .all(|result| result.key != "Deleted.md")
+    );
+    assert!(search.backlinks("Deleted.md").unwrap().is_empty());
+    assert_eq!(search.backlinks("Other.md").unwrap()[0].key, "Source.md");
+}
+
+#[test]
 fn replace_removes_a_renamed_key_transactionally() {
     let data = tempdir().unwrap();
     let vault = tempdir().unwrap();
