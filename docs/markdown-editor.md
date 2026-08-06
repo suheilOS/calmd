@@ -21,9 +21,7 @@ The document remains plain Markdown. Supported wiki links use `[[target]]` or `[
 - The title begins as one line, grows vertically as it wraps, and remains a single logical line capped at 120 characters.
 - Soft line wrapping and a 65-character measure keep the page prose-oriented.
 - A descending semantic heading scale, tight heading leading, full-size body text, and higher-contrast source punctuation preserve hierarchy without turning source mode into a preview.
-- A small amount of space above heading lines separates sections without disrupting the body-text rhythm.
-- Complete heading and blockquote prefixes hang in the left gutter so their content and wrapped continuations share the body text axis. A blockquote's stored `>` marker is shown as a quiet `|` after its following space is typed; the source remains editable Markdown.
-- Narrow editor layouts reserve enough source gutter to keep headings through level six visible without horizontal scrolling.
+- Markdown headings and blockquotes use a Live Preview treatment: their source markers are visible while the cursor is on the line, heading markers are hidden elsewhere, and a spaced blockquote's `>` marker becomes a quiet `|` in its normal inline position. The source remains editable Markdown.
 - Programming ligatures are disabled in the Markdown surface so punctuation remains literal, while normal kerning remains enabled.
 - Long URLs and identifiers can wrap without widening the writing column.
 - Wiki links use a Live Preview treatment: inactive plain links show their target, aliases show only their display text, and the complete source syntax reappears whenever a cursor or selection touches the link. Links to existing notes use the accent color; unresolved links use a lighter accent variant. Primary Ctrl-click on Linux/Windows or Cmd-click on macOS uses the existing flush-gated open-or-create navigation path.

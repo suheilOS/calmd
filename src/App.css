@@ -238,51 +238,17 @@
   color: var(--color-syntax);
 }
 
-.markdown-editor .cm-hanging-markdown-prefix {
-  display: inline-block;
-  white-space: nowrap;
-  width: 0;
-}
-
-.markdown-editor .cm-hanging-markdown-prefix,
-.markdown-editor .cm-hanging-markdown-prefix * {
-  font-size: var(--text-base);
-  font-style: normal;
-  font-weight: 400;
-  letter-spacing: 0;
-  line-height: inherit;
-}
-
-.markdown-editor .cm-quote-marker,
-.markdown-editor .cm-quote-marker * {
+.markdown-editor .cm-quote-marker {
   color: transparent;
-}
-
-.markdown-editor .cm-heading-prefix {
-  transform: translateX(calc(0ch - var(--markdown-prefix-width)));
-}
-
-.markdown-editor .cm-quote-line {
   position: relative;
 }
 
-.markdown-editor .cm-quote-line::before {
-  background: var(--color-syntax);
-  content: "";
-  inset-block: 0;
-  inset-inline-start: calc(0.25ch - var(--markdown-prefix-width));
+.markdown-editor .cm-quote-marker::before {
+  color: var(--color-syntax);
+  content: "|";
+  font-weight: 600;
+  inset-inline-start: 0.25ch;
   position: absolute;
-  width: 2px;
-}
-
-.markdown-editor .cm-line.cm-heading-line {
-  padding-block-start: 0.45em;
-}
-
-@media (max-width: 45rem) {
-  .note-editor-page {
-    padding-inline-start: calc(1.5rem + 5ch);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

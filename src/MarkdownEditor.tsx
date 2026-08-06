@@ -98,88 +98,66 @@ const markdownHighlighting = syntaxHighlighting(HighlightStyle.define([
   { tag: tags.meta, class: 'cm-markup' },
 ], { scope: commonmarkLanguage }))
 
-function hangingMarkdownMarkers(view: EditorView) {
+function markdownMarkerDecorations(view: EditorView) {
   const decorations: Range<Decoration>[] = []
-  const prefixes = new Map<number, { end: number; heading: boolean; quote: boolean }>()
 
   for (const range of view.visibleRanges) {
     syntaxTree(view.state).iterate({
       from: range.from,
       to: range.to,
       enter: (node) => {
-        if (node.name === 'HeaderMark' || node.name === 'QuoteMark') {
-          const line = view.state.doc.lineAt(node.from)
-          const prefix = prefixes.get(line.from)
-          const gap = view.state.sliceDoc(prefix?.end ?? line.from, node.from)
+        if (node.name !== 'HeaderMark' && node.name !== 'QuoteMark') return
 
-          if (!/^\s*$/.test(gap)) return
+        const line = view.state.doc.lineAt(node.from)
+        const lineIsActive = view.state.selection.ranges.some((selection) =>
+          selectionTouchesSourceRange(selection, { from: line.from, to: line.to }),
+        )
 
-          const isQuote = node.name === 'QuoteMark'
-          const isSpacedQuote = isQuote
-            && /[\t ]/.test(view.state.sliceDoc(node.to, node.to + 1))
+        if (node.name === 'HeaderMark') {
+          if (lineIsActive) return
 
-          if (isQuote && !isSpacedQuote) return
-
-          if (isSpacedQuote) {
-            decorations.push(Decoration.mark({
-              class: 'cm-quote-marker',
-            }).range(node.from, node.to))
+          let prefixEnd = node.to
+          while (
+            prefixEnd < line.to
+            && /[\t ]/.test(view.state.sliceDoc(prefixEnd, prefixEnd + 1))
+          ) {
+            prefixEnd += 1
           }
+          decorations.push(Decoration.replace({}).range(node.from, prefixEnd))
+          return
+        }
 
-          prefixes.set(line.from, {
-            end: node.to,
-            heading: Boolean(prefix?.heading || node.name === 'HeaderMark'),
-            quote: Boolean(prefix?.quote || isSpacedQuote),
-          })
+        if (
+          node.name === 'QuoteMark'
+          && /[\t ]/.test(view.state.sliceDoc(node.to, node.to + 1))
+          && !lineIsActive
+        ) {
+          decorations.push(Decoration.mark({
+            class: 'cm-quote-marker',
+          }).range(node.from, node.to))
         }
       },
     })
   }
 
-  for (const [lineFrom, prefix] of prefixes) {
-    const line = view.state.doc.lineAt(lineFrom)
-    let prefixEnd = prefix.end
-
-    while (prefixEnd < line.to && /[\t ]/.test(view.state.sliceDoc(prefixEnd, prefixEnd + 1))) {
-      prefixEnd += 1
-    }
-
-    const prefixLength = prefixEnd - line.from
-    decorations.push(Decoration.mark({
-      class: [
-        'cm-hanging-markdown-prefix',
-        prefix.heading && 'cm-heading-prefix',
-      ].filter(Boolean).join(' '),
-    }).range(line.from, prefixEnd))
-    decorations.push(Decoration.line({
-      attributes: {
-        class: [
-          'cm-hanging-markdown-line',
-          prefix.heading && 'cm-heading-line',
-          prefix.quote && 'cm-quote-line',
-        ].filter(Boolean).join(' '),
-        style: `--markdown-prefix-width: ${prefixLength}ch`,
-      },
-    }).range(line.from))
-  }
-
   return Decoration.set(decorations, true)
 }
 
-const hangingMarkdown = ViewPlugin.fromClass(class {
+const markdownMarkers = ViewPlugin.fromClass(class {
   decorations: DecorationSet
 
   constructor(view: EditorView) {
-    this.decorations = hangingMarkdownMarkers(view)
+    this.decorations = markdownMarkerDecorations(view)
   }
 
   update(update: ViewUpdate) {
     if (
       update.docChanged
       || update.viewportChanged
+      || update.selectionSet
       || syntaxTree(update.startState) !== syntaxTree(update.state)
     ) {
-      this.decorations = hangingMarkdownMarkers(update.view)
+      this.decorations = markdownMarkerDecorations(update.view)
     }
   }
 }, {
@@ -525,7 +503,7 @@ const editorExtensions = [
   highlightSelectionMatches(),
   syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
   markdownHighlighting,
-  hangingMarkdown,
+  markdownMarkers,
   markdown({
     addKeymap: false,
     base: commonmarkLanguage,
