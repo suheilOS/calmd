@@ -17,9 +17,11 @@ use std::{
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 use tauri_plugin_store::StoreExt;
+use url::Url;
 
 const SETTINGS_FILE: &str = "settings.json";
 const VAULT_PATH_KEY: &str = "vault_path";
+const SUBSTACK_PUBLICATION_URL_KEY: &str = "substack_publication_url";
 const MAX_FILENAME_BYTES: usize = 180;
 const NOTE_PREVIEW_CHARACTER_LIMIT: usize = 4_000;
 
@@ -86,6 +88,32 @@ pub fn restore_vault(
     }
 
     Ok(())
+}
+
+#[tauri::command]
+pub fn get_substack_publication_url(app: AppHandle) -> CommandResult<Option<String>> {
+    let store = app
+        .store(SETTINGS_FILE)
+        .map_err(|error| CommandError::io("Could not open settings", error))?;
+    Ok(store
+        .get(SUBSTACK_PUBLICATION_URL_KEY)
+        .and_then(|value| value.as_str().map(str::to_owned)))
+}
+
+#[tauri::command]
+pub fn set_substack_publication_url(url: String, app: AppHandle) -> CommandResult<String> {
+    let url = normalize_substack_publication_url(&url)?;
+    let store = app
+        .store(SETTINGS_FILE)
+        .map_err(|error| CommandError::io("Could not open settings", error))?;
+    store.set(
+        SUBSTACK_PUBLICATION_URL_KEY,
+        serde_json::Value::String(url.clone()),
+    );
+    store
+        .save()
+        .map_err(|error| CommandError::io("Could not save settings", error))?;
+    Ok(url)
 }
 
 #[tauri::command]
@@ -347,6 +375,32 @@ fn get_unlinked_mentions_in(app: &AppHandle, key: &str) -> CommandResult<Vec<Unl
     let root = vault_root(&guard)?;
     reconcile_search_if_needed(&search, &root)?;
     search.unlinked_mentions(key).map_err(search_command_error)
+}
+
+fn normalize_substack_publication_url(value: &str) -> CommandResult<String> {
+    let value = value.trim().trim_end_matches('/');
+    let parsed = Url::parse(value).map_err(|_| {
+        CommandError::new(
+            "invalid_substack_url",
+            "Enter a valid HTTPS publication URL.",
+        )
+    })?;
+
+    if parsed.scheme() != "https"
+        || parsed.host_str().is_none()
+        || !parsed.username().is_empty()
+        || parsed.password().is_some()
+        || (parsed.path() != "" && parsed.path() != "/")
+        || parsed.query().is_some()
+        || parsed.fragment().is_some()
+    {
+        return Err(CommandError::new(
+            "invalid_substack_url",
+            "Enter the base HTTPS URL of your publication, such as https://your-publication.substack.com.",
+        ));
+    }
+
+    Ok(value.to_owned())
 }
 
 fn validate_link_target(target: &str) -> CommandResult<String> {
@@ -640,5 +694,18 @@ mod tests {
         let stored = persistence.read(&note.key).unwrap();
         assert_eq!(stored.title, "Durable source");
         assert_eq!(stored.revision, note.revision);
+    }
+
+    #[test]
+    fn validates_substack_publication_urls() {
+        assert_eq!(
+            normalize_substack_publication_url(" https://example.substack.com/ ").unwrap(),
+            "https://example.substack.com"
+        );
+        assert!(normalize_substack_publication_url("http://example.substack.com").is_err());
+        assert!(normalize_substack_publication_url("https://example.substack.com/about").is_err());
+        assert!(
+            normalize_substack_publication_url("https://example.substack.com?draft=1").is_err()
+        );
     }
 }

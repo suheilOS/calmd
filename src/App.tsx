@@ -7,8 +7,8 @@ import {
   isCreateUntitledShortcut,
   isNavigateHomeShortcut,
 } from './keyboardShortcuts'
-import { NoteActions } from './NoteActions'
 import { NoteEditor } from './NoteEditor'
+import { SubstackNoteActions } from './SubstackNoteActions'
 import type { WikiLinkActivation } from './MarkdownEditor'
 import { NoteNavigation } from './noteNavigation'
 import { resolveWikiLinkActivation } from './wikiLinkNavigation'
@@ -441,11 +441,13 @@ function App() {
       <AppShell
         navigation={titleBarNavigation}
         noteActions={(
-          <NoteActions
+          <SubstackNoteActions
             deleteOpen={deleteOpen}
             deleting={deleting}
+            flush={noteEditing.flush}
             onDelete={() => void deleteCurrentNote()}
             onDeleteOpenChange={setDeleteOpen}
+            onMessage={setStorageMessage}
           />
         )}
       >

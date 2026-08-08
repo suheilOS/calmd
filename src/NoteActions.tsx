@@ -1,10 +1,13 @@
 import { Button } from '@base-ui/react/button'
 import { Dialog } from '@base-ui/react/dialog'
 import { Menu } from '@base-ui/react/menu'
+import type { ReactNode } from 'react'
 
-type NoteActionsProps = {
+export type NoteActionsProps = {
   deleteOpen: boolean
   deleting: boolean
+  dialogs?: ReactNode
+  menuItems?: ReactNode
   onDeleteOpenChange: (open: boolean) => void
   onDelete: () => void
 }
@@ -19,12 +22,22 @@ function MoreIcon() {
   )
 }
 
+function TrashIcon() {
+  return (
+    <svg aria-hidden="true" className="size-4 shrink-0" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" viewBox="0 0 16 16">
+      <path d="M3 4.5h10v9H3zM1.5 3h13M6 3V1.5h4V3M6 6.5v4M10 6.5v4" />
+    </svg>
+  )
+}
+
 const actionClassName =
   'inline-flex size-10 items-center justify-center rounded-lg text-muted transition-[background-color,color,transform] duration-150 ease-out hover:bg-hover hover:text-ink focus-visible:bg-active focus-visible:text-active-ink focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-faint active:scale-[0.96] disabled:cursor-not-allowed disabled:text-faint disabled:active:scale-100'
 
 export function NoteActions({
   deleteOpen,
   deleting,
+  dialogs,
+  menuItems,
   onDeleteOpenChange,
   onDelete,
 }: NoteActionsProps) {
@@ -41,16 +54,20 @@ export function NoteActions({
         <Menu.Portal>
           <Menu.Positioner align="end" className="z-40" side="bottom" sideOffset={6}>
             <Menu.Popup className="w-44 rounded-xl bg-surface p-1.5 text-small text-ink shadow-[0_8px_24px_oklch(0_0_0/0.18)] outline-none">
+              {menuItems}
               <Menu.Item
-                className="flex h-10 cursor-default select-none items-center rounded-lg px-3 text-red-500 outline-none data-[highlighted]:bg-red-500 data-[highlighted]:text-white"
+                className="flex h-10 cursor-default select-none items-center gap-2 rounded-lg px-3 text-red-500 outline-none data-[highlighted]:bg-red-500 data-[highlighted]:text-white"
                 onClick={() => onDeleteOpenChange(true)}
               >
-                Delete note
+                <TrashIcon />
+                <span>Delete note</span>
               </Menu.Item>
             </Menu.Popup>
           </Menu.Positioner>
         </Menu.Portal>
       </Menu.Root>
+
+      {dialogs}
 
       <Dialog.Root
         open={deleteOpen}
@@ -89,6 +106,7 @@ export function NoteActions({
           </Dialog.Viewport>
         </Dialog.Portal>
       </Dialog.Root>
+
     </>
   )
 }

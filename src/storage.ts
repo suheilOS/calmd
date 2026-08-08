@@ -42,6 +42,14 @@ export function selectVault(name: string) {
   return invoke<boolean>('select_vault', { name })
 }
 
+export function readStoredSubstackPublicationUrl() {
+  return invoke<string | null>('get_substack_publication_url')
+}
+
+export function saveStoredSubstackPublicationUrl(url: string) {
+  return invoke<string>('set_substack_publication_url', { url })
+}
+
 export function searchStoredNotes(query: string) {
   return invoke<SearchResponse>('search_notes', { query })
 }
