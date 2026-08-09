@@ -19,6 +19,7 @@ describe('handleTitleKeyDown', () => {
     const keyEvent = titleKeyEvent('Enter')
     let focusAtEndCalls = 0
     const bodyEditor: MarkdownEditorHandle = {
+      applyBlock: () => {},
       focusAtEnd: () => { focusAtEndCalls += 1 },
     }
 
@@ -33,6 +34,7 @@ describe('handleTitleKeyDown', () => {
     const otherKey = titleKeyEvent('ArrowDown')
     let focusAtEndCalls = 0
     const bodyEditor: MarkdownEditorHandle = {
+      applyBlock: () => {},
       focusAtEnd: () => { focusAtEndCalls += 1 },
     }
 

@@ -49,7 +49,10 @@ async function renderEditor(
   noteKey = `test-note-${++noteSequence}.md`,
 ) {
   const container = document.createElement('div')
-  document.body.append(container)
+  const scrollContainer = document.createElement('div')
+  scrollContainer.className = 'app-scroll-container'
+  scrollContainer.append(container)
+  document.body.append(scrollContainer)
   const root = createRoot(container)
   roots.push(root)
   await act(async () => {
@@ -60,7 +63,7 @@ async function renderEditor(
       />,
     )
   })
-  return { container, root }
+  return { container, root, scrollContainer }
 }
 
 function pressUndo(container: HTMLElement) {
@@ -146,6 +149,64 @@ describe('MarkdownEditor document sessions', () => {
     expect(content.textContent).toBe('first and **second** tail')
     await act(async () => pressUndo(container))
     expect(content.textContent).toBe('first and **second** tail')
+  })
+
+  test('preserves user undo history across canonical body updates', async () => {
+    const source = 'before [[Old]] after'
+    const canonical = 'edited [[New]] after'
+    const { container, root } = await renderEditor(source, 51, () => {}, 'canonical.md')
+    const content = container.querySelector<HTMLElement>('.cm-content')
+    if (!content) throw new Error('CodeMirror content was not mounted')
+    const view = EditorView.findFromDOM(content)
+
+    await act(async () => view.dispatch({
+      changes: { from: 0, to: 'before'.length, insert: 'edited' },
+      userEvent: 'input',
+    }))
+    await act(async () => {
+      root.render(
+        <MarkdownEditor
+          {...editorProps(canonical, 51, () => {}, 'canonical.md')}
+          value={canonical}
+        />,
+      )
+    })
+
+    await act(async () => pressUndo(container))
+
+    expect(view.state.doc.toString()).toBe('before [[New]] after')
+  })
+
+  test('restores the outer app scroll position per note', async () => {
+    const noteA = 'note A'
+    const { container, root, scrollContainer } = await renderEditor(
+      noteA,
+      61,
+      () => {},
+      'scroll-a.md',
+    )
+
+    await act(async () => {
+      scrollContainer.scrollTop = 240
+      scrollContainer.dispatchEvent(new Event('scroll'))
+    })
+    await act(async () => {
+      root.render(
+        <MarkdownEditor {...editorProps('note B', 62, () => {}, 'scroll-b.md')} value="note B" />,
+      )
+    })
+    expect(scrollContainer.scrollTop).toBe(0)
+
+    await act(async () => {
+      root.render(
+        <MarkdownEditor
+          {...editorProps(noteA, 63, () => {}, 'scroll-a.md')}
+          value={noteA}
+        />,
+      )
+    })
+    expect(scrollContainer.scrollTop).toBe(240)
+    expect(container.querySelector('.cm-content')).not.toBeNull()
   })
 
   test('ignores wiki-link resolution that completes for a previous note session', async () => {

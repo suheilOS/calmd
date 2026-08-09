@@ -8,7 +8,7 @@ import {
   isNavigateHomeShortcut,
 } from './keyboardShortcuts'
 import { NoteEditor } from './NoteEditor'
-import { discardEditorViewState } from './editorViewState'
+import { clearEditorViewState, discardEditorViewState } from './editorViewState'
 import { SubstackNoteActions } from './SubstackNoteActions'
 import type { WikiLinkActivation } from './MarkdownEditor'
 import { NoteNavigation } from './noteNavigation'
@@ -389,6 +389,7 @@ function App() {
     try {
       const didSelect = await selectVault(vaultName)
       if (didSelect) {
+        clearEditorViewState()
         setVaultReady(true)
         setSearchGeneration((generation) => generation + 1)
         setVaultName('')

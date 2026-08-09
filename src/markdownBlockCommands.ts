@@ -33,20 +33,24 @@ export function setMarkdownBlock(kind: MarkdownBlockKind): StateCommand {
     }
 
     let previousLine: number | null = null
-    let orderedIndex = 0
+    const orderedIndexes = new Map<string, number>()
     const changes = [...lineNumbers]
       .sort((left, right) => left - right)
       .flatMap((number) => {
-        orderedIndex = previousLine === number - 1 ? orderedIndex + 1 : 0
+        if (previousLine !== number - 1) orderedIndexes.clear()
         previousLine = number
         const line = state.doc.line(number)
         const match = line.text.match(structuralPrefix)
         const indentation = match?.[1] ?? ''
-        const content = line.text.slice(match?.[0].length ?? 0)
-        const replacement = indentation + prefixFor(kind, orderedIndex) + content
-        return replacement === line.text
+        const orderedIndex = orderedIndexes.get(indentation) ?? 0
+        orderedIndexes.set(indentation, orderedIndex + 1)
+        const prefixStart = line.from + indentation.length
+        const prefixEnd = line.from + (match?.[0].length ?? indentation.length)
+        const replacement = prefixFor(kind, orderedIndex)
+        const currentPrefix = line.text.slice(indentation.length, prefixEnd - line.from)
+        return replacement === currentPrefix
           ? []
-          : [{ from: line.from, to: line.to, insert: replacement }]
+          : [{ from: prefixStart, to: prefixEnd, insert: replacement }]
       })
 
     if (changes.length === 0) return false

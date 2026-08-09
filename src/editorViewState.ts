@@ -66,3 +66,9 @@ export function discardEditorViewState(noteKey: string) {
     discardedNoteKeys.delete(oldest)
   }
 }
+
+/** View positions belong to the selected vault and must not cross vault boundaries. */
+export function clearEditorViewState() {
+  noteViewStates.clear()
+  discardedNoteKeys.clear()
+}

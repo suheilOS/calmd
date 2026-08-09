@@ -171,6 +171,11 @@ function decorationRanges(view: EditorView) {
   return merged
 }
 
+function parseTarget(view: EditorView) {
+  const relevantEnd = decorationRanges(view).at(-1)?.to ?? 0
+  return Math.min(view.state.doc.length, relevantEnd + 2_000)
+}
+
 function livePreviewDecorations(
   view: EditorView,
   resolvedTargets: ReadonlyMap<string, boolean | null>,
@@ -211,6 +216,7 @@ function livePreviewDecorations(
         if (node.name === 'InlineCode' || node.name === 'URL') {
           decorations.push(Decoration.mark({
             attributes: { spellcheck: 'false' },
+            class: node.name === 'InlineCode' ? 'cm-inline-code' : undefined,
           }).range(node.from, node.to))
         }
 
@@ -254,6 +260,11 @@ function livePreviewDecorations(
           const heading = parent
           if (!heading) return
           const level = headingLevel(heading.name)
+          if (level) {
+            decorations.push(Decoration.line({
+              class: `cm-heading-line cm-heading-line-${level}`,
+            }).range(view.state.doc.lineAt(node.from).from))
+          }
           const active = level
             ? owningLineIsActive(view, node.from)
             : selectionsTouch(view, heading)
@@ -328,15 +339,27 @@ function livePreviewDecorations(
         if (node.name === 'FencedCode') {
           const active = selectionsTouch(view, node)
           const lines = new Set<number>()
-          for (let number = view.state.doc.lineAt(node.from).number;
-            number <= view.state.doc.lineAt(node.to).number;
-            number += 1) {
-            lines.add(view.state.doc.line(number).from)
+          const firstCodeLine = view.state.doc.lineAt(node.from).number
+          const lastCodeLine = view.state.doc.lineAt(Math.max(node.from, node.to - 1)).number
+          for (const range of decorationRanges(view)) {
+            const from = Math.max(node.from, range.from)
+            const to = Math.min(node.to, range.to)
+            if (from > to) continue
+            const firstLine = view.state.doc.lineAt(from).number
+            const lastLine = view.state.doc.lineAt(Math.max(from, to - 1)).number
+            for (let number = firstLine; number <= lastLine; number += 1) {
+              lines.add(view.state.doc.line(number).from)
+            }
           }
           for (const from of lines) {
+            const lineNumber = view.state.doc.lineAt(from).number
             decorations.push(Decoration.line({
               attributes: { spellcheck: 'false' },
-              class: 'cm-fenced-code-line',
+              class: [
+                'cm-fenced-code-line',
+                lineNumber === firstCodeLine ? 'cm-fenced-code-first-line' : '',
+                lineNumber === lastCodeLine ? 'cm-fenced-code-last-line' : '',
+              ].filter(Boolean).join(' '),
             }).range(from))
           }
           if (!active) {
@@ -462,9 +485,13 @@ export function livePreview(
     }
 
     private scheduleParse(view: EditorView) {
-      if (this.parseFrame !== null) return
-      const relevantEnd = decorationRanges(view).at(-1)?.to ?? 0
-      const target = Math.min(view.state.doc.length, relevantEnd + 2_000)
+      const target = parseTarget(view)
+      if (this.parseFrame !== null) {
+        if (!syntaxTreeAvailable(view.state, target)) {
+          view.dom.classList.add('cm-live-preview-pending')
+        }
+        return
+      }
       if (!syntaxTreeAvailable(view.state, target)) {
         view.dom.classList.add('cm-live-preview-pending')
       }
@@ -472,9 +499,11 @@ export function livePreview(
         this.parseFrame = null
         if (!this.active) return
         forceParsing(view, target, 50)
-        if (syntaxTreeAvailable(view.state, target)) {
+        const latestTarget = parseTarget(view)
+        if (syntaxTreeAvailable(view.state, latestTarget)) {
           view.dom.classList.remove('cm-live-preview-pending')
         } else {
+          view.dom.classList.add('cm-live-preview-pending')
           this.scheduleParse(view)
         }
       })

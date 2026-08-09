@@ -56,4 +56,26 @@ describe('setMarkdownBlock', () => {
 
     expect(state.doc.toString()).toBe('1. one\nskip\n1. three')
   })
+
+  test('preserves the caret inside line content', () => {
+    let state = EditorState.create({
+      doc: 'hello world',
+      selection: EditorSelection.cursor(6),
+    })
+
+    setMarkdownBlock('heading-2')({
+      state,
+      dispatch: (transaction) => { state = transaction.state },
+    })
+
+    expect(state.doc.toString()).toBe('## hello world')
+    expect(state.selection.main.anchor).toBe(9)
+  })
+
+  test('numbers nested list levels independently', () => {
+    const source = '- parent\n  - child\n  - sibling\n- next'
+    const result = apply(source, 'ordered')
+
+    expect(result.text).toBe('1. parent\n  1. child\n  2. sibling\n2. next')
+  })
 })

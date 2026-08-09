@@ -1,4 +1,4 @@
-type TextEdit = {
+export type TextEdit = {
   from: number
   to: number
   insert: string
@@ -8,7 +8,7 @@ type TextEdit = {
 // conflict handling instead of causing unbounded work on the editor thread.
 const MAX_DIFF_CELLS = 4_000_000
 
-function textEdits(base: string, changed: string): TextEdit[] | null {
+export function diffTextChanges(base: string, changed: string): TextEdit[] | null {
   if (base === changed) return []
 
   let prefix = 0
@@ -101,8 +101,8 @@ export function mergeConcurrentTextChanges(
   if (current === base) return canonical
   if (canonical === base || current === canonical) return current
 
-  const canonicalEdits = textEdits(base, canonical)
-  const currentEdits = textEdits(base, current)
+  const canonicalEdits = diffTextChanges(base, canonical)
+  const currentEdits = diffTextChanges(base, current)
   if (!canonicalEdits || !currentEdits) return null
   if (canonicalEdits.some((canonicalEdit) =>
     currentEdits.some((currentEdit) => editsOverlap(canonicalEdit, currentEdit)))) {

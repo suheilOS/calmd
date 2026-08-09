@@ -52,12 +52,12 @@ import {
   rememberEditorViewState,
   renameEditorViewState,
 } from './editorViewState'
-import { EditorContextMenu } from './EditorContextMenu'
 import { markdownHighlight } from './markdownHighlight'
 import { toggleLink, toggleMarkdown } from './markdownCommands'
 import { livePreview } from './livePreview'
 import type { NoteReference } from './notes'
 import { navigationPlatform, type NotePreviewCandidate } from './notePreview'
+import { diffTextChanges } from './threeWayTextMerge'
 import { wikiLinkCompletion } from './wikiLinkCompletion'
 import {
   canonicalResolvedWikiLink,
@@ -75,6 +75,7 @@ export type WikiLinkActivation = {
 }
 
 export type MarkdownEditorHandle = {
+  applyBlock: (kind: MarkdownBlockKind) => void
   focusAtEnd: () => void
 }
 
@@ -87,7 +88,6 @@ type MarkdownEditorProps = {
   onPreviewCandidateLeave: () => void
   onPreviewDismiss: () => void
   onWikiLinkActivate: (activation: WikiLinkActivation) => void
-  onSpellcheckEnabledChange: (enabled: boolean) => void
   resolveWikiLink: (target: string) => Promise<boolean | null>
   spellcheckEnabled: boolean
   suggestWikiLinks: (query: string) => Promise<NoteReference[]>
@@ -402,7 +402,6 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
   onPreviewCandidateLeave,
   onPreviewDismiss,
   onWikiLinkActivate,
-  onSpellcheckEnabledChange,
   resolveWikiLink,
   spellcheckEnabled,
   suggestWikiLinks,
@@ -414,11 +413,21 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
   const initialSpellcheckEnabledRef = useRef(spellcheckEnabled)
   const currentSessionIdRef = useRef(editorSessionId)
   const currentNoteKeyRef = useRef(noteKey)
+  const scrollElementRef = useRef<HTMLElement | null>(null)
   const historyCompartmentRef = useRef(new Compartment())
   const contentAttributesCompartmentRef = useRef(new Compartment())
   const livePreviewCompartmentRef = useRef(new Compartment())
 
   useImperativeHandle(ref, () => ({
+    applyBlock(kind) {
+      const editor = editorRef.current
+      if (!editor) return
+      setMarkdownBlock(kind)({
+        state: editor.state,
+        dispatch: (transaction) => editor.dispatch(transaction),
+      })
+      editor.focus()
+    },
     focusAtEnd() {
       const editor = editorRef.current
       if (!editor) return
@@ -492,10 +501,11 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
             onChangeRef.current(update.state.doc.toString())
           }
           if (update.selectionSet || update.docChanged) {
+            const scrollElement = scrollElementRef.current ?? update.view.scrollDOM
             rememberEditorViewState(
               currentNoteKeyRef.current,
               update.state,
-              update.view.scrollDOM.scrollTop,
+              scrollElement.scrollTop,
             )
           }
         }),
@@ -504,18 +514,22 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
     })
 
     editorRef.current = editor
-    if (recalled) editor.scrollDOM.scrollTop = recalled.scrollTop
+    const scrollElement = editor.dom.closest<HTMLElement>('.app-scroll-container')
+      ?? editor.scrollDOM
+    scrollElementRef.current = scrollElement
+    if (recalled) scrollElement.scrollTop = recalled.scrollTop
     const rememberScroll = () => rememberEditorViewState(
       currentNoteKeyRef.current,
       editor.state,
-      editor.scrollDOM.scrollTop,
+      scrollElement.scrollTop,
     )
-    editor.scrollDOM.addEventListener('scroll', rememberScroll, { passive: true })
+    scrollElement.addEventListener('scroll', rememberScroll, { passive: true })
     editor.focus()
 
     return () => {
       rememberScroll()
-      editor.scrollDOM.removeEventListener('scroll', rememberScroll)
+      scrollElement.removeEventListener('scroll', rememberScroll)
+      scrollElementRef.current = null
       editor.destroy()
       editorRef.current = null
     }
@@ -524,6 +538,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
   useEffect(() => {
     const editor = editorRef.current
     if (!editor) return
+    const scrollElement = scrollElementRef.current ?? editor.scrollDOM
 
     const sessionChanged = currentSessionIdRef.current !== editorSessionId
     const noteRenamed = !sessionChanged && currentNoteKeyRef.current !== noteKey
@@ -535,7 +550,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
       rememberEditorViewState(
         currentNoteKeyRef.current,
         editor.state,
-        editor.scrollDOM.scrollTop,
+        scrollElement.scrollTop,
       )
       currentSessionIdRef.current = editorSessionId
       currentNoteKeyRef.current = noteKey
@@ -549,20 +564,27 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
       const recalled = sessionChanged
         ? recallEditorViewState(noteKey, value.length)
         : null
+      const changes = documentChanged
+        ? diffTextChanges(editor.state.doc.toString(), value)
+        : []
+      const resetHistory = documentChanged && changes === null && !sessionChanged
       editor.dispatch({
         annotations: [
           externalSync.of(true),
           Transaction.addToHistory.of(false),
         ],
         changes: documentChanged
-          ? { from: 0, to: editor.state.doc.length, insert: value }
+          ? changes ?? { from: 0, to: editor.state.doc.length, insert: value }
           : undefined,
-        effects: sessionChanged
+        effects: sessionChanged || resetHistory
           ? [
+              historyCompartmentRef.current.reconfigure([]),
               historyCompartmentRef.current.reconfigure(history()),
-              livePreviewCompartmentRef.current.reconfigure(
-                livePreview((target) => resolveWikiLinkRef.current(target)),
-              ),
+              ...(sessionChanged
+                ? [livePreviewCompartmentRef.current.reconfigure(
+                    livePreview((target) => resolveWikiLinkRef.current(target)),
+                  )]
+                : []),
             ]
           : undefined,
         selection: sessionChanged
@@ -574,7 +596,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
         editor.requestMeasure({
           read: () => null,
           write: () => {
-            editor.scrollDOM.scrollTop = scrollTop
+            scrollElement.scrollTop = scrollTop
             rememberEditorViewState(noteKey, editor.state, scrollTop)
           },
         })
@@ -592,23 +614,5 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
     })
   }, [spellcheckEnabled])
 
-  function applyBlock(kind: MarkdownBlockKind) {
-    const editor = editorRef.current
-    if (!editor) return
-    setMarkdownBlock(kind)({
-      state: editor.state,
-      dispatch: (transaction) => editor.dispatch(transaction),
-    })
-    editor.focus()
-  }
-
-  return (
-    <EditorContextMenu
-      onBlockChange={applyBlock}
-      onSpellcheckChange={onSpellcheckEnabledChange}
-      spellcheckEnabled={spellcheckEnabled}
-    >
-      <div className="markdown-editor" ref={containerRef} />
-    </EditorContextMenu>
-  )
+  return <div className="markdown-editor" ref={containerRef} />
 })
