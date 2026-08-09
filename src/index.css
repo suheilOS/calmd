@@ -1,8 +1,11 @@
 @import '@fontsource-variable/rubik/wght.css';
 @import '@fontsource-variable/rubik/wght-italic.css';
+@import '@fontsource-variable/jetbrains-mono/wght.css';
 @import 'tailwindcss';
 
 @theme {
+  --font-code: "JetBrains Mono Variable", ui-monospace, "SFMono-Regular", Consolas, monospace;
+
   --text-large: clamp(1.5rem, 3vw, 1.75rem);
   --text-large--font-weight: 500;
   --text-large--line-height: 1.15;

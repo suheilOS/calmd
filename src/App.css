@@ -240,6 +240,7 @@
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
   color: var(--color-ink);
+  font-family: var(--font-code);
   padding: 0.1em 0.32em;
 }
 
@@ -288,7 +289,7 @@
   background: var(--color-surface);
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
-  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-code);
   font-size: 0.9em;
   line-height: 1.45;
   padding-inline: 0.75rem;
