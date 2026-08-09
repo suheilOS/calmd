@@ -25,10 +25,13 @@ import {
   markdownKeymap,
 } from '@codemirror/lang-markdown'
 import { highlightSelectionMatches, searchKeymap } from '@codemirror/search'
-import { Annotation, EditorState, StateEffect, type Range } from '@codemirror/state'
 import {
-  Decoration,
-  type DecorationSet,
+  Annotation,
+  Compartment,
+  EditorState,
+  Transaction,
+} from '@codemirror/state'
+import {
   drawSelection,
   dropCursor,
   EditorView,
@@ -40,10 +43,19 @@ import {
 } from '@codemirror/view'
 import { tags } from '@lezer/highlight'
 import { GFM } from '@lezer/markdown'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } from 'react'
 import { insertNewlineContinueBlockquote } from './markdownBlockquote'
+import { setMarkdownBlock, type MarkdownBlockKind } from './markdownBlockCommands'
+import {
+  recallEditorViewState,
+  rememberEditorViewState,
+  renameEditorViewState,
+} from './editorViewState'
+import { EditorContextMenu } from './EditorContextMenu'
 import { markdownHighlight } from './markdownHighlight'
 import { toggleLink, toggleMarkdown } from './markdownCommands'
+import { livePreview } from './livePreview'
 import type { NoteReference } from './notes'
 import { navigationPlatform, type NotePreviewCandidate } from './notePreview'
 import { wikiLinkCompletion } from './wikiLinkCompletion'
@@ -51,9 +63,7 @@ import {
   canonicalResolvedWikiLink,
   isWikiLinkNavigationClick,
   parseWikiLinkText,
-  selectionTouchesSourceRange,
   validateWikiLinkOccurrence,
-  wikiLinkHiddenSyntaxRanges,
   wikiLinkMarkdown,
 } from './wikiLinks'
 
@@ -69,17 +79,31 @@ export type MarkdownEditorHandle = {
 }
 
 type MarkdownEditorProps = {
+  editorSessionId: number
+  noteKey: string
   value: string
   onChange: (value: string) => void
   onPreviewCandidateEnter: (candidate: NotePreviewCandidate) => void
   onPreviewCandidateLeave: () => void
   onPreviewDismiss: () => void
   onWikiLinkActivate: (activation: WikiLinkActivation) => void
+  onSpellcheckEnabledChange: (enabled: boolean) => void
   resolveWikiLink: (target: string) => Promise<boolean | null>
+  spellcheckEnabled: boolean
   suggestWikiLinks: (query: string) => Promise<NoteReference[]>
 }
 
 const externalSync = Annotation.define<boolean>()
+
+function editorContentAttributes(spellcheckEnabled: boolean) {
+  return EditorView.contentAttributes.of({
+    'aria-label': 'Note content',
+    'aria-multiline': 'true',
+    autocapitalize: 'off',
+    autocorrect: 'off',
+    spellcheck: spellcheckEnabled ? 'true' : 'false',
+  })
+}
 
 const markdownHighlighting = syntaxHighlighting(HighlightStyle.define([
   { tag: tags.heading1, class: 'cm-heading cm-heading-1' },
@@ -97,210 +121,6 @@ const markdownHighlighting = syntaxHighlighting(HighlightStyle.define([
   { tag: tags.quote, class: 'cm-quote' },
   { tag: tags.meta, class: 'cm-markup' },
 ], { scope: commonmarkLanguage }))
-
-function markdownMarkerDecorations(view: EditorView) {
-  const decorations: Range<Decoration>[] = []
-
-  for (const range of view.visibleRanges) {
-    syntaxTree(view.state).iterate({
-      from: range.from,
-      to: range.to,
-      enter: (node) => {
-        if (node.name !== 'HeaderMark' && node.name !== 'QuoteMark') return
-
-        const line = view.state.doc.lineAt(node.from)
-        const lineIsActive = view.state.selection.ranges.some((selection) =>
-          selectionTouchesSourceRange(selection, { from: line.from, to: line.to }),
-        )
-
-        if (node.name === 'HeaderMark') {
-          if (lineIsActive) return
-
-          let prefixEnd = node.to
-          while (
-            prefixEnd < line.to
-            && /[\t ]/.test(view.state.sliceDoc(prefixEnd, prefixEnd + 1))
-          ) {
-            prefixEnd += 1
-          }
-          decorations.push(Decoration.replace({}).range(node.from, prefixEnd))
-          return
-        }
-
-        if (
-          node.name === 'QuoteMark'
-          && /[\t ]/.test(view.state.sliceDoc(node.to, node.to + 1))
-          && !lineIsActive
-        ) {
-          decorations.push(Decoration.mark({
-            class: 'cm-quote-marker',
-          }).range(node.from, node.to))
-        }
-      },
-    })
-  }
-
-  return Decoration.set(decorations, true)
-}
-
-const markdownMarkers = ViewPlugin.fromClass(class {
-  decorations: DecorationSet
-
-  constructor(view: EditorView) {
-    this.decorations = markdownMarkerDecorations(view)
-  }
-
-  update(update: ViewUpdate) {
-    if (
-      update.docChanged
-      || update.viewportChanged
-      || update.selectionSet
-      || syntaxTree(update.startState) !== syntaxTree(update.state)
-    ) {
-      this.decorations = markdownMarkerDecorations(update.view)
-    }
-  }
-}, {
-  decorations: (plugin) => plugin.decorations,
-})
-
-function selectionTouchesRange(
-  view: EditorView,
-  range: { from: number; to: number },
-) {
-  return view.state.selection.ranges.some((selection) =>
-    selectionTouchesSourceRange(selection, range),
-  )
-}
-
-function inlineMarkdownDecorations(
-  view: EditorView,
-  resolvedTargets: ReadonlyMap<string, boolean | null>,
-) {
-  const decorations: Range<Decoration>[] = []
-
-  syntaxTree(view.state).iterate({
-    enter: (node) => {
-      if (node.name === 'WikiLink') {
-        const parsed = parseWikiLinkText(view.state.sliceDoc(node.from, node.to))
-        const missing = parsed && resolvedTargets.get(parsed.target) === false
-        decorations.push(Decoration.mark({
-          class: missing ? 'cm-wiki-link cm-wiki-link-missing' : 'cm-wiki-link',
-        }).range(node.from, node.to))
-
-        const children: { name: string; from: number; to: number }[] = []
-        const cursor = node.node.cursor()
-        if (cursor.firstChild()) {
-          do {
-            children.push({ name: cursor.name, from: cursor.from, to: cursor.to })
-          } while (cursor.nextSibling())
-        }
-
-        for (const range of wikiLinkHiddenSyntaxRanges(
-          node,
-          children,
-          view.state.selection.ranges,
-        )) {
-          decorations.push(Decoration.replace({}).range(range.from, range.to))
-        }
-        return
-      }
-
-      if (node.name === 'EmphasisMark') {
-        const format = node.node.parent
-        if (format && !selectionTouchesRange(view, format)) {
-          decorations.push(Decoration.replace({}).range(node.from, node.to))
-        }
-        return
-      }
-
-      if (node.name !== 'Highlight') return
-
-      const marks: { from: number; to: number }[] = []
-      const cursor = node.node.cursor()
-      if (cursor.firstChild()) {
-        do {
-          if (cursor.name === 'HighlightMark') {
-            marks.push({ from: cursor.from, to: cursor.to })
-          }
-        } while (cursor.nextSibling())
-      }
-
-      if (marks.length >= 2) {
-        const first = marks[0]
-        const last = marks[marks.length - 1]
-        decorations.push(Decoration.mark({ class: 'cm-highlight' }).range(
-          first.to,
-          last.from,
-        ))
-        if (!selectionTouchesRange(view, node)) {
-          decorations.push(Decoration.replace({}).range(first.from, first.to))
-          decorations.push(Decoration.replace({}).range(last.from, last.to))
-        }
-      }
-    },
-  })
-
-  return Decoration.set(decorations, true)
-}
-
-const wikiLinkResolutionChanged = StateEffect.define<null>()
-
-function wikiLinkTargets(view: EditorView) {
-  const targets = new Set<string>()
-  syntaxTree(view.state).iterate({
-    enter: (node) => {
-      if (node.name !== 'WikiLink') return
-      const parsed = parseWikiLinkText(view.state.sliceDoc(node.from, node.to))
-      if (parsed) targets.add(parsed.target)
-    },
-  })
-  return targets
-}
-
-function inlineMarkdown(
-  resolveWikiLink: (target: string) => Promise<boolean | null>,
-) {
-  return ViewPlugin.fromClass(class {
-    decorations: DecorationSet
-    resolvedTargets = new Map<string, boolean | null>()
-    pendingTargets = new Set<string>()
-
-    constructor(view: EditorView) {
-      this.decorations = inlineMarkdownDecorations(view, this.resolvedTargets)
-      this.resolveTargets(view)
-    }
-
-    update(update: ViewUpdate) {
-      if (update.docChanged) this.resolveTargets(update.view)
-      const resolutionChanged = update.transactions.some((transaction) =>
-        transaction.effects.some((effect) => effect.is(wikiLinkResolutionChanged)),
-      )
-      if (update.docChanged || update.viewportChanged || update.selectionSet || resolutionChanged) {
-        this.decorations = inlineMarkdownDecorations(update.view, this.resolvedTargets)
-      }
-    }
-
-    resolveTargets(view: EditorView) {
-      for (const target of wikiLinkTargets(view)) {
-        if (this.resolvedTargets.has(target) || this.pendingTargets.has(target)) continue
-        this.pendingTargets.add(target)
-        void resolveWikiLink(target).then(
-          (exists) => this.finishTarget(view, target, exists),
-          () => this.finishTarget(view, target, null),
-        )
-      }
-    }
-
-    finishTarget(view: EditorView, target: string, exists: boolean | null) {
-      this.pendingTargets.delete(target)
-      this.resolvedTargets.set(target, exists)
-      if (view.dom.isConnected) view.dispatch({ effects: wikiLinkResolutionChanged.of(null) })
-    }
-  }, {
-    decorations: (plugin) => plugin.decorations,
-  })
-}
 
 const editorTheme = EditorView.theme({
   '&': {
@@ -369,7 +189,7 @@ const editorTheme = EditorView.theme({
   },
 })
 
-function wikiLinkInteraction(
+function linkInteraction(
   onActivate: (activation: WikiLinkActivation) => void,
   onPreviewCandidateEnter: (candidate: NotePreviewCandidate) => void,
   onPreviewCandidateLeave: () => void,
@@ -448,7 +268,40 @@ function wikiLinkInteraction(
       return false
     }
 
-    activate(view: EditorView, event: MouseEvent) {
+    activateExternalLink(view: EditorView, event: MouseEvent) {
+      if (!isWikiLinkNavigationClick(navigationPlatform(), event)) return false
+      const position = view.posAtDOM(event.target as Node)
+      let node = syntaxTree(view.state).resolveInner(position, -1)
+      while (node.name !== 'Link' && node.parent) node = node.parent
+      if (node.name !== 'Link') return false
+
+      const cursor = node.cursor()
+      let destination: string | null = null
+      if (cursor.firstChild()) {
+        do {
+          if (cursor.name === 'URL') {
+            destination = view.state.sliceDoc(cursor.from, cursor.to)
+            break
+          }
+        } while (cursor.nextSibling())
+      }
+      if (!destination) return false
+
+      let url: URL
+      try {
+        url = new URL(destination)
+      } catch {
+        return false
+      }
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') return false
+
+      event.preventDefault()
+      onPreviewDismiss()
+      void openUrl(url.href).catch(() => {})
+      return true
+    }
+
+    activateWikiLink(view: EditorView, event: MouseEvent) {
       if (!isWikiLinkNavigationClick(navigationPlatform(), event)) return false
       const position = view.posAtDOM(event.target as Node)
       let node = syntaxTree(view.state).resolveInner(position, -1)
@@ -484,7 +337,10 @@ function wikiLinkInteraction(
     }
   }, {
     eventHandlers: {
-      mousedown(event, view) { return this.activate(view, event) },
+      mousedown(event, view) {
+        return this.activateWikiLink(view, event)
+          || this.activateExternalLink(view, event)
+      },
       pointerleave(event) { return this.pointerLeave(event) },
       pointermove(event, view) { return this.pointerMove(view, event) },
     },
@@ -493,7 +349,6 @@ function wikiLinkInteraction(
 
 const editorExtensions = [
   highlightSpecialChars(),
-  history(),
   drawSelection(),
   dropCursor(),
   EditorState.allowMultipleSelections.of(true),
@@ -503,7 +358,6 @@ const editorExtensions = [
   highlightSelectionMatches(),
   syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
   markdownHighlighting,
-  markdownMarkers,
   markdown({
     addKeymap: false,
     base: commonmarkLanguage,
@@ -519,6 +373,14 @@ const editorExtensions = [
     { key: 'Mod-k', run: toggleLink },
     { key: 'Mod-`', run: toggleMarkdown('`') },
     { key: 'Mod-Shift-x', run: toggleMarkdown('~~') },
+    ...([1, 2, 3, 4, 5, 6] as const).map((level) => ({
+      key: `Mod-Alt-${level}`,
+      run: setMarkdownBlock(`heading-${level}`),
+    })),
+    { key: 'Mod-Shift-7', run: setMarkdownBlock('ordered') },
+    { key: 'Mod-Shift-8', run: setMarkdownBlock('bullet') },
+    { key: 'Mod-Shift-9', run: setMarkdownBlock('quote') },
+    { key: 'Mod-Shift-l', run: setMarkdownBlock('task') },
     ...markdownKeymap,
     ...closeBracketsKeymap,
     ...defaultKeymap,
@@ -527,28 +389,34 @@ const editorExtensions = [
     indentWithTab,
   ]),
   EditorView.lineWrapping,
-  EditorView.contentAttributes.of({
-    'aria-label': 'Note content',
-    'aria-multiline': 'true',
-    spellcheck: 'false',
-  }),
   placeholder('Start writing…'),
   editorTheme,
 ]
 
 export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(function MarkdownEditor({
+  editorSessionId,
+  noteKey,
   value,
   onChange,
   onPreviewCandidateEnter,
   onPreviewCandidateLeave,
   onPreviewDismiss,
   onWikiLinkActivate,
+  onSpellcheckEnabledChange,
   resolveWikiLink,
+  spellcheckEnabled,
   suggestWikiLinks,
 }, ref) {
   const containerRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<EditorView>(null)
   const initialValueRef = useRef(value)
+  const initialNoteKeyRef = useRef(noteKey)
+  const initialSpellcheckEnabledRef = useRef(spellcheckEnabled)
+  const currentSessionIdRef = useRef(editorSessionId)
+  const currentNoteKeyRef = useRef(noteKey)
+  const historyCompartmentRef = useRef(new Compartment())
+  const contentAttributesCompartmentRef = useRef(new Compartment())
+  const livePreviewCompartmentRef = useRef(new Compartment())
 
   useImperativeHandle(ref, () => ({
     focusAtEnd() {
@@ -587,19 +455,29 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
   useLayoutEffect(() => {
     if (!containerRef.current) return
 
+    const recalled = recallEditorViewState(
+      initialNoteKeyRef.current,
+      initialValueRef.current.length,
+    )
     const editor = new EditorView({
       doc: initialValueRef.current,
-      selection: { anchor: initialValueRef.current.length },
+      selection: recalled?.selection ?? { anchor: initialValueRef.current.length },
       extensions: [
         editorExtensions,
-        inlineMarkdown((target) => resolveWikiLinkRef.current(target)),
+        historyCompartmentRef.current.of(history()),
+        contentAttributesCompartmentRef.current.of(
+          editorContentAttributes(initialSpellcheckEnabledRef.current),
+        ),
+        livePreviewCompartmentRef.current.of(
+          livePreview((target) => resolveWikiLinkRef.current(target)),
+        ),
         autocompletion({
           activateOnTyping: true,
           icons: false,
           maxRenderedOptions: 8,
           override: [wikiLinkCompletion((query) => suggestWikiLinksRef.current(query))],
         }),
-        wikiLinkInteraction(
+        linkInteraction(
           (activation) => onWikiLinkActivateRef.current(activation),
           (candidate) => onPreviewCandidateEnterRef.current(candidate),
           () => onPreviewCandidateLeaveRef.current(),
@@ -613,15 +491,31 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
           if (update.docChanged && !isExternalSync) {
             onChangeRef.current(update.state.doc.toString())
           }
+          if (update.selectionSet || update.docChanged) {
+            rememberEditorViewState(
+              currentNoteKeyRef.current,
+              update.state,
+              update.view.scrollDOM.scrollTop,
+            )
+          }
         }),
       ],
       parent: containerRef.current,
     })
 
     editorRef.current = editor
+    if (recalled) editor.scrollDOM.scrollTop = recalled.scrollTop
+    const rememberScroll = () => rememberEditorViewState(
+      currentNoteKeyRef.current,
+      editor.state,
+      editor.scrollDOM.scrollTop,
+    )
+    editor.scrollDOM.addEventListener('scroll', rememberScroll, { passive: true })
     editor.focus()
 
     return () => {
+      rememberScroll()
+      editor.scrollDOM.removeEventListener('scroll', rememberScroll)
       editor.destroy()
       editorRef.current = null
     }
@@ -629,13 +523,92 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
 
   useEffect(() => {
     const editor = editorRef.current
-    if (!editor || editor.state.doc.toString() === value) return
+    if (!editor) return
 
+    const sessionChanged = currentSessionIdRef.current !== editorSessionId
+    const noteRenamed = !sessionChanged && currentNoteKeyRef.current !== noteKey
+    if (noteRenamed) {
+      renameEditorViewState(currentNoteKeyRef.current, noteKey)
+      currentNoteKeyRef.current = noteKey
+    }
+    if (sessionChanged) {
+      rememberEditorViewState(
+        currentNoteKeyRef.current,
+        editor.state,
+        editor.scrollDOM.scrollTop,
+      )
+      currentSessionIdRef.current = editorSessionId
+      currentNoteKeyRef.current = noteKey
+      editor.dispatch({
+        effects: historyCompartmentRef.current.reconfigure([]),
+      })
+    }
+
+    const documentChanged = editor.state.doc.toString() !== value
+    if (documentChanged || sessionChanged) {
+      const recalled = sessionChanged
+        ? recallEditorViewState(noteKey, value.length)
+        : null
+      editor.dispatch({
+        annotations: [
+          externalSync.of(true),
+          Transaction.addToHistory.of(false),
+        ],
+        changes: documentChanged
+          ? { from: 0, to: editor.state.doc.length, insert: value }
+          : undefined,
+        effects: sessionChanged
+          ? [
+              historyCompartmentRef.current.reconfigure(history()),
+              livePreviewCompartmentRef.current.reconfigure(
+                livePreview((target) => resolveWikiLinkRef.current(target)),
+              ),
+            ]
+          : undefined,
+        selection: sessionChanged
+          ? recalled?.selection ?? { anchor: 0 }
+          : undefined,
+      })
+      if (sessionChanged) {
+        const scrollTop = recalled?.scrollTop ?? 0
+        editor.requestMeasure({
+          read: () => null,
+          write: () => {
+            editor.scrollDOM.scrollTop = scrollTop
+            rememberEditorViewState(noteKey, editor.state, scrollTop)
+          },
+        })
+      }
+    }
+  }, [editorSessionId, noteKey, value])
+
+  useEffect(() => {
+    const editor = editorRef.current
+    if (!editor) return
     editor.dispatch({
-      annotations: externalSync.of(true),
-      changes: { from: 0, to: editor.state.doc.length, insert: value },
+      effects: contentAttributesCompartmentRef.current.reconfigure(
+        editorContentAttributes(spellcheckEnabled),
+      ),
     })
-  }, [value])
+  }, [spellcheckEnabled])
 
-  return <div className="markdown-editor" ref={containerRef} />
+  function applyBlock(kind: MarkdownBlockKind) {
+    const editor = editorRef.current
+    if (!editor) return
+    setMarkdownBlock(kind)({
+      state: editor.state,
+      dispatch: (transaction) => editor.dispatch(transaction),
+    })
+    editor.focus()
+  }
+
+  return (
+    <EditorContextMenu
+      onBlockChange={applyBlock}
+      onSpellcheckChange={onSpellcheckEnabledChange}
+      spellcheckEnabled={spellcheckEnabled}
+    >
+      <div className="markdown-editor" ref={containerRef} />
+    </EditorContextMenu>
+  )
 })

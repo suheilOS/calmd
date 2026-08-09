@@ -251,6 +251,56 @@
   position: absolute;
 }
 
+.markdown-editor .cm-heading-source {
+  color: var(--color-syntax);
+  display: inline-block;
+  position: relative;
+  text-align: end;
+}
+
+.markdown-editor .cm-heading-source-1 { margin-inline-start: -2ch; width: 2ch; }
+.markdown-editor .cm-heading-source-2 { margin-inline-start: -3ch; width: 3ch; }
+.markdown-editor .cm-heading-source-3 { margin-inline-start: -4ch; width: 4ch; }
+.markdown-editor .cm-heading-source-4 { margin-inline-start: -5ch; width: 5ch; }
+.markdown-editor .cm-heading-source-5 { margin-inline-start: -6ch; width: 6ch; }
+.markdown-editor .cm-heading-source-6 { margin-inline-start: -7ch; width: 7ch; }
+
+.markdown-editor .cm-fenced-code-line {
+  background: var(--color-hover);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.markdown-editor .cm-thematic-break {
+  border-top: 0.5px solid var(--color-divider);
+  display: inline-block;
+  transform: translateY(-0.2em);
+  width: 100%;
+}
+
+.markdown-editor .cm-list-marker {
+  color: var(--color-syntax);
+  display: inline-block;
+  text-align: start;
+}
+
+.markdown-editor .cm-task-marker {
+  display: inline-block;
+}
+
+.markdown-editor .cm-task-checkbox {
+  accent-color: var(--color-accent);
+  block-size: 1em;
+  cursor: pointer;
+  inline-size: 1em;
+  margin: 0 0.5ch 0 0;
+  vertical-align: -0.08em;
+}
+
+.markdown-editor.cm-live-preview-pending .cm-content {
+  opacity: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .backlinks-popover,
   .note-preview-popover {

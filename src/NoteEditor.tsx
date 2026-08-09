@@ -44,11 +44,14 @@ async function loadNotePreview(
 
 type NoteEditorProps = {
   draft: NoteDraft
+  editorSessionId: number
+  spellcheckEnabled: boolean
   noteKey: string
   backlinksOpen: boolean
   onDraftChange: (draft: NoteDraft) => void
   onBacklinksOpenChange: (open: boolean) => void
   onConflictReload: (() => void) | null
+  onSpellcheckEnabledChange: (enabled: boolean) => void
   onWikiLinkActivate: (activation: WikiLinkActivation) => void
   onBacklinkSelect: (key: string) => void
   resolveWikiLink: (target: string) => Promise<boolean | null>
@@ -58,11 +61,14 @@ type NoteEditorProps = {
 
 export function NoteEditor({
   draft,
+  editorSessionId,
+  spellcheckEnabled,
   noteKey,
   backlinksOpen,
   onDraftChange,
   onBacklinksOpenChange,
   onConflictReload,
+  onSpellcheckEnabledChange,
   onWikiLinkActivate,
   onBacklinkSelect,
   resolveWikiLink,
@@ -125,6 +131,8 @@ export function NoteEditor({
         <div className="mt-6 sm:mt-8">
           <Suspense fallback={<div aria-hidden="true" className="min-h-[58vh]" />}>
             <MarkdownEditor
+              editorSessionId={editorSessionId}
+              noteKey={noteKey}
               ref={bodyEditorRef}
               onChange={(body) => onDraftChange({ ...draft, body })}
               onPreviewCandidateEnter={previewController.enterSource}
@@ -132,6 +140,8 @@ export function NoteEditor({
               onPreviewDismiss={previewController.dismiss}
               onWikiLinkActivate={onWikiLinkActivate}
               resolveWikiLink={resolveWikiLink}
+              onSpellcheckEnabledChange={onSpellcheckEnabledChange}
+              spellcheckEnabled={spellcheckEnabled}
               suggestWikiLinks={suggestWikiLinks}
               value={draft.body}
             />

@@ -50,6 +50,14 @@ export function saveStoredSubstackPublicationUrl(url: string) {
   return invoke<string>('set_substack_publication_url', { url })
 }
 
+export function readStoredEditorSpellcheck() {
+  return invoke<boolean>('get_editor_spellcheck')
+}
+
+export function saveStoredEditorSpellcheck(enabled: boolean) {
+  return invoke<boolean>('set_editor_spellcheck', { enabled })
+}
+
 export function searchStoredNotes(query: string) {
   return invoke<SearchResponse>('search_notes', { query })
 }

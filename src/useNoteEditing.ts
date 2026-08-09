@@ -12,6 +12,7 @@ export function useNoteEditing(
 ) {
   const sessionRef = useRef<NoteEditingSession | null>(null)
   const [snapshot, setSnapshot] = useState<NoteEditingSnapshot | null>(null)
+  const [editorSessionId, setEditorSessionId] = useState(0)
   const onRenameRef = useRef(onRename)
 
   useEffect(() => {
@@ -32,6 +33,7 @@ export function useNoteEditing(
     )
     sessionRef.current = session
     setSnapshot(session.current())
+    setEditorSessionId((id) => id + 1)
   }, [persistence])
 
   const updateDraft = useCallback((draft: NoteDraft) => {
@@ -43,7 +45,9 @@ export function useNoteEditing(
   }, [])
 
   const reload = useCallback(async () => {
-    return await sessionRef.current?.reload() ?? false
+    const reloaded = await sessionRef.current?.reload() ?? false
+    if (reloaded) setEditorSessionId((id) => id + 1)
+    return reloaded
   }, [])
 
   const flush = useCallback(async () => {
@@ -68,5 +72,15 @@ export function useNoteEditing(
     return true
   }, [close, flush])
 
-  return { snapshot, begin, updateDraft, updateBody, reload, flush, close, flushAndClose }
+  return {
+    snapshot,
+    editorSessionId,
+    begin,
+    updateDraft,
+    updateBody,
+    reload,
+    flush,
+    close,
+    flushAndClose,
+  }
 }
