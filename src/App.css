@@ -252,6 +252,25 @@
   color: var(--color-syntax);
 }
 
+.markdown-editor .cm-quote-line {
+  --quote-indent: 1.2rem;
+  padding-inline-start: var(--quote-indent);
+  position: relative;
+}
+
+.markdown-editor .cm-quote-prefix-line .cm-quote-marker {
+  margin-inline-start: calc(-1 * var(--quote-indent));
+}
+
+.markdown-editor .cm-quote-line::before {
+  background: var(--color-border);
+  content: "";
+  inset-block: 0;
+  inset-inline-start: 0.32ch;
+  position: absolute;
+  width: 2px;
+}
+
 .markdown-editor .cm-quote-marker {
   background: linear-gradient(
     to right,

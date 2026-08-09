@@ -294,8 +294,24 @@ function livePreviewDecorations(
           return
         }
 
+        if (node.name === 'Blockquote') {
+          const firstLine = view.state.doc.lineAt(node.from).number
+          const lastLine = view.state.doc.lineAt(Math.max(node.from, node.to - 1)).number
+          for (let number = firstLine; number <= lastLine; number += 1) {
+            decorations.push(Decoration.line({ class: 'cm-quote-line' }).range(
+              view.state.doc.line(number).from,
+            ))
+          }
+          return
+        }
+
         if (node.name === 'QuoteMark') {
           const spaced = /[\t ]/.test(view.state.sliceDoc(node.to, node.to + 1))
+          if (spaced) {
+            decorations.push(Decoration.line({ class: 'cm-quote-prefix-line' }).range(
+              view.state.doc.lineAt(node.from).from,
+            ))
+          }
           if (spaced && !owningLineIsActive(view, node.from)) {
             decorations.push(Decoration.mark({ class: 'cm-quote-marker' }).range(
               node.from,

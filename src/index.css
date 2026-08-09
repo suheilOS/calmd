@@ -104,8 +104,8 @@ html {
     --color-active: oklch(0.365 0.004 67.689);
     --color-active-ink: oklch(0.990 0.016 95.219);
     --color-active-muted: oklch(0.772 0.013 96.470);
-    --color-selection: oklch(0.599 0.110 246.996);
-    --color-selection-ink: oklch(0.170 0.002 17.321);
+    --color-selection: oklch(0.420 0.080 246.996);
+    --color-selection-ink: oklch(0.990 0.016 95.219);
     --color-highlight: oklch(0.370 0.074 88.380);
     --color-accent: oklch(0.670 0.100 186.578);
     --color-missing-link: color-mix(in oklab, var(--color-accent) 65%, var(--color-ink));

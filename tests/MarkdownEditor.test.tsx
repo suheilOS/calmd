@@ -330,6 +330,12 @@ describe('MarkdownEditor Live Preview', () => {
     )
   })
 
+  test('extends blockquote styling across every quote line', async () => {
+    const { container } = await renderEditor('> first line\ncontinuation', 1)
+
+    expect(container.querySelectorAll('.cm-quote-line')).toHaveLength(2)
+  })
+
   test('previews escapes, Setext headings, fenced code, and thematic breaks', async () => {
     const source = 'Heading\n---\n\\*literal\\*\n```ts\nconst value = 1\n```\n***\ntail'
     const { container } = await renderEditor(source, 1)
