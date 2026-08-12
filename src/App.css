@@ -196,10 +196,7 @@
 }
 
 .markdown-editor .cm-highlight {
-  background-color: var(--color-highlight);
   border-radius: 0.2em;
-  box-decoration-break: clone;
-  -webkit-box-decoration-break: clone;
 }
 
 .markdown-editor .cm-emphasis {
@@ -235,10 +232,7 @@
 }
 
 .markdown-editor .cm-monospace {
-  background: var(--color-surface);
   border-radius: 0.3rem;
-  box-decoration-break: clone;
-  -webkit-box-decoration-break: clone;
   color: var(--color-ink);
   font-family: var(--font-code);
   padding: 0.1em 0.32em;
@@ -305,9 +299,6 @@
 .markdown-editor .cm-heading-source-6 { font-size: var(--text-editor-heading-3); margin-inline-start: -7ch; width: 7ch; }
 
 .markdown-editor .cm-fenced-code-line {
-  background: var(--color-surface);
-  box-decoration-break: clone;
-  -webkit-box-decoration-break: clone;
   font-family: var(--font-code);
   font-size: 0.9em;
   line-height: 1.45;
@@ -315,21 +306,42 @@
 }
 
 .markdown-editor .cm-fenced-code-line .cm-monospace {
-  background: transparent;
   border-radius: 0;
   padding: 0;
 }
 
 .markdown-editor .cm-fenced-code-first-line {
-  border-start-start-radius: 0.5rem;
-  border-start-end-radius: 0.5rem;
   padding-block-start: 0.25rem;
 }
 
 .markdown-editor .cm-fenced-code-last-line {
+  padding-block-end: 0.25rem;
+}
+
+.markdown-editor .cm-fenced-code-background,
+.markdown-editor .cm-monospace-background {
+  background: var(--color-surface);
+  pointer-events: none;
+}
+
+.markdown-editor .cm-monospace-background {
+  border-radius: 0.3rem;
+}
+
+.markdown-editor .cm-highlight-background {
+  background: var(--color-highlight);
+  border-radius: 0.2em;
+  pointer-events: none;
+}
+
+.markdown-editor .cm-fenced-code-background-first-line {
+  border-start-start-radius: 0.5rem;
+  border-start-end-radius: 0.5rem;
+}
+
+.markdown-editor .cm-fenced-code-background-last-line {
   border-end-start-radius: 0.5rem;
   border-end-end-radius: 0.5rem;
-  padding-block-end: 0.25rem;
 }
 
 .markdown-editor .cm-thematic-break {

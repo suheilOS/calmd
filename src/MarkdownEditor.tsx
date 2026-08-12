@@ -32,12 +32,15 @@ import {
   Transaction,
 } from '@codemirror/state'
 import {
+  Direction,
   drawSelection,
   dropCursor,
   EditorView,
   highlightSpecialChars,
   keymap,
+  layer,
   placeholder,
+  RectangleMarker,
   ViewPlugin,
   type ViewUpdate,
 } from '@codemirror/view'
@@ -347,6 +350,65 @@ function linkInteraction(
   })
 }
 
+// Backgrounds must be rendered in a layer below CodeMirror's drawn selection.
+// The layer is intentionally declared after drawSelection() so its z-index stays lower.
+const markdownBackgroundLayer = layer({
+  above: false,
+  class: 'cm-markdown-background-layer',
+  update(update) {
+    return update.docChanged || update.selectionSet || update.viewportChanged || update.geometryChanged
+  },
+  markers(view) {
+    const scrollRect = view.scrollDOM.getBoundingClientRect()
+    const baseLeft = view.textDirection === Direction.LTR
+      ? scrollRect.left
+      : scrollRect.right - view.scrollDOM.clientWidth * view.scaleX
+    const baseTop = scrollRect.top
+    const markerForRect = (className: string, rect: DOMRect) => new RectangleMarker(
+      className,
+      rect.left - baseLeft + view.scrollDOM.scrollLeft * view.scaleX,
+      rect.top - baseTop + view.scrollDOM.scrollTop * view.scaleY,
+      rect.width,
+      rect.height,
+    )
+    const markers: RectangleMarker[] = []
+
+    for (const line of view.dom.querySelectorAll<HTMLElement>('.cm-line.cm-fenced-code-line')) {
+      const rect = line.getBoundingClientRect()
+      const className = [
+        'cm-fenced-code-background',
+        line.classList.contains('cm-fenced-code-first-line')
+          ? 'cm-fenced-code-background-first-line'
+          : '',
+        line.classList.contains('cm-fenced-code-last-line')
+          ? 'cm-fenced-code-background-last-line'
+          : '',
+      ].filter(Boolean).join(' ')
+      markers.push(markerForRect(className, rect))
+    }
+
+    for (const code of view.dom.querySelectorAll<HTMLElement>('.cm-monospace')) {
+      if (code.closest('.cm-fenced-code-line')) continue
+      for (const rect of code.getClientRects()) {
+        if (rect.width > 0 && rect.height > 0) {
+          markers.push(markerForRect('cm-monospace-background', rect))
+        }
+      }
+    }
+
+    for (const highlight of view.dom.querySelectorAll<HTMLElement>('.cm-highlight')) {
+      if (highlight.closest('.cm-fenced-code-line')) continue
+      for (const rect of highlight.getClientRects()) {
+        if (rect.width > 0 && rect.height > 0) {
+          markers.push(markerForRect('cm-highlight-background', rect))
+        }
+      }
+    }
+
+    return markers
+  },
+})
+
 const editorExtensions = [
   highlightSpecialChars(),
   drawSelection(),
@@ -391,6 +453,7 @@ const editorExtensions = [
   EditorView.lineWrapping,
   placeholder('Start writing…'),
   editorTheme,
+  markdownBackgroundLayer,
 ]
 
 export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(function MarkdownEditor({

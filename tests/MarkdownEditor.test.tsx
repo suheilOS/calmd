@@ -321,12 +321,12 @@ describe('MarkdownEditor Live Preview', () => {
 
   test('hides inactive prose syntax consistently', async () => {
     const { container } = await renderEditor(
-      '~~gone~~, `code`, and [Calmd](https://calmd.local) tail',
+      '~~gone~~, `code`, ==highlighted==, and [Calmd](https://calmd.local) tail',
       1,
     )
 
     expect(container.querySelector('.cm-content')?.textContent).toBe(
-      'gone, code, and Calmd tail',
+      'gone, code, highlighted, and Calmd tail',
     )
   })
 
@@ -347,6 +347,7 @@ describe('MarkdownEditor Live Preview', () => {
     expect(content.textContent).not.toContain('ts')
     expect(content.textContent).toContain('*literal*')
     expect(container.querySelector('.cm-thematic-break')).not.toBeNull()
+    expect(container.querySelectorAll('.cm-fenced-code-background')).toHaveLength(3)
 
     const view = EditorView.findFromDOM(content)
     view.contentDOM.blur()
