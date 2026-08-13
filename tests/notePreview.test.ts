@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'bun:test'
 import {
-  isPlatformPrimaryModifier,
   NOTE_PREVIEW_CHARACTER_LIMIT,
   NOTE_PREVIEW_CLOSE_DELAY_MS,
   NOTE_PREVIEW_OPEN_DELAY_MS,
@@ -215,23 +214,5 @@ describe('note previews', () => {
     controller.leaveSource()
     scheduler.advance(NOTE_PREVIEW_CLOSE_DELAY_MS)
     expect(controller.getSnapshot().status).toBe('idle')
-  })
-
-  test('requires only the platform primary modifier', () => {
-    const none = { altKey: false, ctrlKey: false, metaKey: false, shiftKey: false }
-    expect(isPlatformPrimaryModifier('MacIntel', { ...none, metaKey: true })).toBe(true)
-    expect(isPlatformPrimaryModifier('MacIntel', { ...none, ctrlKey: true })).toBe(false)
-    expect(isPlatformPrimaryModifier('Linux', { ...none, ctrlKey: true })).toBe(true)
-    expect(isPlatformPrimaryModifier('Win32', { ...none, metaKey: true })).toBe(false)
-    expect(isPlatformPrimaryModifier('Linux', {
-      ...none,
-      ctrlKey: true,
-      shiftKey: true,
-    })).toBe(false)
-    expect(isPlatformPrimaryModifier('MacIntel', {
-      ...none,
-      ctrlKey: true,
-      metaKey: true,
-    })).toBe(false)
   })
 })

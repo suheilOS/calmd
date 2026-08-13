@@ -19,6 +19,8 @@ pub fn run() {
             storage::open_vault,
             storage::get_substack_publication_url,
             storage::set_substack_publication_url,
+            storage::get_editor_spellcheck,
+            storage::set_editor_spellcheck,
             storage::search_notes,
             storage::suggest_notes,
             storage::create_note,

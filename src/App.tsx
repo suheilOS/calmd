@@ -8,6 +8,7 @@ import {
   isNavigateHomeShortcut,
 } from './keyboardShortcuts'
 import { NoteEditor } from './NoteEditor'
+import { clearEditorViewState, discardEditorViewState } from './editorViewState'
 import { SubstackNoteActions } from './SubstackNoteActions'
 import type { WikiLinkActivation } from './MarkdownEditor'
 import { NoteNavigation } from './noteNavigation'
@@ -27,6 +28,8 @@ import {
   openVault,
   openStoredNoteLink,
   readStoredNote,
+  readStoredEditorSpellcheck,
+  saveStoredEditorSpellcheck,
   searchStoredNotes,
   selectVault,
   storedWikiLinkExists,
@@ -58,9 +61,13 @@ function App() {
   const [deleting, setDeleting] = useState(false)
   const [activeResultIndex, setActiveResultIndex] = useState(-1)
   const [storageMessage, setStorageMessage] = useState<string | null>(null)
+  const [spellcheckEnabled, setSpellcheckEnabled] = useState(true)
   const [searchView, setSearchView] = useState<SearchView>(EMPTY_SEARCH_VIEW)
   const [searchGeneration, setSearchGeneration] = useState(0)
   const searchRequestRef = useRef(0)
+  const spellcheckRequestRef = useRef(0)
+  const lastPersistedSpellcheckRef = useRef(true)
+  const spellcheckSaveRef = useRef(Promise.resolve())
   const [navigation] = useState(() => new NoteNavigation())
   const [, setNavigationRevision] = useState(0)
   const noteEditing = useNoteEditing(tauriNotePersistence, (oldKey, newKey) => {
@@ -114,6 +121,42 @@ function App() {
     const startupTimer = window.setTimeout(() => void refreshVault(), 0)
     return () => window.clearTimeout(startupTimer)
   }, [refreshVault])
+
+  useEffect(() => {
+    const requestId = ++spellcheckRequestRef.current
+    void readStoredEditorSpellcheck().then(
+      (enabled) => {
+        if (spellcheckRequestRef.current === requestId) {
+          lastPersistedSpellcheckRef.current = enabled
+          setSpellcheckEnabled(enabled)
+        }
+      },
+      (error) => {
+        if (spellcheckRequestRef.current === requestId) {
+          setStorageMessage(getStorageError(error).message)
+        }
+      },
+    )
+  }, [])
+
+  async function updateSpellcheck(enabled: boolean) {
+    const requestId = ++spellcheckRequestRef.current
+    setSpellcheckEnabled(enabled)
+    try {
+      const operation = spellcheckSaveRef.current.then(() =>
+        saveStoredEditorSpellcheck(enabled),
+      )
+      spellcheckSaveRef.current = operation.then(() => undefined, () => undefined)
+      const saved = await operation
+      lastPersistedSpellcheckRef.current = saved
+      if (spellcheckRequestRef.current === requestId) setSpellcheckEnabled(saved)
+    } catch (error) {
+      if (spellcheckRequestRef.current === requestId) {
+        setSpellcheckEnabled(lastPersistedSpellcheckRef.current)
+        setStorageMessage(getStorageError(error).message)
+      }
+    }
+  }
 
   useEffect(() => {
     function handleFocus() {
@@ -236,6 +279,7 @@ function App() {
       await deleteStoredNote(saved.key, saved.revision)
       if (!navigation.isCurrent(generation)) return
       navigation.completeNoteDeletion(saved.key)
+      discardEditorViewState(saved.key)
       setNavigationRevision((revision) => revision + 1)
       noteEditing.close()
       setThought('')
@@ -349,6 +393,7 @@ function App() {
     try {
       const didSelect = await selectVault(vaultName)
       if (didSelect) {
+        clearEditorViewState()
         setVaultReady(true)
         setSearchGeneration((generation) => generation + 1)
         setVaultName('')
@@ -454,15 +499,19 @@ function App() {
       <NoteEditor
         backlinksOpen={backlinksOpen}
         draft={editorDraft}
+        editorSessionId={noteEditing.editorSessionId}
         noteKey={noteEditing.snapshot!.key}
         onBacklinksOpenChange={setBacklinksOpen}
         onDraftChange={noteEditing.updateDraft}
         onConflictReload={noteEditing.snapshot?.conflict ? reloadConflictedNote : null}
+        onExternalLinkError={(error) => setStorageMessage(getStorageError(error).message)}
+        onSpellcheckEnabledChange={(enabled) => void updateSpellcheck(enabled)}
         onWikiLinkActivate={(activation) => void activateWikiLink(activation)}
         onBacklinkSelect={(key) => void openNote({ key })}
         resolveWikiLink={storedWikiLinkExists}
         suggestWikiLinks={suggestStoredNotes}
         saveMessage={noteEditing.snapshot?.failure?.message ?? storageMessage}
+        spellcheckEnabled={spellcheckEnabled}
       />
       </AppShell>
     )

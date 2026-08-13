@@ -1,6 +1,7 @@
 import { Button } from '@base-ui/react/button'
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { BacklinksPopover } from './BacklinksPopover'
+import { EditorContextMenu } from './EditorContextMenu'
 import { NotePreviewPopover } from './NotePreviewPopover'
 import type { MarkdownEditorHandle, WikiLinkActivation } from './MarkdownEditor'
 import { handleTitleKeyDown } from './titleKeyDown'
@@ -44,11 +45,15 @@ async function loadNotePreview(
 
 type NoteEditorProps = {
   draft: NoteDraft
+  editorSessionId: number
+  spellcheckEnabled: boolean
   noteKey: string
   backlinksOpen: boolean
   onDraftChange: (draft: NoteDraft) => void
   onBacklinksOpenChange: (open: boolean) => void
   onConflictReload: (() => void) | null
+  onExternalLinkError: (error: unknown) => void
+  onSpellcheckEnabledChange: (enabled: boolean) => void
   onWikiLinkActivate: (activation: WikiLinkActivation) => void
   onBacklinkSelect: (key: string) => void
   resolveWikiLink: (target: string) => Promise<boolean | null>
@@ -58,11 +63,15 @@ type NoteEditorProps = {
 
 export function NoteEditor({
   draft,
+  editorSessionId,
+  spellcheckEnabled,
   noteKey,
   backlinksOpen,
   onDraftChange,
   onBacklinksOpenChange,
   onConflictReload,
+  onExternalLinkError,
+  onSpellcheckEnabledChange,
   onWikiLinkActivate,
   onBacklinkSelect,
   resolveWikiLink,
@@ -89,11 +98,12 @@ export function NoteEditor({
   return (
     <main className="app bg-canvas text-ink">
       <article className="note-editor-page mx-auto w-full max-w-[65ch] px-6 pb-24 pt-[15vh] sm:px-8">
-        <label className="sr-only" htmlFor="note-title">Note title</label>
-        <textarea
+        <div className="flex items-start gap-2">
+          <label className="sr-only" htmlFor="note-title">Note title</label>
+          <textarea
           aria-label="Note title"
           autoComplete="off"
-          className="block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-large text-ink outline-none break-words placeholder:text-placeholder focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-faint [field-sizing:content]"
+          className="block min-w-0 flex-1 resize-none overflow-hidden border-0 bg-transparent p-0 text-large text-ink outline-none break-words placeholder:text-placeholder focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-faint [field-sizing:content]"
           id="note-title"
           maxLength={MAX_NOTE_TITLE_LENGTH}
           name="title"
@@ -121,17 +131,27 @@ export function NoteEditor({
           ref={titleRef}
           rows={1}
           value={draft.title}
-        />
+          />
+          <EditorContextMenu
+            onBlockChange={(kind) => bodyEditorRef.current?.applyBlock(kind)}
+            onSpellcheckChange={onSpellcheckEnabledChange}
+            spellcheckEnabled={spellcheckEnabled}
+          />
+        </div>
         <div className="mt-6 sm:mt-8">
           <Suspense fallback={<div aria-hidden="true" className="min-h-[58vh]" />}>
             <MarkdownEditor
+              editorSessionId={editorSessionId}
+              noteKey={noteKey}
               ref={bodyEditorRef}
               onChange={(body) => onDraftChange({ ...draft, body })}
               onPreviewCandidateEnter={previewController.enterSource}
               onPreviewCandidateLeave={previewController.leaveSource}
               onPreviewDismiss={previewController.dismiss}
+              onExternalLinkError={onExternalLinkError}
               onWikiLinkActivate={onWikiLinkActivate}
               resolveWikiLink={resolveWikiLink}
+              spellcheckEnabled={spellcheckEnabled}
               suggestWikiLinks={suggestWikiLinks}
               value={draft.body}
             />

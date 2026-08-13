@@ -22,6 +22,7 @@ use url::Url;
 const SETTINGS_FILE: &str = "settings.json";
 const VAULT_PATH_KEY: &str = "vault_path";
 const SUBSTACK_PUBLICATION_URL_KEY: &str = "substack_publication_url";
+const EDITOR_SPELLCHECK_KEY: &str = "editor_spellcheck_enabled";
 const MAX_FILENAME_BYTES: usize = 180;
 const NOTE_PREVIEW_CHARACTER_LIMIT: usize = 4_000;
 
@@ -114,6 +115,32 @@ pub fn set_substack_publication_url(url: String, app: AppHandle) -> CommandResul
         .save()
         .map_err(|error| CommandError::io("Could not save settings", error))?;
     Ok(url)
+}
+
+fn editor_spellcheck_from_value(value: Option<&serde_json::Value>) -> bool {
+    value.and_then(serde_json::Value::as_bool).unwrap_or(true)
+}
+
+#[tauri::command]
+pub fn get_editor_spellcheck(app: AppHandle) -> CommandResult<bool> {
+    let store = app
+        .store(SETTINGS_FILE)
+        .map_err(|error| CommandError::io("Could not open settings", error))?;
+    Ok(editor_spellcheck_from_value(
+        store.get(EDITOR_SPELLCHECK_KEY).as_ref(),
+    ))
+}
+
+#[tauri::command]
+pub fn set_editor_spellcheck(enabled: bool, app: AppHandle) -> CommandResult<bool> {
+    let store = app
+        .store(SETTINGS_FILE)
+        .map_err(|error| CommandError::io("Could not open settings", error))?;
+    store.set(EDITOR_SPELLCHECK_KEY, serde_json::Value::Bool(enabled));
+    store
+        .save()
+        .map_err(|error| CommandError::io("Could not save settings", error))?;
+    Ok(enabled)
 }
 
 #[tauri::command]
@@ -707,5 +734,19 @@ mod tests {
         assert!(
             normalize_substack_publication_url("https://example.substack.com?draft=1").is_err()
         );
+    }
+
+    #[test]
+    fn editor_spellcheck_defaults_on_and_respects_a_stored_boolean() {
+        assert!(editor_spellcheck_from_value(None));
+        assert!(editor_spellcheck_from_value(Some(
+            &serde_json::Value::Bool(true)
+        )));
+        assert!(!editor_spellcheck_from_value(Some(
+            &serde_json::Value::Bool(false)
+        )));
+        assert!(editor_spellcheck_from_value(Some(
+            &serde_json::Value::String("invalid".to_owned(),)
+        )));
     }
 }

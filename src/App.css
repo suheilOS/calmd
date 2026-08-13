@@ -182,16 +182,21 @@
   font-size: var(--text-editor-heading-3);
 }
 
+.markdown-editor .cm-heading-line {
+  padding-block-start: 0.875rem !important;
+}
+
+.markdown-editor .cm-heading-line-1 {
+  padding-block-start: 1.125rem !important;
+}
+
 .markdown-editor .cm-strong {
   color: var(--color-ink);
   font-weight: 650;
 }
 
 .markdown-editor .cm-highlight {
-  background-color: var(--color-highlight);
   border-radius: 0.2em;
-  box-decoration-break: clone;
-  -webkit-box-decoration-break: clone;
 }
 
 .markdown-editor .cm-emphasis {
@@ -227,7 +232,10 @@
 }
 
 .markdown-editor .cm-monospace {
+  border-radius: 0.3rem;
   color: var(--color-ink);
+  font-family: var(--font-code);
+  padding: 0.1em 0.32em;
 }
 
 .markdown-editor .cm-quote {
@@ -238,17 +246,132 @@
   color: var(--color-syntax);
 }
 
-.markdown-editor .cm-quote-marker {
-  color: transparent;
+.markdown-editor .cm-quote-line {
+  --quote-indent: 1.2rem;
+  padding-inline-start: var(--quote-indent);
   position: relative;
 }
 
-.markdown-editor .cm-quote-marker::before {
-  color: var(--color-syntax);
-  content: "|";
-  font-weight: 600;
-  inset-inline-start: 0.25ch;
+.markdown-editor .cm-quote-prefix-line .cm-quote-marker {
+  margin-inline-start: calc(-1 * var(--quote-indent));
+}
+
+.markdown-editor .cm-quote-line::before {
+  background: var(--color-border);
+  content: "";
+  inset-block: 0;
+  inset-inline-start: 0.32ch;
   position: absolute;
+  width: 2px;
+}
+
+.markdown-editor .cm-quote-marker {
+  background: linear-gradient(
+    to right,
+    transparent 0.32ch,
+    var(--color-border) 0.32ch,
+    var(--color-border) calc(0.32ch + 2px),
+    transparent calc(0.32ch + 2px)
+  );
+  color: transparent !important;
+  display: inline-block;
+  margin-inline-end: 0.4rem;
+}
+
+.markdown-editor .cm-quote-marker * {
+  color: transparent !important;
+  -webkit-text-fill-color: transparent;
+}
+
+.markdown-editor .cm-heading-source {
+  color: var(--color-syntax);
+  display: inline-block;
+  line-height: 1.15;
+  position: relative;
+  text-align: end;
+}
+
+.markdown-editor .cm-heading-source-1 { font-size: var(--text-editor-heading-1); margin-inline-start: -2ch; width: 2ch; }
+.markdown-editor .cm-heading-source-2 { font-size: var(--text-editor-heading-2); margin-inline-start: -3ch; width: 3ch; }
+.markdown-editor .cm-heading-source-3 { font-size: var(--text-editor-heading-3); margin-inline-start: -4ch; width: 4ch; }
+.markdown-editor .cm-heading-source-4 { font-size: var(--text-editor-heading-3); margin-inline-start: -5ch; width: 5ch; }
+.markdown-editor .cm-heading-source-5 { font-size: var(--text-editor-heading-3); margin-inline-start: -6ch; width: 6ch; }
+.markdown-editor .cm-heading-source-6 { font-size: var(--text-editor-heading-3); margin-inline-start: -7ch; width: 7ch; }
+
+.markdown-editor .cm-fenced-code-line {
+  font-family: var(--font-code);
+  font-size: 0.9em;
+  line-height: 1.45;
+  padding-inline: 0.75rem;
+}
+
+.markdown-editor .cm-fenced-code-line .cm-monospace {
+  border-radius: 0;
+  padding: 0;
+}
+
+.markdown-editor .cm-fenced-code-first-line {
+  padding-block-start: 0.25rem;
+}
+
+.markdown-editor .cm-fenced-code-last-line {
+  padding-block-end: 0.25rem;
+}
+
+.markdown-editor .cm-fenced-code-background,
+.markdown-editor .cm-monospace-background {
+  background: var(--color-surface);
+  pointer-events: none;
+}
+
+.markdown-editor .cm-monospace-background {
+  border-radius: 0.3rem;
+}
+
+.markdown-editor .cm-highlight-background {
+  background: var(--color-highlight);
+  border-radius: 0.2em;
+  pointer-events: none;
+}
+
+.markdown-editor .cm-fenced-code-background-first-line {
+  border-start-start-radius: 0.5rem;
+  border-start-end-radius: 0.5rem;
+}
+
+.markdown-editor .cm-fenced-code-background-last-line {
+  border-end-start-radius: 0.5rem;
+  border-end-end-radius: 0.5rem;
+}
+
+.markdown-editor .cm-thematic-break {
+  border-top: 0.5px solid var(--color-divider);
+  display: inline-block;
+  transform: translateY(-0.2em);
+  width: 100%;
+}
+
+.markdown-editor .cm-list-marker {
+  color: var(--color-syntax);
+  display: inline-block;
+  text-align: start;
+}
+
+.markdown-editor .cm-task-marker {
+  display: inline-block;
+}
+
+.markdown-editor .cm-task-checkbox {
+  accent-color: var(--color-accent);
+  block-size: 1em;
+  cursor: pointer;
+  inline-size: 1em;
+  margin: 0 0.5ch 0 0;
+  vertical-align: -0.08em;
+}
+
+.markdown-editor .cm-editor.cm-live-preview-pending .cm-content {
+  opacity: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {

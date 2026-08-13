@@ -63,3 +63,7 @@ _Avoid_: App-only link
 **Backlink**:
 An internal link from another note into the note currently being read. Backlinks stay hidden until explicitly requested.
 _Avoid_: Related-notes panel
+
+**Live Preview**:
+Calmd's sole editing presentation, in which supported Markdown appears formatted until its source syntax becomes relevant. Inline syntax is revealed only for an active formatted span, every span overlapped by a completed selection is active, and structural prefixes are revealed for their owning line. A caret at either boundary activates a span; adjacent spans can therefore both be active at a shared boundary. Pointer-drag selection keeps the presentation stable until the selection is completed. The same note content and active selection always have the same presentation.
+_Avoid_: Whole-line source reveal, reading view, WYSIWYG

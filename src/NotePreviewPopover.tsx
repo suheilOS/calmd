@@ -1,9 +1,8 @@
 import { Popover } from '@base-ui/react/popover'
 import { lazy, Suspense, useEffect, useSyncExternalStore } from 'react'
 import type { NoteDraft } from './notes'
+import { isPlatformPrimaryModifier, navigationPlatform } from './navigation'
 import {
-  isPlatformPrimaryModifier,
-  navigationPlatform,
   NotePreviewController,
   previewFromDraft,
 } from './notePreview'
