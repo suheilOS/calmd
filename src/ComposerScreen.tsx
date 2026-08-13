@@ -135,7 +135,7 @@ export function ComposerScreen({
           <div className="min-h-0 overflow-hidden">
             <Button
               aria-keyshortcuts="Control+Alt+R Meta+Alt+R"
-              className="inline-flex min-h-9 items-center rounded-lg px-2 text-small text-secondary transition-[background-color,color,transform] duration-150 ease-out enabled:hover:bg-surface enabled:hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-faint active:scale-[0.97] disabled:cursor-default"
+              className="-mx-2 inline-flex min-h-9 items-center rounded-lg px-2 text-small text-secondary transition-[background-color,color,transform] duration-150 ease-out enabled:hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-faint active:scale-[0.97] disabled:cursor-default"
               disabled={hasThought}
               onClick={onRandomNote}
               type="button"
