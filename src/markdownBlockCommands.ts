@@ -42,6 +42,11 @@ export function setMarkdownBlock(kind: MarkdownBlockKind): StateCommand {
         const line = state.doc.line(number)
         const match = line.text.match(structuralPrefix)
         const indentation = match?.[1] ?? ''
+        for (const existingIndentation of orderedIndexes.keys()) {
+          if (existingIndentation.length > indentation.length) {
+            orderedIndexes.delete(existingIndentation)
+          }
+        }
         const orderedIndex = orderedIndexes.get(indentation) ?? 0
         orderedIndexes.set(indentation, orderedIndex + 1)
         const prefixStart = line.from + indentation.length

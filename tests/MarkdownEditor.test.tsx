@@ -1,10 +1,13 @@
 import { afterEach, beforeAll, describe, expect, test } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
+import { commonmarkLanguage, markdown } from '@codemirror/lang-markdown'
 import { EditorSelection } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
+import { GFM } from '@lezer/markdown'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { MarkdownEditor } from '../src/MarkdownEditor'
+import { activateExternalLink } from '../src/externalLinks'
 
 beforeAll(() => {
   GlobalRegistrator.register()
@@ -243,6 +246,75 @@ describe('MarkdownEditor document sessions', () => {
       await Promise.resolve()
     })
     expect(container.querySelector('.cm-wiki-link-missing')).toBeNull()
+  })
+})
+
+describe('MarkdownEditor external links', () => {
+  function externalLinkView(doc: string) {
+    const container = document.createElement('div')
+    document.body.append(container)
+    return new EditorView({
+      doc,
+      extensions: [markdown({ base: commonmarkLanguage, extensions: [GFM] })],
+      parent: container,
+    })
+  }
+
+  function mouseDownEvent(ctrlKey = false) {
+    return new MouseEvent('mousedown', {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      ctrlKey,
+    })
+  }
+
+  test('opens bare and formatted HTTP(S) links with the primary modifier', () => {
+    for (const doc of [
+      'https://example.com/docs',
+      '[Example](https://example.com/docs)',
+      '<https://example.com/docs>',
+    ]) {
+      const opened: string[] = []
+      const view = externalLinkView(doc)
+      const event = mouseDownEvent(true)
+
+      expect(activateExternalLink(view.state, 0, event, () => {}, async (url) => {
+        opened.push(url)
+      })).toBe(true)
+
+      expect(opened).toEqual(['https://example.com/docs'])
+      expect(event.defaultPrevented).toBe(true)
+      view.destroy()
+    }
+  })
+
+  test('does not open an external link without the primary modifier', () => {
+    const opened: string[] = []
+    const view = externalLinkView('https://example.com/docs')
+    const event = mouseDownEvent()
+
+    expect(activateExternalLink(view.state, 0, event, () => {}, async (url) => {
+      opened.push(url)
+    })).toBe(false)
+
+    expect(opened).toEqual([])
+    view.destroy()
+  })
+
+  test('does not activate unsupported schemes or URLs inside code', () => {
+    for (const doc of ['ftp://example.com', '`https://example.com`']) {
+      const opened: string[] = []
+      const view = externalLinkView(doc)
+      const event = mouseDownEvent(true)
+
+      expect(activateExternalLink(view.state, 0, event, () => {}, async (url) => {
+        opened.push(url)
+      })).toBe(false)
+
+      expect(opened).toEqual([])
+      view.destroy()
+    }
   })
 })
 

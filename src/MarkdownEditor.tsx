@@ -59,12 +59,13 @@ import { markdownHighlight } from './markdownHighlight'
 import { toggleLink, toggleMarkdown } from './markdownCommands'
 import { livePreview } from './livePreview'
 import type { NoteReference } from './notes'
-import { navigationPlatform, type NotePreviewCandidate } from './notePreview'
+import { navigationPlatform, isPrimaryNavigationClick } from './navigation'
+import type { NotePreviewCandidate } from './notePreview'
 import { diffTextChanges } from './threeWayTextMerge'
+import { activateExternalLink as activateExternalUrl } from './externalLinks'
 import { wikiLinkCompletion } from './wikiLinkCompletion'
 import {
   canonicalResolvedWikiLink,
-  isWikiLinkNavigationClick,
   parseWikiLinkText,
   validateWikiLinkOccurrence,
   wikiLinkMarkdown,
@@ -272,40 +273,12 @@ function linkInteraction(
     }
 
     activateExternalLink(view: EditorView, event: MouseEvent) {
-      if (!isWikiLinkNavigationClick(navigationPlatform(), event)) return false
       const position = view.posAtDOM(event.target as Node)
-      let node = syntaxTree(view.state).resolveInner(position, -1)
-      while (node.name !== 'Link' && node.parent) node = node.parent
-      if (node.name !== 'Link') return false
-
-      const cursor = node.cursor()
-      let destination: string | null = null
-      if (cursor.firstChild()) {
-        do {
-          if (cursor.name === 'URL') {
-            destination = view.state.sliceDoc(cursor.from, cursor.to)
-            break
-          }
-        } while (cursor.nextSibling())
-      }
-      if (!destination) return false
-
-      let url: URL
-      try {
-        url = new URL(destination)
-      } catch {
-        return false
-      }
-      if (url.protocol !== 'http:' && url.protocol !== 'https:') return false
-
-      event.preventDefault()
-      onPreviewDismiss()
-      void openUrl(url.href).catch(() => {})
-      return true
+      return activateExternalUrl(view.state, position, event, onPreviewDismiss, openUrl)
     }
 
     activateWikiLink(view: EditorView, event: MouseEvent) {
-      if (!isWikiLinkNavigationClick(navigationPlatform(), event)) return false
+      if (!isPrimaryNavigationClick(navigationPlatform(), event)) return false
       const position = view.posAtDOM(event.target as Node)
       let node = syntaxTree(view.state).resolveInner(position, -1)
       while (node.name !== 'WikiLink' && node.parent) node = node.parent

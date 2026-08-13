@@ -29,13 +29,6 @@ export type NotePreviewState =
   | { status: 'visible'; candidate: NotePreviewCandidate; preview: NotePreview }
   | { status: 'error'; candidate: NotePreviewCandidate; message: string }
 
-export type PrimaryModifierState = {
-  altKey: boolean
-  ctrlKey: boolean
-  metaKey: boolean
-  shiftKey: boolean
-}
-
 type TimerHandle = ReturnType<typeof setTimeout>
 type PreviewScheduler = {
   set: (callback: () => void, delay: number) => TimerHandle
@@ -209,25 +202,6 @@ export class NotePreviewController {
     this.state = state
     for (const listener of this.listeners) listener()
   }
-}
-
-export function navigationPlatform() {
-  const navigatorWithUserAgentData = navigator as Navigator & {
-    userAgentData?: { platform?: string }
-  }
-  return navigatorWithUserAgentData.userAgentData?.platform
-    || navigator.platform
-    || navigator.userAgent
-}
-
-export function isPlatformPrimaryModifier(
-  platform: string,
-  modifiers: PrimaryModifierState,
-) {
-  if (modifiers.altKey || modifiers.shiftKey) return false
-  return /Mac/i.test(platform)
-    ? modifiers.metaKey && !modifiers.ctrlKey
-    : modifiers.ctrlKey && !modifiers.metaKey
 }
 
 export function truncateNotePreviewBody(body: string) {

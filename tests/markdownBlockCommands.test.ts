@@ -78,4 +78,11 @@ describe('setMarkdownBlock', () => {
 
     expect(result.text).toBe('1. parent\n  1. child\n  2. sibling\n2. next')
   })
+
+  test('restarts nested numbering when a parent level resumes', () => {
+    const source = 'a\n  b\n    c\n  d\n    e'
+    const result = apply(source, 'ordered')
+
+    expect(result.text).toBe('1. a\n  1. b\n    1. c\n  2. d\n    1. e')
+  })
 })

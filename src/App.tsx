@@ -66,6 +66,7 @@ function App() {
   const [searchGeneration, setSearchGeneration] = useState(0)
   const searchRequestRef = useRef(0)
   const spellcheckRequestRef = useRef(0)
+  const lastPersistedSpellcheckRef = useRef(true)
   const spellcheckSaveRef = useRef(Promise.resolve())
   const [navigation] = useState(() => new NoteNavigation())
   const [, setNavigationRevision] = useState(0)
@@ -125,7 +126,10 @@ function App() {
     const requestId = ++spellcheckRequestRef.current
     void readStoredEditorSpellcheck().then(
       (enabled) => {
-        if (spellcheckRequestRef.current === requestId) setSpellcheckEnabled(enabled)
+        if (spellcheckRequestRef.current === requestId) {
+          lastPersistedSpellcheckRef.current = enabled
+          setSpellcheckEnabled(enabled)
+        }
       },
       (error) => {
         if (spellcheckRequestRef.current === requestId) {
@@ -137,7 +141,6 @@ function App() {
 
   async function updateSpellcheck(enabled: boolean) {
     const requestId = ++spellcheckRequestRef.current
-    const previous = spellcheckEnabled
     setSpellcheckEnabled(enabled)
     try {
       const operation = spellcheckSaveRef.current.then(() =>
@@ -145,10 +148,11 @@ function App() {
       )
       spellcheckSaveRef.current = operation.then(() => undefined, () => undefined)
       const saved = await operation
+      lastPersistedSpellcheckRef.current = saved
       if (spellcheckRequestRef.current === requestId) setSpellcheckEnabled(saved)
     } catch (error) {
       if (spellcheckRequestRef.current === requestId) {
-        setSpellcheckEnabled(previous)
+        setSpellcheckEnabled(lastPersistedSpellcheckRef.current)
         setStorageMessage(getStorageError(error).message)
       }
     }

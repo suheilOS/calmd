@@ -2,28 +2,11 @@ import { syntaxTree } from '@codemirror/language'
 import type { EditorState } from '@codemirror/state'
 import type { MarkdownConfig } from '@lezer/markdown'
 import { noteKeyStem } from './notes'
-import { isPlatformPrimaryModifier } from './notePreview'
 
 export type SourceRange = { from: number; to: number }
 
 export type WikiLinkSyntaxChild = SourceRange & {
   name: string
-}
-
-export type WikiLinkClickModifiers = {
-  button: number
-  altKey: boolean
-  ctrlKey: boolean
-  metaKey: boolean
-  shiftKey: boolean
-}
-
-export function isWikiLinkNavigationClick(
-  platform: string,
-  modifiers: WikiLinkClickModifiers,
-) {
-  return modifiers.button === 0
-    && isPlatformPrimaryModifier(platform, modifiers)
 }
 
 export function selectionTouchesSourceRange(
