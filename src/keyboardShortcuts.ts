@@ -2,6 +2,8 @@ type KeyboardShortcut = Pick<KeyboardEvent,
   'altKey' | 'ctrlKey' | 'key' | 'metaKey' | 'repeat' | 'shiftKey'
 >
 
+type RandomNoteShortcut = KeyboardShortcut & Pick<KeyboardEvent, 'code'>
+
 function isInitialCtrlKey(event: KeyboardShortcut, key: string) {
   return !event.repeat
     && event.ctrlKey
@@ -21,4 +23,12 @@ export function isNavigateHomeShortcut(event: KeyboardShortcut) {
     && !event.metaKey
     && !event.shiftKey
     && event.key === 'Home'
+}
+
+export function isOpenRandomNoteShortcut(event: RandomNoteShortcut) {
+  return !event.repeat
+    && event.altKey
+    && !event.shiftKey
+    && event.ctrlKey !== event.metaKey
+    && event.code === 'KeyR'
 }

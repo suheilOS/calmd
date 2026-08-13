@@ -10,6 +10,7 @@ type ComposerScreenProps = {
   hasExactMatch: boolean
   activeResultIndex: number
   onThoughtChange: (thought: string) => void
+  onRandomNote: () => void
   onSubmit: () => void
   onResultSelect: (index: number) => void
   onActiveResultChange: (index: number) => void
@@ -57,6 +58,7 @@ export function ComposerScreen({
   hasExactMatch,
   activeResultIndex,
   onThoughtChange,
+  onRandomNote,
   onSubmit,
   onResultSelect,
   onActiveResultChange,
@@ -125,6 +127,23 @@ export function ComposerScreen({
             value={thought}
           />
         </form>
+
+        <div
+          aria-hidden={hasThought || undefined}
+          className={`grid transition-[grid-template-rows,margin,opacity,transform] duration-200 ease-out motion-reduce:transform-none motion-reduce:transition-none ${hasThought ? 'pointer-events-none -translate-y-1 grid-rows-[0fr] mt-0 opacity-0' : 'grid-rows-[1fr] mt-4 opacity-100'}`}
+        >
+          <div className="min-h-0 overflow-hidden">
+            <Button
+              aria-keyshortcuts="Control+Alt+R Meta+Alt+R"
+              className="inline-flex min-h-9 items-center rounded-lg px-2 text-small text-secondary transition-[background-color,color,transform] duration-150 ease-out enabled:hover:bg-surface enabled:hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-faint active:scale-[0.97] disabled:cursor-default"
+              disabled={hasThought}
+              onClick={onRandomNote}
+              type="button"
+            >
+              Open a random note
+            </Button>
+          </div>
+        </div>
 
         {hasThought ? (
           <div className="mt-4 space-y-2 motion-safe:animate-[result-in_180ms_ease-out]" id="search-results" role="listbox">

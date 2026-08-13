@@ -344,6 +344,55 @@ pub async fn suggest_notes(query: String, app: AppHandle) -> CommandResult<Vec<N
         .map_err(|error| CommandError::new("search", format!("Could not suggest notes: {error}")))?
 }
 
+#[tauri::command]
+pub async fn open_random_note(
+    excluded_key: Option<String>,
+    app: AppHandle,
+) -> CommandResult<Option<Note>> {
+    tauri::async_runtime::spawn_blocking(move || open_random_note_in(&app, excluded_key.as_deref()))
+        .await
+        .map_err(|error| {
+            CommandError::new("search", format!("Could not open a random note: {error}"))
+        })?
+}
+
+fn open_random_note_in(app: &AppHandle, excluded_key: Option<&str>) -> CommandResult<Option<Note>> {
+    let state = app.state::<VaultState>();
+    let search = app.state::<SearchState>();
+    let guard = state
+        .0
+        .lock()
+        .map_err(|_| CommandError::new("state", "Vault state is unavailable."))?;
+    let root = vault_root(&guard)?;
+    reconcile_search_if_needed(&search, &root)?;
+
+    random_note_from_index(&root, &search, excluded_key)
+}
+
+fn random_note_from_index(
+    root: &Path,
+    search: &SearchState,
+    excluded_key: Option<&str>,
+) -> CommandResult<Option<Note>> {
+    let key = match (
+        search
+            .random_key(excluded_key)
+            .map_err(search_command_error)?,
+        excluded_key.is_some(),
+    ) {
+        (None, true) => search.random_key(None).map_err(search_command_error)?,
+        (key, _) => key,
+    };
+    let Some(key) = key else {
+        return Ok(None);
+    };
+
+    NotePersistence::new(root)
+        .read(&key)
+        .map(Some)
+        .map_err(Into::into)
+}
+
 fn suggest_notes_in(app: &AppHandle, query: &str) -> CommandResult<Vec<NoteReference>> {
     let state = app.state::<VaultState>();
     let search = app.state::<SearchState>();
@@ -721,6 +770,30 @@ mod tests {
         let stored = persistence.read(&note.key).unwrap();
         assert_eq!(stored.title, "Durable source");
         assert_eq!(stored.revision, note.revision);
+    }
+
+    #[test]
+    fn random_note_reads_the_current_markdown_source_after_index_selection() {
+        let data = tempdir().unwrap();
+        let vault = tempdir().unwrap();
+        let persistence = NotePersistence::new(vault.path());
+        let note = persistence.create("Indexed title").unwrap();
+        let search = SearchState::available(data.path().to_path_buf());
+        let indexed = indexed_note(vault.path(), &note).unwrap();
+        search.reconcile(vault.path(), &[indexed]).unwrap();
+
+        fs::write(
+            vault.path().join(&note.key),
+            "# Current title\n\nUpdated directly on disk",
+        )
+        .unwrap();
+
+        let selected = random_note_from_index(vault.path(), &search, None)
+            .unwrap()
+            .unwrap();
+        assert_eq!(selected.key, note.key);
+        assert_eq!(selected.title, "Current title");
+        assert_eq!(selected.body, "Updated directly on disk");
     }
 
     #[test]

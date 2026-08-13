@@ -3,9 +3,11 @@ import { Input } from '@base-ui/react/input'
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
 import { ComposerScreen } from './ComposerScreen'
 import { createUntitledNote } from './createUntitledNote'
+import { openRandomNote } from './openRandomNote'
 import {
   isCreateUntitledShortcut,
   isNavigateHomeShortcut,
+  isOpenRandomNoteShortcut,
 } from './keyboardShortcuts'
 import { NoteEditor } from './NoteEditor'
 import { clearEditorViewState, discardEditorViewState } from './editorViewState'
@@ -26,6 +28,7 @@ import {
   deleteStoredNote,
   getStorageError,
   openVault,
+  openRandomStoredNote,
   openStoredNoteLink,
   readStoredNote,
   readStoredEditorSpellcheck,
@@ -91,6 +94,31 @@ function App() {
   })
   const handleNavigateHome = useEffectEvent(() => {
     void navigateHome()
+  })
+  async function handleOpenRandomNote() {
+    if (!vaultReady) return
+
+    try {
+      const result = await openRandomNote({
+        navigation,
+        prepare: async () => {
+          if (noteEditing.snapshot === null) return { currentKey: null }
+          const saved = await noteEditing.flush()
+          return saved ? { currentKey: saved.key } : null
+        },
+        pick: openRandomStoredNote,
+        open: beginEditing,
+      })
+      if (result === 'empty') setStorageMessage('No notes to rediscover yet.')
+    } catch (error) {
+      const message = getStorageError(error).message
+      await refreshVault()
+      setStorageMessage(message)
+    }
+  }
+
+  const handleOpenRandomNoteShortcut = useEffectEvent(() => {
+    void handleOpenRandomNote()
   })
 
   const searchQuery = canonicalizeTitle(thought)
@@ -169,6 +197,12 @@ function App() {
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
+      if (isOpenRandomNoteShortcut(event)) {
+        event.preventDefault()
+        handleOpenRandomNoteShortcut()
+        return
+      }
+
       if (isCreateUntitledShortcut(event)) {
         event.preventDefault()
         void handleCreateUntitledNote()
@@ -523,6 +557,7 @@ function App() {
         activeResultIndex={activeResultIndex}
         hasExactMatch={Boolean(exactNote)}
         onActiveResultChange={setActiveResultIndex}
+        onRandomNote={() => void handleOpenRandomNote()}
         onResultSelect={selectSearchResult}
         onSubmit={() => void createNote()}
         onThoughtChange={(nextThought) => {

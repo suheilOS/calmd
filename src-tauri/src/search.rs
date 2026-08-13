@@ -226,6 +226,10 @@ impl SearchState {
         self.mutate(|connection| remove_note(connection, key))
     }
 
+    pub fn random_key(&self, excluded_key: Option<&str>) -> Result<Option<String>, SearchError> {
+        self.query(|connection| random_key_connection(connection, excluded_key))
+    }
+
     pub fn backlinks(&self, key: &str) -> Result<Vec<NoteReference>, SearchError> {
         self.query(|connection| backlinks_connection(connection, key))
     }
@@ -640,6 +644,35 @@ fn remove_note(connection: &mut Connection, key: &str) -> Result<(), SearchError
     transaction
         .commit()
         .map_err(|error| SearchError::sqlite("Could not finish the search update", error))
+}
+
+fn random_key_connection(
+    connection: &Connection,
+    excluded_key: Option<&str>,
+) -> Result<Option<String>, SearchError> {
+    connection
+        .query_row(
+            "WITH eligible AS (
+                 SELECT key
+                 FROM notes
+                 WHERE ?1 IS NULL OR key <> ?1
+                 ORDER BY id
+             )
+             SELECT key
+             FROM eligible
+             LIMIT 1
+             OFFSET (
+                 COALESCE(
+                     (random() & 9223372036854775807)
+                     % (SELECT count(*) FROM eligible),
+                     0
+                 )
+             )",
+            [excluded_key],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|error| SearchError::sqlite("Could not select a random note", error))
 }
 
 fn upsert_note(connection: &Connection, note: &IndexedNote) -> Result<(), SearchError> {

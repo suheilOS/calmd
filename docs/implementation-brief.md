@@ -26,6 +26,7 @@ The interface reads and writes top-level Markdown notes in one user-selected vau
 - Minimal full-page editor with `[[target]]` and `[[target|display text]]` Live Preview links
 - Conflict-safe modifier-click link navigation that resolves or creates targets and canonicalizes the clicked occurrence
 - Application-owned Back, Forward, and Home navigation with save-gated transitions
+- Focused random-note rediscovery from the reconciled index, with current-note exclusion when possible
 - On-demand backlinks derived from unambiguous normalized filename identity
 - Responsive light and dark presentation using a restrained three-level type scale
 
@@ -37,7 +38,7 @@ Renames stage and sync the complete new file in the vault, verify the original r
 
 A filesystem cannot provide one portable atomic operation that simultaneously replaces file content and changes its name. There is therefore a brief interval between unlinking the original path and installing the new path. Calmd restores the original after ordinary errors, but a process or machine failure in that interval can leave the complete original in a `.calmd-backup-*.tmp` file. The strategy also requires same-filesystem hard-link support inside the vault. As with atomic save replacement, an external process can still race the final revision check. Cleanup failures are logged rather than reported as failed saves after the new note has already been committed.
 
-The search database stores note keys, normalized filename identities, titles, bodies, revisions, filesystem modification times, and outgoing links under Tauri app data. Schema version 2 derives backlinks while FTS5 indexes titles and bodies with title-weighted BM25 ranking and trigram substring matching. Non-exact results use match-specific FTS5 snippets with a 96-token context window. Rust removes visible `[[...]]` brackets and bounds every excerpt at 240 Unicode characters before Tauri IPC. Exact-title results bypass FTS, read at most 480 body characters, and return one result with a bounded leading excerpt. Launch and focus scans reconcile the complete top-level Markdown snapshot transactionally. Missing, incompatible, and corrupt databases are discarded and rebuilt. Index failures never roll back a successful Markdown write.
+The search database stores note keys, normalized filename identities, titles, bodies, revisions, filesystem modification times, and outgoing links under Tauri app data. Schema version 2 derives backlinks while FTS5 indexes titles and bodies with title-weighted BM25 ranking and trigram substring matching. Non-exact results use match-specific FTS5 snippets with a 96-token context window. Rust removes visible `[[...]]` brackets and bounds every excerpt at 240 Unicode characters before Tauri IPC. Exact-title results bypass FTS, read at most 480 body characters, and return one result with a bounded leading excerpt. Random rediscovery chooses a uniform row offset from the reconciled indexed notes, optionally excluding the active key, then reads the selected Markdown source before returning it. Launch and focus scans reconcile the complete top-level Markdown snapshot transactionally. Missing, incompatible, and corrupt databases are discarded and rebuilt. Index failures never roll back a successful Markdown write.
 
 ### Remaining limitations and deferred work
 
@@ -48,11 +49,11 @@ The search database stores note keys, normalized filename identities, titles, bo
 
 ## Current experience
 
-The app opens to a single composer. As the user types, it searches existing notes, shows relevant matches, and offers to create a new note. While Calmd is focused, `Ctrl+N` safely flushes the active note and creates the first available visible title in the sequence `Untitled`, `Untitled 1`, `Untitled 2`, and so on. There is no sidebar, file tree, dashboard, graph, note count, or recent-notes feed.
+The app opens to a single composer. As the user types, it searches existing notes, shows relevant matches, and offers to create a new note. When the composer is empty, a quiet **Open a random note** action offers rediscovery without showing collection scale; it folds away while typing. While Calmd is focused, `Ctrl+N` safely flushes the active note and creates the first available visible title in the sequence `Untitled`, `Untitled 1`, `Untitled 2`, and so on. There is no sidebar, file tree, dashboard, graph, note count, or recent-notes feed.
 
 ## Current navigation
 
-Knowledge is accessed through literal retrieval, inline `[[links]]`, backlinks, and application-owned back and forward navigation. While Calmd is focused, `Alt+Home` returns Home through the same save-gated navigation flow as the title-bar control. The full collection is never shown by default.
+Knowledge is accessed through literal retrieval, inline `[[links]]`, backlinks, random rediscovery, and application-owned back and forward navigation. While Calmd is focused, `Alt+Home` returns Home through the same save-gated navigation flow as the title-bar control, and `Cmd/Ctrl+Alt+R` opens a random indexed note through the same save-gated note transition. The random action prefers a different note from the current one and leaves a one-note editor unchanged. The full collection is never shown by default.
 
 ## Current note storage
 
@@ -93,6 +94,7 @@ Literal retrieval uses SQLite FTS5 trigram matching for title and body text, tit
 5. **Completed:** On-demand backlinks, internal wiki links, and conflict-safe navigation
 6. **Completed:** Tauri Markdown vault integration with atomic, conflict-safe saving and coordinated rename rewriting
 7. **Completed:** Rebuildable schema-version-2 SQLite/FTS5 literal search, ranked excerpts, and backlink index
+8. **Completed:** Save-gated random-note rediscovery with a focused-window `Cmd/Ctrl+Alt+R` shortcut
 
 Semantic retrieval and embeddings were considered during planning, but current literal retrieval is effective, predictable, and lightweight for the intended workflow and better aligned with Calmd's minimal product philosophy. They are outside Calmd's current product direction and are not planned unless usage evidence shows repeated retrieval failures caused by differences in wording.
 

@@ -376,6 +376,53 @@ fn unlinked_mentions_handle_fts_quotes_and_ambiguous_keys() {
 }
 
 #[test]
+fn random_key_selects_indexed_notes_and_honors_exclusion() {
+    let data = tempdir().unwrap();
+    let vault = tempdir().unwrap();
+    let search = state(data.path());
+    search
+        .reconcile(
+            vault.path(),
+            &[
+                note("First.md", "First", "", "one"),
+                note("Second.md", "Second", "", "two"),
+                note("Third.md", "Third", "", "three"),
+            ],
+        )
+        .unwrap();
+
+    for _ in 0..16 {
+        let key = search.random_key(None).unwrap().unwrap();
+        assert!(matches!(
+            key.as_str(),
+            "First.md" | "Second.md" | "Third.md"
+        ));
+        assert_ne!(
+            search.random_key(Some("First.md")).unwrap().unwrap(),
+            "First.md"
+        );
+    }
+
+    assert!(search.random_key(Some("First.md")).unwrap().is_some());
+}
+
+#[test]
+fn random_key_returns_none_for_empty_indexes_or_exhausted_exclusions() {
+    let data = tempdir().unwrap();
+    let vault = tempdir().unwrap();
+    let search = state(data.path());
+
+    search.reconcile(vault.path(), &[]).unwrap();
+    assert!(search.random_key(None).unwrap().is_none());
+
+    search
+        .reconcile(vault.path(), &[note("Only.md", "Only", "", "one")])
+        .unwrap();
+    assert_eq!(search.random_key(None).unwrap().as_deref(), Some("Only.md"));
+    assert!(search.random_key(Some("Only.md")).unwrap().is_none());
+}
+
+#[test]
 fn remove_clears_retrieval_and_backlinks_without_removing_other_outgoing_links() {
     let data = tempdir().unwrap();
     let vault = tempdir().unwrap();

@@ -74,6 +74,10 @@ export function createUntitledStoredNote() {
   return invoke<Note>('create_untitled_note')
 }
 
+export function openRandomStoredNote(excludedKey: string | null) {
+  return invoke<Note | null>('open_random_note', { excludedKey })
+}
+
 export function openStoredNoteLink(target: string) {
   return invoke<OpenNoteLinkResponse>('open_note_link', { target })
 }

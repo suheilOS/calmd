@@ -23,6 +23,7 @@ pub fn run() {
             storage::set_editor_spellcheck,
             storage::search_notes,
             storage::suggest_notes,
+            storage::open_random_note,
             storage::create_note,
             storage::create_untitled_note,
             storage::open_note_link,
