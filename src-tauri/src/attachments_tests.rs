@@ -85,8 +85,16 @@ fn sanitizes_portable_names_and_never_overwrites() {
     let bytes = image_bytes(ImageFormat::Png);
     let first = service.import_bytes("CON?.png", &bytes, &note_key).unwrap();
     let second = service.import_bytes("CON?.png", &bytes, &note_key).unwrap();
+    let fragment = service
+        .import_bytes("photo#1.png", &bytes, &note_key)
+        .unwrap();
+    let reserved = service
+        .import_bytes("CON.backup.png", &bytes, &note_key)
+        .unwrap();
     assert_eq!(first.relative_path, "attachments/CON-.png");
     assert_eq!(second.relative_path, "attachments/CON- 2.png");
+    assert_eq!(fragment.relative_path, "attachments/photo-1.png");
+    assert_eq!(reserved.relative_path, "attachments/CON image.backup.png");
     assert_eq!(
         fs::read(vault.path().join(first.relative_path)).unwrap(),
         bytes
@@ -127,6 +135,22 @@ fn rejects_non_portable_and_outside_destinations() {
             "invalid_path"
         );
     }
+}
+
+#[cfg(unix)]
+#[test]
+fn rejects_a_symlinked_attachments_directory() {
+    use std::os::unix::fs::symlink;
+
+    let (vault, note_key) = service_vault();
+    let outside = tempfile::tempdir().unwrap();
+    symlink(outside.path(), vault.path().join(ATTACHMENTS_DIRECTORY)).unwrap();
+
+    let error = AttachmentService::new(vault.path())
+        .import_bytes("photo.png", &image_bytes(ImageFormat::Png), &note_key)
+        .unwrap_err();
+    assert_eq!(error.code, "invalid_directory");
+    assert!(fs::read_dir(outside.path()).unwrap().next().is_none());
 }
 
 #[cfg(unix)]

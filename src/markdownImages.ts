@@ -22,7 +22,7 @@ type SyntaxRange = {
 const URI_SCHEME = /^[a-z][a-z\d+.-]*:/iu
 const WINDOWS_DRIVE = /^[a-z]:/iu
 const MARKDOWN_DESTINATION_ESCAPE = /([\\)])/gu
-const MARKDOWN_ALT_ESCAPE = /([\\\]])/gu
+const MARKDOWN_ALT_ESCAPE = /([\\[\]])/gu
 
 function unescapeMarkdown(value: string) {
   return value.replace(/\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/gu, '$1')

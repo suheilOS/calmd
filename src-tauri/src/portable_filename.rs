@@ -30,7 +30,10 @@ pub fn portable_stem(
         .unwrap_or_default()
         .trim_end_matches([' ', '.']);
     if is_windows_reserved_name(device_name) {
-        stem.push_str(reserved_suffix);
+        stem = match stem.split_once('.') {
+            Some((device, rest)) => format!("{device}{reserved_suffix}.{rest}"),
+            None => format!("{stem}{reserved_suffix}"),
+        };
     }
     truncate_utf8(&stem, max_bytes).to_owned()
 }

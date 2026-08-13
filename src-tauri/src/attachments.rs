@@ -237,10 +237,7 @@ impl<'a> AttachmentService<'a> {
             .file_stem()
             .and_then(OsStr::to_str)
             .unwrap_or("image");
-        let directory = self.root.join(ATTACHMENTS_DIRECTORY);
-        fs::create_dir_all(&directory).map_err(|error| {
-            AttachmentError::io("Could not create the attachments directory", error)
-        })?;
+        let directory = prepare_attachments_directory(self.root)?;
         let filename = install_available(&directory, stem, extension, bytes)?;
         Ok(ImportedAttachment {
             relative_path: format!("{ATTACHMENTS_DIRECTORY}/{filename}"),
@@ -413,6 +410,42 @@ fn validate_relative_destination(destination: &str) -> AttachmentResult<PathBuf>
     Ok(path.to_owned())
 }
 
+fn prepare_attachments_directory(root: &Path) -> AttachmentResult<PathBuf> {
+    let directory = root.join(ATTACHMENTS_DIRECTORY);
+    match fs::create_dir(&directory) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+        Err(error) => {
+            return Err(AttachmentError::io(
+                "Could not create the attachments directory",
+                error,
+            ));
+        }
+    }
+    let metadata = fs::symlink_metadata(&directory).map_err(|error| {
+        AttachmentError::io("Could not inspect the attachments directory", error)
+    })?;
+    if !metadata.file_type().is_dir() {
+        return Err(AttachmentError::new(
+            "invalid_directory",
+            "The attachments path must be a directory inside the vault.",
+        ));
+    }
+    let canonical_root = root
+        .canonicalize()
+        .map_err(|error| AttachmentError::io("Could not resolve the vault", error))?;
+    let canonical_directory = directory.canonicalize().map_err(|error| {
+        AttachmentError::io("Could not resolve the attachments directory", error)
+    })?;
+    if canonical_directory.parent() != Some(canonical_root.as_path()) {
+        return Err(AttachmentError::new(
+            "invalid_directory",
+            "The attachments directory must stay inside the vault.",
+        ));
+    }
+    Ok(directory)
+}
+
 fn install_available(
     directory: &Path,
     raw_stem: &str,
@@ -421,7 +454,8 @@ fn install_available(
 ) -> AttachmentResult<String> {
     let extension = extension.to_ascii_lowercase();
     let max_stem_bytes = MAX_FILENAME_BYTES.saturating_sub(extension.len() + 1);
-    let base = portable_stem(raw_stem, "image", " image", max_stem_bytes);
+    let markdown_safe_stem = raw_stem.replace('#', "-");
+    let base = portable_stem(&markdown_safe_stem, "image", " image", max_stem_bytes);
     let existing = fs::read_dir(directory)
         .map_err(|error| AttachmentError::io("Could not inspect attachment filenames", error))?
         .filter_map(Result::ok)
@@ -454,24 +488,37 @@ fn install_available(
             if existing.contains(&filename.to_lowercase()) {
                 continue;
             }
-            match fs::hard_link(&temporary, directory.join(&filename)) {
-                Ok(()) => {
-                    File::open(directory)
-                        .and_then(|directory| directory.sync_all())
-                        .map_err(|error| {
-                            AttachmentError::io("Could not flush the attachments directory", error)
-                        })?;
-                    return Ok(filename);
-                }
+            let destination = directory.join(&filename);
+            match fs::hard_link(&temporary, &destination) {
+                Ok(()) => {}
                 Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
-                Err(error) => {
-                    return Err(AttachmentError::io("Could not install the image", error));
-                }
+                Err(_) => match write_exclusive(&destination, bytes) {
+                    Ok(()) => {}
+                    Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                    Err(error) => {
+                        return Err(AttachmentError::io("Could not install the image", error));
+                    }
+                },
             }
+            File::open(directory)
+                .and_then(|directory| directory.sync_all())
+                .map_err(|error| {
+                    AttachmentError::io("Could not flush the attachments directory", error)
+                })?;
+            return Ok(filename);
         }
         unreachable!()
     })();
     let _ = fs::remove_file(temporary);
+    result
+}
+
+fn write_exclusive(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    let mut file = OpenOptions::new().write(true).create_new(true).open(path)?;
+    let result = file.write_all(bytes).and_then(|()| file.sync_all());
+    if result.is_err() {
+        let _ = fs::remove_file(path);
+    }
     result
 }
 

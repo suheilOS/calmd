@@ -87,5 +87,11 @@ describe('Markdown image contract', () => {
       .toBe('<attachments/photo \\<one\\>.png>')
     expect(markdownImage('attachments/photo one.png', 'A ] photo'))
       .toBe('![A \\] photo](<attachments/photo one.png>)')
+    expect(markdownImage('attachments/photo[.png', 'photo['))
+      .toBe('![photo\\[](attachments/photo[.png)')
+    expect(parseImage(markdownImage('attachments/photo[.png', 'photo['))).toEqual({
+      alt: 'photo[',
+      destination: 'attachments/photo[.png',
+    })
   })
 })
