@@ -2,7 +2,11 @@ import { markdown, commonmarkLanguage } from '@codemirror/lang-markdown'
 import { EditorState } from '@codemirror/state'
 import { GFM } from '@lezer/markdown'
 import { describe, expect, test } from 'bun:test'
-import { externalUrlAt, supportedExternalUrl } from '../src/externalLinks'
+import {
+  activateExternalLink,
+  externalUrlAt,
+  supportedExternalUrl,
+} from '../src/externalLinks'
 
 function markdownState(doc: string) {
   return EditorState.create({
@@ -52,9 +56,45 @@ describe('supported external URLs', () => {
       .toBe('https://example.com/docs?q=one%20two')
   })
 
+  test('decodes Markdown escapes and character references before opening', () => {
+    expect(supportedExternalUrl('https://example.com/a\\(b\\)'))
+      .toBe('https://example.com/a(b)')
+    expect(supportedExternalUrl('https://example.com/?a=one&amp;b=two'))
+      .toBe('https://example.com/?a=one&b=two')
+  })
+
   test('rejects unsupported and invalid URL schemes', () => {
     expect(supportedExternalUrl('ftp://example.com')).toBeNull()
     expect(supportedExternalUrl('javascript:alert(1)')).toBeNull()
     expect(supportedExternalUrl('not a URL')).toBeNull()
+  })
+})
+
+describe('external link activation', () => {
+  test('reports failures from the platform opener', async () => {
+    const view = markdownState('https://example.com')
+    const failure = new Error('opener unavailable')
+    let reported: unknown
+
+    const event = {
+      altKey: false,
+      button: 0,
+      ctrlKey: true,
+      metaKey: false,
+      preventDefault: () => {},
+      shiftKey: false,
+    } as MouseEvent
+
+    expect(activateExternalLink(
+      view,
+      0,
+      event,
+      () => {},
+      async () => { throw failure },
+      (error) => { reported = error },
+    )).toBe(true)
+
+    await Promise.resolve()
+    expect(reported).toBe(failure)
   })
 })

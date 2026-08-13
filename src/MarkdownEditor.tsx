@@ -91,6 +91,7 @@ type MarkdownEditorProps = {
   onPreviewCandidateEnter: (candidate: NotePreviewCandidate) => void
   onPreviewCandidateLeave: () => void
   onPreviewDismiss: () => void
+  onExternalLinkError?: (error: unknown) => void
   onWikiLinkActivate: (activation: WikiLinkActivation) => void
   resolveWikiLink: (target: string) => Promise<boolean | null>
   spellcheckEnabled: boolean
@@ -198,6 +199,7 @@ function linkInteraction(
   onPreviewCandidateEnter: (candidate: NotePreviewCandidate) => void,
   onPreviewCandidateLeave: () => void,
   onPreviewDismiss: () => void,
+  onExternalLinkError: (error: unknown) => void,
 ) {
   return ViewPlugin.fromClass(class {
     active = new Set<{ from: number; to: number; original: string; target: string }>()
@@ -274,7 +276,14 @@ function linkInteraction(
 
     activateExternalLink(view: EditorView, event: MouseEvent) {
       const position = view.posAtDOM(event.target as Node)
-      return activateExternalUrl(view.state, position, event, onPreviewDismiss, openUrl)
+      return activateExternalUrl(
+        view.state,
+        position,
+        event,
+        onPreviewDismiss,
+        openUrl,
+        onExternalLinkError,
+      )
     }
 
     activateWikiLink(view: EditorView, event: MouseEvent) {
@@ -437,6 +446,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
   onPreviewCandidateEnter,
   onPreviewCandidateLeave,
   onPreviewDismiss,
+  onExternalLinkError,
   onWikiLinkActivate,
   resolveWikiLink,
   spellcheckEnabled,
@@ -475,6 +485,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
   const onPreviewCandidateEnterRef = useRef(onPreviewCandidateEnter)
   const onPreviewCandidateLeaveRef = useRef(onPreviewCandidateLeave)
   const onPreviewDismissRef = useRef(onPreviewDismiss)
+  const onExternalLinkErrorRef = useRef(onExternalLinkError)
   const onWikiLinkActivateRef = useRef(onWikiLinkActivate)
   const resolveWikiLinkRef = useRef(resolveWikiLink)
   const suggestWikiLinksRef = useRef(suggestWikiLinks)
@@ -484,6 +495,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
     onPreviewCandidateEnterRef.current = onPreviewCandidateEnter
     onPreviewCandidateLeaveRef.current = onPreviewCandidateLeave
     onPreviewDismissRef.current = onPreviewDismiss
+    onExternalLinkErrorRef.current = onExternalLinkError
     onWikiLinkActivateRef.current = onWikiLinkActivate
     resolveWikiLinkRef.current = resolveWikiLink
     suggestWikiLinksRef.current = suggestWikiLinks
@@ -492,6 +504,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
     onPreviewCandidateEnter,
     onPreviewCandidateLeave,
     onPreviewDismiss,
+    onExternalLinkError,
     onWikiLinkActivate,
     resolveWikiLink,
     suggestWikiLinks,
@@ -527,6 +540,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
           (candidate) => onPreviewCandidateEnterRef.current(candidate),
           () => onPreviewCandidateLeaveRef.current(),
           () => onPreviewDismissRef.current(),
+          (error) => onExternalLinkErrorRef.current?.(error),
         ),
         EditorView.updateListener.of((update) => {
           const isExternalSync = update.transactions.some((transaction) =>

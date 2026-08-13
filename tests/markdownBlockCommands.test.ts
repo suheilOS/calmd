@@ -72,6 +72,13 @@ describe('setMarkdownBlock', () => {
     expect(state.selection.main.anchor).toBe(9)
   })
 
+  test('removes code indentation when applying a top-level heading', () => {
+    expect(apply('    text', 'heading-2')).toEqual({
+      changed: true,
+      text: '## text',
+    })
+  })
+
   test('numbers nested list levels independently', () => {
     const source = '- parent\n  - child\n  - sibling\n- next'
     const result = apply(source, 'ordered')

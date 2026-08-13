@@ -50,6 +50,7 @@ async function renderEditor(
   editorSessionId: number,
   onChange = () => {},
   noteKey = `test-note-${++noteSequence}.md`,
+  resolveWikiLink = async () => null,
 ) {
   const container = document.createElement('div')
   const scrollContainer = document.createElement('div')
@@ -62,6 +63,7 @@ async function renderEditor(
     root.render(
       <MarkdownEditor
         {...editorProps(value, editorSessionId, onChange, noteKey)}
+        resolveWikiLink={resolveWikiLink}
         value={value}
       />,
     )
@@ -400,6 +402,46 @@ describe('MarkdownEditor Live Preview', () => {
     expect(container.querySelector('.cm-content')?.textContent).toBe(
       'gone, code, highlighted, and Calmd tail',
     )
+  })
+
+  test('retains resolved wiki targets while they leave the active ranges', async () => {
+    const resolutions: Array<(exists: boolean | null) => void> = []
+    const resolveWikiLink = () => new Promise<boolean | null>((resolve) => {
+      resolutions.push(resolve)
+    })
+    const { container, root } = await renderEditor(
+      '[[Target]]',
+      1,
+      () => {},
+      'cache.md',
+      resolveWikiLink,
+    )
+
+    await act(async () => {
+      resolutions[0]?.(false)
+      await Promise.resolve()
+    })
+    await act(async () => {
+      root.render(
+        <MarkdownEditor
+          {...editorProps('plain text', 1, () => {}, 'cache.md')}
+          resolveWikiLink={resolveWikiLink}
+          value="plain text"
+        />,
+      )
+    })
+    await act(async () => {
+      root.render(
+        <MarkdownEditor
+          {...editorProps('[[Target]]', 1, () => {}, 'cache.md')}
+          resolveWikiLink={resolveWikiLink}
+          value="[[Target]]"
+        />,
+      )
+    })
+
+    expect(resolutions).toHaveLength(1)
+    expect(container.querySelector('.cm-wiki-link-missing')).not.toBeNull()
   })
 
   test('extends blockquote styling across every quote line', async () => {

@@ -504,6 +504,7 @@ function App() {
         onBacklinksOpenChange={setBacklinksOpen}
         onDraftChange={noteEditing.updateDraft}
         onConflictReload={noteEditing.snapshot?.conflict ? reloadConflictedNote : null}
+        onExternalLinkError={(error) => setStorageMessage(getStorageError(error).message)}
         onSpellcheckEnabledChange={(enabled) => void updateSpellcheck(enabled)}
         onWikiLinkActivate={(activation) => void activateWikiLink(activation)}
         onBacklinkSelect={(key) => void openNote({ key })}

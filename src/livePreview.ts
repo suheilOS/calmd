@@ -181,8 +181,9 @@ function livePreviewDecorations(
   resolvedTargets: ReadonlyMap<string, boolean | null>,
 ) {
   const decorations: Range<Decoration>[] = []
+  const ranges = decorationRanges(view)
 
-  for (const visible of decorationRanges(view)) {
+  for (const visible of ranges) {
     syntaxTree(view.state).iterate({
       from: visible.from,
       to: visible.to,
@@ -295,9 +296,18 @@ function livePreviewDecorations(
         }
 
         if (node.name === 'Blockquote') {
-          const firstLine = view.state.doc.lineAt(node.from).number
-          const lastLine = view.state.doc.lineAt(Math.max(node.from, node.to - 1)).number
-          for (let number = firstLine; number <= lastLine; number += 1) {
+          const lines = new Set<number>()
+          for (const range of ranges) {
+            const from = Math.max(node.from, range.from)
+            const to = Math.min(node.to, range.to)
+            if (from > to) continue
+            const firstLine = view.state.doc.lineAt(from).number
+            const lastLine = view.state.doc.lineAt(Math.max(from, to - 1)).number
+            for (let number = firstLine; number <= lastLine; number += 1) {
+              lines.add(number)
+            }
+          }
+          for (const number of lines) {
             decorations.push(Decoration.line({ class: 'cm-quote-line' }).range(
               view.state.doc.line(number).from,
             ))
@@ -357,7 +367,7 @@ function livePreviewDecorations(
           const lines = new Set<number>()
           const firstCodeLine = view.state.doc.lineAt(node.from).number
           const lastCodeLine = view.state.doc.lineAt(Math.max(node.from, node.to - 1)).number
-          for (const range of decorationRanges(view)) {
+          for (const range of ranges) {
             const from = Math.max(node.from, range.from)
             const to = Math.min(node.to, range.to)
             if (from > to) continue
@@ -539,9 +549,6 @@ export function livePreview(
 
     private resolveTargets(view: EditorView) {
       this.wantedTargets = wikiLinkTargets(view)
-      for (const target of this.resolvedTargets.keys()) {
-        if (!this.wantedTargets.has(target)) this.resolvedTargets.delete(target)
-      }
       for (const target of this.wantedTargets) {
         if (this.resolvedTargets.has(target) || this.pendingTargets.has(target)) continue
         this.pendingTargets.add(target)
@@ -555,9 +562,10 @@ export function livePreview(
     private finishTarget(target: string, exists: boolean | null) {
       if (!this.active) return
       this.pendingTargets.delete(target)
-      if (!this.wantedTargets.has(target)) return
       this.resolvedTargets.set(target, exists)
-      this.view.dispatch({ effects: wikiLinkResolutionChanged.of(null) })
+      if (this.wantedTargets.has(target)) {
+        this.view.dispatch({ effects: wikiLinkResolutionChanged.of(null) })
+      }
     }
   }, {
     decorations: (plugin) => plugin.decorations,

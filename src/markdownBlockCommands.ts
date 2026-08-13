@@ -41,7 +41,15 @@ export function setMarkdownBlock(kind: MarkdownBlockKind): StateCommand {
         previousLine = number
         const line = state.doc.line(number)
         const match = line.text.match(structuralPrefix)
+        const sourcePrefix = match?.[0] ?? ''
         const indentation = match?.[1] ?? ''
+        const marker = sourcePrefix.slice(indentation.length)
+        const preservesContainerIndentation = /^(?:>|[-+*]|\d+[.)])/.test(marker)
+        const normalizedIndentation = kind.startsWith('heading-')
+          && indentation.length >= 4
+          && !preservesContainerIndentation
+          ? ''
+          : indentation
         for (const existingIndentation of orderedIndexes.keys()) {
           if (existingIndentation.length > indentation.length) {
             orderedIndexes.delete(existingIndentation)
@@ -49,10 +57,10 @@ export function setMarkdownBlock(kind: MarkdownBlockKind): StateCommand {
         }
         const orderedIndex = orderedIndexes.get(indentation) ?? 0
         orderedIndexes.set(indentation, orderedIndex + 1)
-        const prefixStart = line.from + indentation.length
-        const prefixEnd = line.from + (match?.[0].length ?? indentation.length)
+        const prefixStart = line.from + normalizedIndentation.length
+        const prefixEnd = line.from + sourcePrefix.length
         const replacement = prefixFor(kind, orderedIndex)
-        const currentPrefix = line.text.slice(indentation.length, prefixEnd - line.from)
+        const currentPrefix = line.text.slice(normalizedIndentation.length, prefixEnd - line.from)
         return replacement === currentPrefix
           ? []
           : [{ from: prefixStart, to: prefixEnd, insert: replacement }]

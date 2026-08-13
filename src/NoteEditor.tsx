@@ -52,6 +52,7 @@ type NoteEditorProps = {
   onDraftChange: (draft: NoteDraft) => void
   onBacklinksOpenChange: (open: boolean) => void
   onConflictReload: (() => void) | null
+  onExternalLinkError: (error: unknown) => void
   onSpellcheckEnabledChange: (enabled: boolean) => void
   onWikiLinkActivate: (activation: WikiLinkActivation) => void
   onBacklinkSelect: (key: string) => void
@@ -69,6 +70,7 @@ export function NoteEditor({
   onDraftChange,
   onBacklinksOpenChange,
   onConflictReload,
+  onExternalLinkError,
   onSpellcheckEnabledChange,
   onWikiLinkActivate,
   onBacklinkSelect,
@@ -146,6 +148,7 @@ export function NoteEditor({
               onPreviewCandidateEnter={previewController.enterSource}
               onPreviewCandidateLeave={previewController.leaveSource}
               onPreviewDismiss={previewController.dismiss}
+              onExternalLinkError={onExternalLinkError}
               onWikiLinkActivate={onWikiLinkActivate}
               resolveWikiLink={resolveWikiLink}
               spellcheckEnabled={spellcheckEnabled}
