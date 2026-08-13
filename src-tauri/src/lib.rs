@@ -1,5 +1,7 @@
+mod attachments;
 mod links;
 mod note_persistence;
+mod portable_filename;
 mod search;
 mod storage;
 mod unlinked_mentions;
@@ -35,6 +37,9 @@ pub fn run() {
             storage::save_note,
             storage::rename_note,
             storage::delete_note,
+            attachments::pick_attachment,
+            attachments::import_attachment_bytes,
+            attachments::resolve_image,
         ])
         .setup(|app| {
             let search = match app.path().app_data_dir() {

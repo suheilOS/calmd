@@ -57,6 +57,18 @@ import {
 } from './editorViewState'
 import { markdownHighlight } from './markdownHighlight'
 import { toggleLink, toggleMarkdown } from './markdownCommands'
+import {
+  imagePaste,
+  insertImportedImage,
+  trackedImageInsertion,
+} from './imageInsertion'
+import { imageLivePreview } from './imageLivePreview'
+import {
+  importAttachmentBytes,
+  pickAttachment,
+  resolveLocalImage,
+  type DisplayImage,
+} from './images'
 import { livePreview } from './livePreview'
 import type { NoteReference } from './notes'
 import { navigationPlatform, isPrimaryNavigationClick } from './navigation'
@@ -81,6 +93,7 @@ export type WikiLinkActivation = {
 export type MarkdownEditorHandle = {
   applyBlock: (kind: MarkdownBlockKind) => void
   focusAtEnd: () => void
+  insertImage: () => void
 }
 
 type MarkdownEditorProps = {
@@ -92,7 +105,9 @@ type MarkdownEditorProps = {
   onPreviewCandidateLeave: () => void
   onPreviewDismiss: () => void
   onExternalLinkError?: (error: unknown) => void
+  onImageError?: (error: unknown) => void
   onWikiLinkActivate: (activation: WikiLinkActivation) => void
+  resolveImage?: (destination: string) => Promise<DisplayImage>
   resolveWikiLink: (target: string) => Promise<boolean | null>
   spellcheckEnabled: boolean
   suggestWikiLinks: (query: string) => Promise<NoteReference[]>
@@ -447,7 +462,9 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
   onPreviewCandidateLeave,
   onPreviewDismiss,
   onExternalLinkError,
+  onImageError,
   onWikiLinkActivate,
+  resolveImage,
   resolveWikiLink,
   spellcheckEnabled,
   suggestWikiLinks,
@@ -462,6 +479,8 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
   const scrollElementRef = useRef<HTMLElement | null>(null)
   const historyCompartmentRef = useRef(new Compartment())
   const contentAttributesCompartmentRef = useRef(new Compartment())
+  const imageInsertionCompartmentRef = useRef(new Compartment())
+  const imagePreviewCompartmentRef = useRef(new Compartment())
   const livePreviewCompartmentRef = useRef(new Compartment())
 
   useImperativeHandle(ref, () => ({
@@ -480,13 +499,24 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
       editor.dispatch({ selection: { anchor: editor.state.doc.length } })
       editor.focus()
     },
+    insertImage() {
+      const editor = editorRef.current
+      if (!editor) return
+      insertImportedImage(
+        editor,
+        pickAttachment(currentNoteKeyRef.current),
+        (error) => onImageErrorRef.current?.(error),
+      )
+    },
   }), [])
   const onChangeRef = useRef(onChange)
   const onPreviewCandidateEnterRef = useRef(onPreviewCandidateEnter)
   const onPreviewCandidateLeaveRef = useRef(onPreviewCandidateLeave)
   const onPreviewDismissRef = useRef(onPreviewDismiss)
   const onExternalLinkErrorRef = useRef(onExternalLinkError)
+  const onImageErrorRef = useRef(onImageError)
   const onWikiLinkActivateRef = useRef(onWikiLinkActivate)
+  const resolveImageRef = useRef(resolveImage)
   const resolveWikiLinkRef = useRef(resolveWikiLink)
   const suggestWikiLinksRef = useRef(suggestWikiLinks)
 
@@ -496,7 +526,9 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
     onPreviewCandidateLeaveRef.current = onPreviewCandidateLeave
     onPreviewDismissRef.current = onPreviewDismiss
     onExternalLinkErrorRef.current = onExternalLinkError
+    onImageErrorRef.current = onImageError
     onWikiLinkActivateRef.current = onWikiLinkActivate
+    resolveImageRef.current = resolveImage
     resolveWikiLinkRef.current = resolveWikiLink
     suggestWikiLinksRef.current = suggestWikiLinks
   }, [
@@ -505,7 +537,9 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
     onPreviewCandidateLeave,
     onPreviewDismiss,
     onExternalLinkError,
+    onImageError,
     onWikiLinkActivate,
+    resolveImage,
     resolveWikiLink,
     suggestWikiLinks,
   ])
@@ -523,9 +557,20 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
       extensions: [
         editorExtensions,
         historyCompartmentRef.current.of(history()),
+        imageInsertionCompartmentRef.current.of([
+          trackedImageInsertion,
+          imagePaste(
+            (file) => importAttachmentBytes(currentNoteKeyRef.current, file),
+            (error) => onImageErrorRef.current?.(error),
+          ),
+        ]),
         contentAttributesCompartmentRef.current.of(
           editorContentAttributes(initialSpellcheckEnabledRef.current),
         ),
+        imagePreviewCompartmentRef.current.of(imageLivePreview(
+          (destination) => resolveImageRef.current?.(destination)
+            ?? resolveLocalImage(initialNoteKeyRef.current, destination),
+        )),
         livePreviewCompartmentRef.current.of(
           livePreview((target) => resolveWikiLinkRef.current(target)),
         ),
@@ -595,6 +640,12 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
     if (noteRenamed) {
       renameEditorViewState(currentNoteKeyRef.current, noteKey)
       currentNoteKeyRef.current = noteKey
+      editor.dispatch({
+        effects: imagePreviewCompartmentRef.current.reconfigure(imageLivePreview(
+          (destination) => resolveImageRef.current?.(destination)
+            ?? resolveLocalImage(noteKey, destination),
+        )),
+      })
     }
     if (sessionChanged) {
       rememberEditorViewState(
@@ -631,9 +682,22 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
               historyCompartmentRef.current.reconfigure([]),
               historyCompartmentRef.current.reconfigure(history()),
               ...(sessionChanged
-                ? [livePreviewCompartmentRef.current.reconfigure(
-                    livePreview((target) => resolveWikiLinkRef.current(target)),
-                  )]
+                ? [
+                    imageInsertionCompartmentRef.current.reconfigure([
+                      trackedImageInsertion,
+                      imagePaste(
+                        (file) => importAttachmentBytes(noteKey, file),
+                        (error) => onImageErrorRef.current?.(error),
+                      ),
+                    ]),
+                    imagePreviewCompartmentRef.current.reconfigure(imageLivePreview(
+                      (destination) => resolveImageRef.current?.(destination)
+                        ?? resolveLocalImage(noteKey, destination),
+                    )),
+                    livePreviewCompartmentRef.current.reconfigure(
+                      livePreview((target) => resolveWikiLinkRef.current(target)),
+                    ),
+                  ]
                 : []),
             ]
           : undefined,

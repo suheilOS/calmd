@@ -1,7 +1,10 @@
 #[path = "note_preview_read.rs"]
 mod note_preview_read;
 
-use crate::links::{key_stem, normalize_key, rewrite_target};
+use crate::{
+    links::{key_stem, normalize_key, rewrite_target},
+    portable_filename::{portable_stem, truncate_utf8},
+};
 use atomic_write_file::AtomicWriteFile;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -802,7 +805,7 @@ fn available_filename(
         .map(|name| name.to_lowercase())
         .collect::<HashSet<_>>();
 
-    let base = safe_filename_stem(title);
+    let base = portable_stem(title, "Untitled", " note", MAX_FILENAME_BYTES - 3);
     for number in 1.. {
         let suffix = if number == 1 {
             String::new()
@@ -817,60 +820,6 @@ fn available_filename(
         }
     }
     unreachable!()
-}
-
-fn safe_filename_stem(title: &str) -> String {
-    let mut stem = title
-        .chars()
-        .map(|character| {
-            if character.is_control()
-                || matches!(
-                    character,
-                    '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*'
-                )
-            {
-                '-'
-            } else {
-                character
-            }
-        })
-        .collect::<String>();
-    stem = stem.trim_end_matches([' ', '.']).to_owned();
-    if stem.is_empty() {
-        stem = "Untitled".to_owned();
-    }
-
-    let device_name = stem
-        .split('.')
-        .next()
-        .unwrap_or_default()
-        .trim_end_matches([' ', '.'])
-        .to_ascii_uppercase();
-    if is_windows_reserved_name(&device_name) {
-        stem.push_str(" note");
-    }
-    truncate_utf8(&stem, MAX_FILENAME_BYTES - 3).to_owned()
-}
-
-fn is_windows_reserved_name(name: &str) -> bool {
-    matches!(name, "CON" | "PRN" | "AUX" | "NUL")
-        || name.strip_prefix("COM").is_some_and(|suffix| {
-            matches!(suffix, "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9")
-        })
-        || name.strip_prefix("LPT").is_some_and(|suffix| {
-            matches!(suffix, "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9")
-        })
-}
-
-fn truncate_utf8(value: &str, max_bytes: usize) -> &str {
-    if value.len() <= max_bytes {
-        return value;
-    }
-    let mut boundary = max_bytes;
-    while !value.is_char_boundary(boundary) {
-        boundary -= 1;
-    }
-    &value[..boundary]
 }
 
 fn unique_temp_path(root: &Path, purpose: &str) -> PathBuf {

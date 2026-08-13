@@ -24,6 +24,7 @@ The document remains plain Markdown. Supported wiki links use `[[target]]` or `[
 - Live Preview is the sole editing presentation. Inline syntax reveals only when a caret or completed selection touches its parsed span; structural prefixes reveal on their owning line. Carets activate inclusive boundaries, and a selection activates every syntax span it overlaps. Opaque Live Preview surfaces render in a background layer below CodeMirror's drawn selection so selections remain visible across code, inline code, and highlighted text.
 - Pointer-drag selections freeze the pre-drag presentation until the gesture completes, preventing source delimiters from moving text under the pointer.
 - Strong, emphasis, highlight, strikethrough, inline code, standard links, wiki links, escapes, ATX and Setext headings, blockquotes, fenced code, thematic breaks, lists, and tasks use the shared Live Preview policy. Malformed or incomplete Markdown remains literal source.
+- Valid vault-relative PNG, JPEG, GIF, and WebP images render through Tauri's exact-file-scoped asset protocol. Image source returns on caret or selection contact; unavailable images retain an accessible alt-text fallback. Remote, absolute, traversal, SVG, and reference-style destinations remain literal source.
 - Activating any part of a fenced code block reveals the entire source unit: opening fence, language identifier, content, and closing fence.
 - Inactive list lines render source-backed bullets, numbers, or task checkboxes. Activating the line reveals the literal prefix. Clicking an inactive checkbox performs one undoable Markdown edit without entering source editing.
 - Programming ligatures are disabled in the Markdown surface so punctuation remains literal, while normal kerning remains enabled.
@@ -38,7 +39,7 @@ The document remains plain Markdown. Supported wiki links use `[[target]]` or `[
 - Each opened note has an isolated undo timeline. Note changes and canonical persistence reconciliation are not undoable user edits, and stale asynchronous link resolution cannot cross the editor-session seam.
 - Selection and scroll position are remembered for up to 100 opened notes during the current app run, migrate with renames, and are discarded with deleted notes.
 - Native spellcheck is enabled for prose by default and can be disabled from the editor context menu. The preference is stored in Tauri settings; autocorrect, autocapitalization, code, and link destinations remain excluded where the webview supports those attributes.
-- The editor context menu exposes paragraph, heading, quote, list, and task commands backed by the same Markdown transformations as their keyboard commands. There is no persistent toolbar or second command surface.
+- The editor context menu exposes paragraph, heading, quote, list, task, and native image-picker actions. Pasted or picked images are validated and atomically imported into the vault-root `attachments/` directory, then inserted as portable standard Markdown. Asynchronous imports map their captured selections through intervening edits and cannot cross note sessions.
 - The editor owns its document state while typing. React receives document changes through an update listener and only dispatches an external replacement when the incoming value actually differs.
 
 ## Benchmarks
