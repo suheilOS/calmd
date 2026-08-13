@@ -134,6 +134,7 @@ export function NoteEditor({
           />
           <EditorContextMenu
             onBlockChange={(kind) => bodyEditorRef.current?.applyBlock(kind)}
+            onInsertImage={() => bodyEditorRef.current?.insertImage()}
             onSpellcheckChange={onSpellcheckEnabledChange}
             spellcheckEnabled={spellcheckEnabled}
           />
@@ -149,6 +150,7 @@ export function NoteEditor({
               onPreviewCandidateLeave={previewController.leaveSource}
               onPreviewDismiss={previewController.dismiss}
               onExternalLinkError={onExternalLinkError}
+              onImageError={onExternalLinkError}
               onWikiLinkActivate={onWikiLinkActivate}
               resolveWikiLink={resolveWikiLink}
               spellcheckEnabled={spellcheckEnabled}

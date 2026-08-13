@@ -29,6 +29,16 @@ const NOTE_PREVIEW_CHARACTER_LIMIT: usize = 4_000;
 #[derive(Default)]
 pub struct VaultState(Mutex<Option<PathBuf>>);
 
+impl VaultState {
+    pub(crate) fn root(&self) -> Result<PathBuf, String> {
+        self.0
+            .lock()
+            .map_err(|_| "Vault state is unavailable.".to_owned())?
+            .clone()
+            .ok_or_else(|| "Choose a vault before working with images.".to_owned())
+    }
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OpenNoteLinkResponse {

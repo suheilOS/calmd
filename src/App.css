@@ -351,6 +351,47 @@
   width: 100%;
 }
 
+.markdown-editor .cm-image {
+  border-radius: 0.5rem;
+  cursor: text;
+  max-inline-size: 100%;
+  overflow: hidden;
+}
+
+.markdown-editor .cm-image-block {
+  display: inline-flex;
+  inline-size: fit-content;
+  max-inline-size: 100%;
+}
+
+.markdown-editor .cm-image-inline {
+  display: inline-flex;
+  max-block-size: 1.6em;
+  vertical-align: text-bottom;
+}
+
+.markdown-editor .cm-image img {
+  block-size: auto;
+  display: block;
+  max-inline-size: 100%;
+  object-fit: contain;
+}
+
+.markdown-editor .cm-image-inline img {
+  max-block-size: 1.6em;
+  inline-size: auto;
+}
+
+.markdown-editor .cm-image-unavailable {
+  align-items: center;
+  background: var(--color-hover);
+  color: var(--color-muted);
+  display: inline-flex;
+  font-size: var(--text-small);
+  min-block-size: 2rem;
+  padding-inline: 0.75rem;
+}
+
 .markdown-editor .cm-list-marker {
   color: var(--color-syntax);
   display: inline-block;

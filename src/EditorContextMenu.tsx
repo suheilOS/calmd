@@ -3,6 +3,7 @@ import type { MarkdownBlockKind } from './markdownBlockCommands'
 
 type EditorContextMenuProps = {
   onBlockChange: (kind: MarkdownBlockKind) => void
+  onInsertImage: () => void
   onSpellcheckChange: (enabled: boolean) => void
   spellcheckEnabled: boolean
 }
@@ -100,6 +101,16 @@ function TaskIcon() {
   )
 }
 
+function ImageIcon() {
+  return (
+    <IconFrame>
+      <rect height="11" rx="1.5" width="13" x="1.5" y="2.5" />
+      <circle cx="5" cy="6" r="1" />
+      <path d="m3 12 3.25-3 2.25 2 1.5-1.5 3 2.5" />
+    </IconFrame>
+  )
+}
+
 function SpellcheckIcon() {
   return (
     <IconFrame>
@@ -127,6 +138,7 @@ function CheckIcon() {
 /** Button-triggered formatting menu that leaves the editor's native context menu intact. */
 export function EditorContextMenu({
   onBlockChange,
+  onInsertImage,
   onSpellcheckChange,
   spellcheckEnabled,
 }: EditorContextMenuProps) {
@@ -195,6 +207,10 @@ export function EditorContextMenu({
               <span>Task</span>
             </Menu.Item>
             <Menu.Separator className="mx-2 my-1 h-px bg-divider" />
+            <Menu.Item className={itemClassName} onClick={onInsertImage}>
+              <ImageIcon />
+              <span>Insert image…</span>
+            </Menu.Item>
             <Menu.CheckboxItem
               checked={spellcheckEnabled}
               className={itemClassName}

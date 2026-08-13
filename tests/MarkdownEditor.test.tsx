@@ -7,6 +7,7 @@ import { GFM } from '@lezer/markdown'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { MarkdownEditor } from '../src/MarkdownEditor'
+import type { DisplayImage } from '../src/images'
 import { activateExternalLink } from '../src/externalLinks'
 
 beforeAll(() => {
@@ -51,6 +52,7 @@ async function renderEditor(
   onChange = () => {},
   noteKey = `test-note-${++noteSequence}.md`,
   resolveWikiLink = async () => null,
+  resolveImage?: (destination: string) => Promise<DisplayImage>,
 ) {
   const container = document.createElement('div')
   const scrollContainer = document.createElement('div')
@@ -63,12 +65,23 @@ async function renderEditor(
     root.render(
       <MarkdownEditor
         {...editorProps(value, editorSessionId, onChange, noteKey)}
+        resolveImage={resolveImage}
         resolveWikiLink={resolveWikiLink}
         value={value}
       />,
     )
   })
   return { container, root, scrollContainer }
+}
+
+const resolvedImage: DisplayImage = {
+  absolutePath: '/vault/attachments/photo.png',
+  assetUrl: 'asset://localhost/photo.png?revision=abc',
+  height: 200,
+  mime: 'image/png',
+  relativePath: 'attachments/photo.png',
+  revision: 'abc',
+  width: 300,
 }
 
 function pressUndo(container: HTMLElement) {
@@ -536,6 +549,52 @@ describe('MarkdownEditor Live Preview', () => {
     expect(editor.classList.contains('cm-live-preview-pending')).toBe(false)
     expect(visibleText).toContain('target tail')
     expect(visibleText).not.toContain('**target**')
+  })
+
+  test('renders resolved local images and reveals their source on contact', async () => {
+    const source = 'before\n\n![Photo](attachments/photo.png)\n\nafter'
+    const { container } = await renderEditor(
+      source,
+      1,
+      () => {},
+      'image-note.md',
+      async () => null,
+      async () => resolvedImage,
+    )
+    const content = container.querySelector<HTMLElement>('.cm-content')
+    if (!content) throw new Error('CodeMirror content was not mounted')
+    await act(async () => Promise.resolve())
+
+    const image = container.querySelector<HTMLImageElement>('.cm-image img')
+    expect(image?.alt).toBe('Photo')
+    expect(image?.src).toContain('asset://localhost/photo.png')
+    expect(content.textContent).not.toContain('![Photo]')
+
+    await act(async () => {
+      EditorView.findFromDOM(content).dispatch({
+        selection: { anchor: source.indexOf('![Photo]') + 3 },
+      })
+    })
+    expect(content.textContent).toContain('![Photo](attachments/photo.png)')
+  })
+
+  test('keeps unsupported image syntax literal and shows an accessible missing fallback', async () => {
+    const source = '![Remote](https://example.com/photo.png)\n\n![Missing](missing.png)'
+    const { container } = await renderEditor(
+      source,
+      1,
+      () => {},
+      'missing-image-note.md',
+      async () => null,
+      async () => Promise.reject(new Error('missing')),
+    )
+    await act(async () => Promise.resolve())
+
+    expect(container.querySelector('.cm-content')?.textContent).toContain(
+      '![Remote](https://example.com/photo.png)',
+    )
+    const fallback = container.querySelector('.cm-image-unavailable')
+    expect(fallback?.getAttribute('aria-label')).toBe('Image unavailable: Missing')
   })
 
 })
