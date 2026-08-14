@@ -15,6 +15,7 @@ The interface reads and writes top-level Markdown notes in one user-selected vau
 - Named vault creation inside a user-selected parent directory, with the canonicalized child path persisted
 - Rust create, read, save, rename, and link open-or-create commands using relative note keys
 - Framework-independent Note persistence behind the Tauri commands, with filesystem behavior tested through its interface
+- Thin Tauri command adapters over cohesive Rust application modules for vault lifecycle, Note operations, Retrieval orchestration, and settings
 - Framework-neutral Note editing sessions that own autosave sequencing, canonical save reconciliation, conflict state, and flush-before-return behavior
 - Canonical `# Title` Markdown serialization and content-preserving external-file parsing
 - Portable filename derivation with case-insensitive collision handling
@@ -61,6 +62,8 @@ Knowledge is accessed through literal retrieval, inline `[[links]]`, backlinks, 
 - No folders, tags, or user-defined properties
 - SQLite indexes and system metadata in Tauri app data
 - Markdown remains the source of truth
+
+The Rust hierarchy keeps Tauri-specific command and settings adapters separate from application orchestration. Vault lifecycle owns selected-root validation and recovery; Note operations own Markdown-first mutations and best-effort index maintenance; Retrieval owns reconciliation and recoverable index reads. The lower-level Note persistence and SQLite search modules remain independently testable through their existing interfaces.
 
 ## Current search
 

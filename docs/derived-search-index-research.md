@@ -90,6 +90,8 @@ On launch and window focus, Rust scans all top-level regular `.md` files using t
 
 Each vault command holds the vault state lock before reading or mutating the index. Create and save update the changed note and its outgoing links after the Markdown write. Rename rewrites Markdown through the persistence transaction first, then scans the full vault. A successful Markdown write remains successful if its derived index update fails. The index is marked dirty and a later search or backlink request retries full reconciliation.
 
+This sequencing lives in the Rust application layer rather than the Tauri command adapter. Note operations own Markdown-first mutation ordering, while Retrieval owns vault scanning, indexed-note conversion, dirty reconciliation, and recoverable rebuild-and-retry behavior. Tauri commands only acquire managed state, move blocking work off the async runtime, and delegate through those interfaces.
+
 A new target can make existing broken-link rows resolve after reconciliation because rows store normalized target identity. An ambiguous normalized filename identity resolves to neither note.
 
 ## Recovery

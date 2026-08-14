@@ -1,9 +1,10 @@
+mod application;
 mod attachments;
+mod commands;
 mod links;
 mod note_persistence;
 mod portable_filename;
 mod search;
-mod storage;
 mod unlinked_mentions;
 
 use tauri::Manager;
@@ -15,28 +16,28 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .manage(storage::VaultState::default())
+        .manage(application::VaultState::default())
         .invoke_handler(tauri::generate_handler![
-            storage::select_vault,
-            storage::open_vault,
-            storage::get_substack_publication_url,
-            storage::set_substack_publication_url,
-            storage::get_editor_spellcheck,
-            storage::set_editor_spellcheck,
-            storage::search_notes,
-            storage::suggest_notes,
-            storage::open_random_note,
-            storage::create_note,
-            storage::create_untitled_note,
-            storage::open_note_link,
-            storage::resolve_note_preview,
-            storage::read_note_preview,
-            storage::get_backlinks,
-            storage::get_unlinked_mentions,
-            storage::read_note,
-            storage::save_note,
-            storage::rename_note,
-            storage::delete_note,
+            commands::select_vault,
+            commands::open_vault,
+            commands::get_substack_publication_url,
+            commands::set_substack_publication_url,
+            commands::get_editor_spellcheck,
+            commands::set_editor_spellcheck,
+            commands::search_notes,
+            commands::suggest_notes,
+            commands::open_random_note,
+            commands::create_note,
+            commands::create_untitled_note,
+            commands::open_note_link,
+            commands::resolve_note_preview,
+            commands::read_note_preview,
+            commands::get_backlinks,
+            commands::get_unlinked_mentions,
+            commands::read_note,
+            commands::save_note,
+            commands::rename_note,
+            commands::delete_note,
             attachments::pick_attachment,
             attachments::import_attachment_bytes,
             attachments::resolve_image,
@@ -49,7 +50,7 @@ pub fn run() {
                 )),
             };
             app.manage(search);
-            storage::restore_vault(app.handle(), &app.state::<storage::VaultState>())?;
+            commands::restore_vault(app.handle(), &app.state::<application::VaultState>())?;
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()

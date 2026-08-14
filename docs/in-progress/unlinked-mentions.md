@@ -46,7 +46,7 @@ Add a read-only **Unlinked mentions** section to the existing on-demand backlink
 
 ### Tauri command
 
-- Add `get_unlinked_mentions(key)` in `storage.rs`.
+- Add `get_unlinked_mentions(key)` to Retrieval and expose it through the Tauri command adapter.
 - Reconcile the derived index before querying, following the existing backlinks command behavior.
 - Register the command in `src-tauri/src/lib.rs`.
 - Preserve the existing behavior where index failures affect retrieval only and never roll back Markdown persistence.

@@ -1,7 +1,7 @@
 use crate::{
+    application::VaultState,
     note_persistence::NotePersistence,
     portable_filename::{portable_stem, truncate_utf8},
-    storage::VaultState,
 };
 use image::{ImageFormat, ImageReader};
 use serde::Serialize;
@@ -255,9 +255,7 @@ pub async fn pick_attachment(
     window: Window,
     state: State<'_, VaultState>,
 ) -> AttachmentResult<Option<ImportedAttachment>> {
-    let root = state
-        .root()
-        .map_err(|message| AttachmentError::new("vault", message))?;
+    let root = attachment_root(&state)?;
     let service = AttachmentService::new(&root);
     service.require_note(&note_key)?;
     let dialog = window
@@ -282,9 +280,7 @@ pub fn import_attachment_bytes(
     let filename = request_header(&request, "x-calmd-filename")?;
     let note_key = request_header(&request, "x-calmd-note-key")?;
     let bytes = request_bytes(&request)?;
-    let root = state
-        .root()
-        .map_err(|message| AttachmentError::new("vault", message))?;
+    let root = attachment_root(&state)?;
     AttachmentService::new(&root).import_bytes(&filename, &bytes, &note_key)
 }
 
@@ -332,14 +328,23 @@ pub fn resolve_image(
     app: AppHandle,
     state: State<'_, VaultState>,
 ) -> AttachmentResult<ResolvedImage> {
-    let root = state
-        .root()
-        .map_err(|message| AttachmentError::new("vault", message))?;
+    let root = attachment_root(&state)?;
     let resolved = AttachmentService::new(&root).resolve(&note_key, &destination)?;
     app.asset_protocol_scope()
         .allow_file(&resolved.absolute_path)
         .map_err(|error| AttachmentError::io("Could not authorize the image", error))?;
     Ok(resolved)
+}
+
+fn attachment_root(state: &VaultState) -> AttachmentResult<PathBuf> {
+    state.root().map_err(|error| {
+        let message = if error.code() == "no_vault" {
+            "Choose a vault before working with images."
+        } else {
+            error.message()
+        };
+        AttachmentError::new("vault", message)
+    })
 }
 
 fn validate_image(

@@ -28,7 +28,7 @@ Complete note CRUD by allowing the currently open note to be permanently deleted
 ## Existing flow and boundaries
 
 - `src-tauri/src/note_persistence.rs` owns safe Markdown filesystem behavior, revisions, and path validation.
-- `src-tauri/src/storage.rs` owns Tauri commands and best-effort derived-index updates.
+- Rust Note operations own Markdown-first deletion and best-effort derived-index updates; `commands.rs` is the Tauri adapter.
 - `src-tauri/src/search.rs` owns the rebuildable SQLite/FTS5 index.
 - `src/useNoteEditing.ts` and `src/noteEditing.ts` own autosave, flush, and conflict handling.
 - `src/TitleBar.tsx` owns the title-bar controls.
@@ -57,7 +57,7 @@ In `src-tauri/src/search.rs`:
 2. Delete the matching `notes` row so existing FTS delete triggers and `note_links` foreign-key cascades run.
 3. Mark the index dirty if the update fails; the next reconciliation must remain able to rebuild it from Markdown.
 
-In `src-tauri/src/storage.rs`:
+In the Rust Note operations module:
 
 1. Add the `delete_note` Tauri command accepting `key` and `expected_revision`.
 2. Validate the vault, delete the Markdown source through `NotePersistence`, then best-effort remove the derived index row.
