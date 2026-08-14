@@ -3,8 +3,8 @@ import { history, undo } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
 import { EditorSelection, EditorState, type StateCommand, type Transaction } from '@codemirror/state'
 import { GFM } from '@lezer/markdown'
-import { markdownHighlight } from '../src/markdownHighlight'
-import { toggleLink, toggleMarkdown } from '../src/markdownCommands'
+import { markdownHighlight } from './markdownHighlight'
+import { toggleLink, toggleMarkdown } from './markdownCommands'
 
 function runCommand(
   doc: string,

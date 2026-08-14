@@ -1,4 +1,4 @@
-import type { MarkdownEditorHandle } from './MarkdownEditor'
+import type { MarkdownEditorCommands } from './markdown-editor/contracts'
 
 type TitleKeyEvent = {
   key: string
@@ -8,7 +8,7 @@ type TitleKeyEvent = {
 
 export function handleTitleKeyDown(
   event: TitleKeyEvent,
-  bodyEditor: MarkdownEditorHandle | null,
+  bodyEditor: MarkdownEditorCommands | null,
 ) {
   if (event.key !== 'Enter' || event.isComposing) return
   event.preventDefault()

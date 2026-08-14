@@ -6,7 +6,7 @@ import {
   activateExternalLink,
   externalUrlAt,
   supportedExternalUrl,
-} from '../src/externalLinks'
+} from './externalLinks'
 
 function markdownState(doc: string) {
   return EditorState.create({

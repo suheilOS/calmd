@@ -4,8 +4,8 @@ import {
   type CompletionSource,
 } from '@codemirror/autocomplete'
 import { syntaxTree } from '@codemirror/language'
-import { noteKeyStem, type NoteReference } from './notes'
-import { canonicalResolvedWikiLink } from './wikiLinks'
+import { noteKeyStem, type NoteReference } from '../notes'
+import { canonicalResolvedWikiLink } from '../wikiLinks'
 
 function isCodePosition(context: CompletionContext) {
   let node = syntaxTree(context.state).resolveInner(context.pos, -1)

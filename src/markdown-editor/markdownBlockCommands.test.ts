@@ -3,7 +3,7 @@ import { EditorSelection, EditorState } from '@codemirror/state'
 import {
   setMarkdownBlock,
   type MarkdownBlockKind,
-} from '../src/markdownBlockCommands'
+} from './markdownBlockCommands'
 
 function apply(text: string, kind: MarkdownBlockKind, from = 0, to = text.length) {
   let state = EditorState.create({

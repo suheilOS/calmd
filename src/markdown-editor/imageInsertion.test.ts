@@ -6,8 +6,8 @@ import {
   imagePaste,
   insertImportedImage,
   trackedImageInsertion,
-} from '../src/imageInsertion'
-import type { ImportedAttachment } from '../src/images'
+} from './imageInsertion'
+import type { ImportedAttachment } from '../images'
 
 beforeAll(() => {
   if (!GlobalRegistrator.isRegistered) GlobalRegistrator.register()

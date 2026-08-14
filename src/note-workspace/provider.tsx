@@ -5,7 +5,7 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from 'react'
-import type { WikiLinkActivation } from '../MarkdownEditor'
+import type { WikiLinkActivation } from '../markdown-editor/contracts'
 import type { NoteDraft, NoteReference } from '../notes'
 import {
   NoteWorkspaceRuntime,

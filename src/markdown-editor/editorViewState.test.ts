@@ -5,7 +5,7 @@ import {
   discardEditorViewState,
   recallEditorViewState,
   rememberEditorViewState,
-} from '../src/editorViewState'
+} from './editorViewState'
 
 test('discarded note state cannot be recreated by a late editor cleanup', () => {
   const state = EditorState.create({ doc: 'deleted' })

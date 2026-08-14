@@ -47,9 +47,28 @@ import {
 import { tags } from '@lezer/highlight'
 import { GFM } from '@lezer/markdown'
 import { openUrl } from '@tauri-apps/plugin-opener'
-import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } from 'react'
+import {
+  importAttachmentBytes,
+  pickAttachment,
+  readClipboardImageFile,
+  resolveLocalImage,
+} from '../images'
+import { navigationPlatform, isPrimaryNavigationClick } from '../navigation'
+import type { NotePreviewCandidate } from '../notePreview'
+import { diffTextChanges } from '../threeWayTextMerge'
+import {
+  canonicalResolvedWikiLink,
+  parseWikiLinkText,
+  validateWikiLinkOccurrence,
+  wikiLinkMarkdown,
+} from '../wikiLinks'
+import type {
+  MarkdownEditorCommands,
+  MarkdownEditorInput,
+  WikiLinkActivation,
+} from './contracts'
 import { insertNewlineContinueBlockquote } from './markdownBlockquote'
-import { setMarkdownBlock, type MarkdownBlockKind } from './markdownBlockCommands'
+import { setMarkdownBlock } from './markdownBlockCommands'
 import {
   recallEditorViewState,
   rememberEditorViewState,
@@ -63,56 +82,9 @@ import {
   trackedImageInsertion,
 } from './imageInsertion'
 import { imageLivePreview } from './imageLivePreview'
-import {
-  importAttachmentBytes,
-  pickAttachment,
-  readClipboardImageFile,
-  resolveLocalImage,
-  type DisplayImage,
-} from './images'
 import { livePreview } from './livePreview'
-import type { NoteReference } from './notes'
-import { navigationPlatform, isPrimaryNavigationClick } from './navigation'
-import type { NotePreviewCandidate } from './notePreview'
-import { diffTextChanges } from './threeWayTextMerge'
 import { activateExternalLink as activateExternalUrl } from './externalLinks'
 import { wikiLinkCompletion } from './wikiLinkCompletion'
-import {
-  canonicalResolvedWikiLink,
-  parseWikiLinkText,
-  validateWikiLinkOccurrence,
-  wikiLinkMarkdown,
-} from './wikiLinks'
-
-export type WikiLinkActivation = {
-  target: string
-  validateCurrentOccurrence: (authoritativeBody: string) => boolean
-  applyCanonical: (canonicalTarget: string, resolvedTitle: string) => string | null
-  finish: () => void
-}
-
-export type MarkdownEditorHandle = {
-  applyBlock: (kind: MarkdownBlockKind) => void
-  focusAtEnd: () => void
-  insertImage: () => void
-}
-
-type MarkdownEditorProps = {
-  editorSessionId: number
-  noteKey: string
-  value: string
-  onChange: (value: string) => void
-  onPreviewCandidateEnter: (candidate: NotePreviewCandidate) => void
-  onPreviewCandidateLeave: () => void
-  onPreviewDismiss: () => void
-  onExternalLinkError?: (error: unknown) => void
-  onImageError?: (error: unknown) => void
-  onWikiLinkActivate: (activation: WikiLinkActivation) => void
-  resolveImage?: (destination: string) => Promise<DisplayImage>
-  resolveWikiLink: (target: string) => Promise<boolean | null>
-  spellcheckEnabled: boolean
-  suggestWikiLinks: (query: string) => Promise<NoteReference[]>
-}
 
 const externalSync = Annotation.define<boolean>()
 
@@ -454,282 +426,224 @@ const editorExtensions = [
   markdownBackgroundLayer,
 ]
 
-export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(function MarkdownEditor({
-  editorSessionId,
-  noteKey,
-  value,
-  onChange,
-  onPreviewCandidateEnter,
-  onPreviewCandidateLeave,
-  onPreviewDismiss,
-  onExternalLinkError,
-  onImageError,
-  onWikiLinkActivate,
-  resolveImage,
-  resolveWikiLink,
-  spellcheckEnabled,
-  suggestWikiLinks,
-}, ref) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const editorRef = useRef<EditorView>(null)
-  const initialValueRef = useRef(value)
-  const initialNoteKeyRef = useRef(noteKey)
-  const initialSpellcheckEnabledRef = useRef(spellcheckEnabled)
-  const currentSessionIdRef = useRef(editorSessionId)
-  const currentNoteKeyRef = useRef(noteKey)
-  const scrollElementRef = useRef<HTMLElement | null>(null)
-  const historyCompartmentRef = useRef(new Compartment())
-  const contentAttributesCompartmentRef = useRef(new Compartment())
-  const imageInsertionCompartmentRef = useRef(new Compartment())
-  const imagePreviewCompartmentRef = useRef(new Compartment())
-  const livePreviewCompartmentRef = useRef(new Compartment())
+export type MarkdownEditorSession = {
+  readonly commands: MarkdownEditorCommands
+  update: (input: MarkdownEditorInput) => void
+  destroy: () => void
+}
 
-  useImperativeHandle(ref, () => ({
-    applyBlock(kind) {
-      const editor = editorRef.current
-      if (!editor) return
+class CodeMirrorDocumentSession implements MarkdownEditorSession {
+  private input: MarkdownEditorInput
+  private readonly editor: EditorView
+  private readonly scrollElement: HTMLElement
+  private currentSessionId: number
+  private currentNoteKey: string
+  private spellcheckEnabled: boolean
+  private destroyed = false
+  private readonly historyCompartment = new Compartment()
+  private readonly contentAttributesCompartment = new Compartment()
+  private readonly imageInsertionCompartment = new Compartment()
+  private readonly imagePreviewCompartment = new Compartment()
+  private readonly livePreviewCompartment = new Compartment()
+
+  readonly commands: MarkdownEditorCommands = {
+    applyBlock: (kind) => {
       setMarkdownBlock(kind)({
-        state: editor.state,
-        dispatch: (transaction) => editor.dispatch(transaction),
+        state: this.editor.state,
+        dispatch: (transaction) => this.editor.dispatch(transaction),
       })
-      editor.focus()
+      this.editor.focus()
     },
-    focusAtEnd() {
-      const editor = editorRef.current
-      if (!editor) return
-      editor.dispatch({ selection: { anchor: editor.state.doc.length } })
-      editor.focus()
+    focusAtEnd: () => {
+      this.editor.dispatch({ selection: { anchor: this.editor.state.doc.length } })
+      this.editor.focus()
     },
-    insertImage() {
-      const editor = editorRef.current
-      if (!editor) return
+    insertImage: () => {
       insertImportedImage(
-        editor,
-        pickAttachment(currentNoteKeyRef.current),
-        (error) => onImageErrorRef.current?.(error),
+        this.editor,
+        pickAttachment(this.currentNoteKey),
+        (error) => this.input.onImageError?.(error),
       )
     },
-  }), [])
-  const onChangeRef = useRef(onChange)
-  const onPreviewCandidateEnterRef = useRef(onPreviewCandidateEnter)
-  const onPreviewCandidateLeaveRef = useRef(onPreviewCandidateLeave)
-  const onPreviewDismissRef = useRef(onPreviewDismiss)
-  const onExternalLinkErrorRef = useRef(onExternalLinkError)
-  const onImageErrorRef = useRef(onImageError)
-  const onWikiLinkActivateRef = useRef(onWikiLinkActivate)
-  const resolveImageRef = useRef(resolveImage)
-  const resolveWikiLinkRef = useRef(resolveWikiLink)
-  const suggestWikiLinksRef = useRef(suggestWikiLinks)
+  }
 
-  useEffect(() => {
-    onChangeRef.current = onChange
-    onPreviewCandidateEnterRef.current = onPreviewCandidateEnter
-    onPreviewCandidateLeaveRef.current = onPreviewCandidateLeave
-    onPreviewDismissRef.current = onPreviewDismiss
-    onExternalLinkErrorRef.current = onExternalLinkError
-    onImageErrorRef.current = onImageError
-    onWikiLinkActivateRef.current = onWikiLinkActivate
-    resolveImageRef.current = resolveImage
-    resolveWikiLinkRef.current = resolveWikiLink
-    suggestWikiLinksRef.current = suggestWikiLinks
-  }, [
-    onChange,
-    onPreviewCandidateEnter,
-    onPreviewCandidateLeave,
-    onPreviewDismiss,
-    onExternalLinkError,
-    onImageError,
-    onWikiLinkActivate,
-    resolveImage,
-    resolveWikiLink,
-    suggestWikiLinks,
-  ])
+  constructor(parent: HTMLElement, input: MarkdownEditorInput) {
+    this.input = input
+    this.currentSessionId = input.editorSessionId
+    this.currentNoteKey = input.noteKey
+    this.spellcheckEnabled = input.spellcheckEnabled
 
-  useLayoutEffect(() => {
-    if (!containerRef.current) return
-
-    const recalled = recallEditorViewState(
-      initialNoteKeyRef.current,
-      initialValueRef.current.length,
-    )
-    const editor = new EditorView({
-      doc: initialValueRef.current,
-      selection: recalled?.selection ?? { anchor: initialValueRef.current.length },
+    const recalled = recallEditorViewState(input.noteKey, input.value.length)
+    this.editor = new EditorView({
+      doc: input.value,
+      selection: recalled?.selection ?? { anchor: input.value.length },
       extensions: [
         editorExtensions,
-        historyCompartmentRef.current.of(history()),
-        imageInsertionCompartmentRef.current.of([
-          trackedImageInsertion,
-          imagePaste(
-            (file) => importAttachmentBytes(currentNoteKeyRef.current, file),
-            readClipboardImageFile,
-            (error) => onImageErrorRef.current?.(error),
-          ),
-        ]),
-        contentAttributesCompartmentRef.current.of(
-          editorContentAttributes(initialSpellcheckEnabledRef.current),
+        this.historyCompartment.of(history()),
+        this.imageInsertionCompartment.of(this.imageInsertion(input.noteKey)),
+        this.contentAttributesCompartment.of(
+          editorContentAttributes(input.spellcheckEnabled),
         ),
-        imagePreviewCompartmentRef.current.of(imageLivePreview(
-          (destination) => resolveImageRef.current?.(destination)
-            ?? resolveLocalImage(initialNoteKeyRef.current, destination),
-        )),
-        livePreviewCompartmentRef.current.of(
-          livePreview((target) => resolveWikiLinkRef.current(target)),
-        ),
+        this.imagePreviewCompartment.of(this.imagePreview(input.noteKey)),
+        this.livePreviewCompartment.of(this.livePreview()),
         autocompletion({
           activateOnTyping: true,
           icons: false,
           maxRenderedOptions: 8,
-          override: [wikiLinkCompletion((query) => suggestWikiLinksRef.current(query))],
+          override: [wikiLinkCompletion((query) => this.input.suggestWikiLinks(query))],
         }),
         linkInteraction(
-          (activation) => onWikiLinkActivateRef.current(activation),
-          (candidate) => onPreviewCandidateEnterRef.current(candidate),
-          () => onPreviewCandidateLeaveRef.current(),
-          () => onPreviewDismissRef.current(),
-          (error) => onExternalLinkErrorRef.current?.(error),
+          (activation) => this.input.onWikiLinkActivate(activation),
+          (candidate) => this.input.onPreviewCandidateEnter(candidate),
+          () => this.input.onPreviewCandidateLeave(),
+          () => this.input.onPreviewDismiss(),
+          (error) => this.input.onExternalLinkError?.(error),
         ),
         EditorView.updateListener.of((update) => {
           const isExternalSync = update.transactions.some((transaction) =>
             transaction.annotation(externalSync),
           )
-
           if (update.docChanged && !isExternalSync) {
-            onChangeRef.current(update.state.doc.toString())
+            this.input.onChange(update.state.doc.toString())
           }
           if (update.selectionSet || update.docChanged) {
-            const scrollElement = scrollElementRef.current ?? update.view.scrollDOM
             rememberEditorViewState(
-              currentNoteKeyRef.current,
+              this.currentNoteKey,
               update.state,
-              scrollElement.scrollTop,
+              this.scrollElement?.scrollTop ?? update.view.scrollDOM.scrollTop,
             )
           }
         }),
       ],
-      parent: containerRef.current,
+      parent,
     })
 
-    editorRef.current = editor
-    const scrollElement = editor.dom.closest<HTMLElement>('.app-scroll-container')
-      ?? editor.scrollDOM
-    scrollElementRef.current = scrollElement
-    if (recalled) scrollElement.scrollTop = recalled.scrollTop
-    const rememberScroll = () => rememberEditorViewState(
-      currentNoteKeyRef.current,
-      editor.state,
-      scrollElement.scrollTop,
-    )
-    scrollElement.addEventListener('scroll', rememberScroll, { passive: true })
-    editor.focus()
+    this.scrollElement = this.editor.dom.closest<HTMLElement>('.app-scroll-container')
+      ?? this.editor.scrollDOM
+    if (recalled) this.scrollElement.scrollTop = recalled.scrollTop
+    this.scrollElement.addEventListener('scroll', this.rememberScroll, { passive: true })
+    this.editor.focus()
+  }
 
-    return () => {
-      rememberScroll()
-      scrollElement.removeEventListener('scroll', rememberScroll)
-      scrollElementRef.current = null
-      editor.destroy()
-      editorRef.current = null
-    }
-  }, [])
+  update(input: MarkdownEditorInput) {
+    if (this.destroyed) return
+    this.input = input
 
-  useEffect(() => {
-    const editor = editorRef.current
-    if (!editor) return
-    const scrollElement = scrollElementRef.current ?? editor.scrollDOM
-
-    const sessionChanged = currentSessionIdRef.current !== editorSessionId
-    const noteRenamed = !sessionChanged && currentNoteKeyRef.current !== noteKey
+    const sessionChanged = this.currentSessionId !== input.editorSessionId
+    const noteRenamed = !sessionChanged && this.currentNoteKey !== input.noteKey
     if (noteRenamed) {
-      renameEditorViewState(currentNoteKeyRef.current, noteKey)
-      currentNoteKeyRef.current = noteKey
-      editor.dispatch({
-        effects: imagePreviewCompartmentRef.current.reconfigure(imageLivePreview(
-          (destination) => resolveImageRef.current?.(destination)
-            ?? resolveLocalImage(noteKey, destination),
-        )),
+      renameEditorViewState(this.currentNoteKey, input.noteKey)
+      this.currentNoteKey = input.noteKey
+      this.editor.dispatch({
+        effects: this.imagePreviewCompartment.reconfigure(this.imagePreview(input.noteKey)),
       })
     }
     if (sessionChanged) {
-      rememberEditorViewState(
-        currentNoteKeyRef.current,
-        editor.state,
-        scrollElement.scrollTop,
-      )
-      currentSessionIdRef.current = editorSessionId
-      currentNoteKeyRef.current = noteKey
-      editor.dispatch({
-        effects: historyCompartmentRef.current.reconfigure([]),
-      })
+      this.rememberScroll()
+      this.currentSessionId = input.editorSessionId
+      this.currentNoteKey = input.noteKey
+      this.editor.dispatch({ effects: this.historyCompartment.reconfigure([]) })
     }
 
-    const documentChanged = editor.state.doc.toString() !== value
+    const documentChanged = this.editor.state.doc.toString() !== input.value
     if (documentChanged || sessionChanged) {
       const recalled = sessionChanged
-        ? recallEditorViewState(noteKey, value.length)
+        ? recallEditorViewState(input.noteKey, input.value.length)
         : null
       const changes = documentChanged
-        ? diffTextChanges(editor.state.doc.toString(), value)
+        ? diffTextChanges(this.editor.state.doc.toString(), input.value)
         : []
       const resetHistory = documentChanged && changes === null && !sessionChanged
-      editor.dispatch({
-        annotations: [
-          externalSync.of(true),
-          Transaction.addToHistory.of(false),
-        ],
+      this.editor.dispatch({
+        annotations: [externalSync.of(true), Transaction.addToHistory.of(false)],
         changes: documentChanged
-          ? changes ?? { from: 0, to: editor.state.doc.length, insert: value }
+          ? changes ?? { from: 0, to: this.editor.state.doc.length, insert: input.value }
           : undefined,
         effects: sessionChanged || resetHistory
           ? [
-              historyCompartmentRef.current.reconfigure([]),
-              historyCompartmentRef.current.reconfigure(history()),
+              this.historyCompartment.reconfigure([]),
+              this.historyCompartment.reconfigure(history()),
               ...(sessionChanged
                 ? [
-                    imageInsertionCompartmentRef.current.reconfigure([
-                      trackedImageInsertion,
-                      imagePaste(
-                        (file) => importAttachmentBytes(noteKey, file),
-                        readClipboardImageFile,
-                        (error) => onImageErrorRef.current?.(error),
-                      ),
-                    ]),
-                    imagePreviewCompartmentRef.current.reconfigure(imageLivePreview(
-                      (destination) => resolveImageRef.current?.(destination)
-                        ?? resolveLocalImage(noteKey, destination),
-                    )),
-                    livePreviewCompartmentRef.current.reconfigure(
-                      livePreview((target) => resolveWikiLinkRef.current(target)),
+                    this.imageInsertionCompartment.reconfigure(
+                      this.imageInsertion(input.noteKey),
                     ),
+                    this.imagePreviewCompartment.reconfigure(
+                      this.imagePreview(input.noteKey),
+                    ),
+                    this.livePreviewCompartment.reconfigure(this.livePreview()),
                   ]
                 : []),
             ]
           : undefined,
-        selection: sessionChanged
-          ? recalled?.selection ?? { anchor: 0 }
-          : undefined,
+        selection: sessionChanged ? recalled?.selection ?? { anchor: 0 } : undefined,
       })
-      if (sessionChanged) {
-        const scrollTop = recalled?.scrollTop ?? 0
-        editor.requestMeasure({
-          read: () => null,
-          write: () => {
-            scrollElement.scrollTop = scrollTop
-            rememberEditorViewState(noteKey, editor.state, scrollTop)
-          },
-        })
-      }
+      if (sessionChanged) this.restoreScroll(input.noteKey, recalled?.scrollTop ?? 0)
     }
-  }, [editorSessionId, noteKey, value])
 
-  useEffect(() => {
-    const editor = editorRef.current
-    if (!editor) return
-    editor.dispatch({
-      effects: contentAttributesCompartmentRef.current.reconfigure(
-        editorContentAttributes(spellcheckEnabled),
+    if (this.spellcheckEnabled !== input.spellcheckEnabled) {
+      this.spellcheckEnabled = input.spellcheckEnabled
+      this.editor.dispatch({
+        effects: this.contentAttributesCompartment.reconfigure(
+          editorContentAttributes(input.spellcheckEnabled),
+        ),
+      })
+    }
+  }
+
+  destroy() {
+    if (this.destroyed) return
+    this.destroyed = true
+    this.rememberScroll()
+    this.scrollElement.removeEventListener('scroll', this.rememberScroll)
+    this.editor.destroy()
+  }
+
+  private readonly rememberScroll = () => {
+    rememberEditorViewState(
+      this.currentNoteKey,
+      this.editor.state,
+      this.scrollElement.scrollTop,
+    )
+  }
+
+  private imageInsertion(noteKey: string) {
+    return [
+      trackedImageInsertion,
+      imagePaste(
+        (file) => importAttachmentBytes(noteKey, file),
+        readClipboardImageFile,
+        (error) => this.input.onImageError?.(error),
       ),
-    })
-  }, [spellcheckEnabled])
+    ]
+  }
 
-  return <div className="markdown-editor" ref={containerRef} />
-})
+  private imagePreview(noteKey: string) {
+    return imageLivePreview(
+      (destination) => this.input.resolveImage?.(destination)
+        ?? resolveLocalImage(noteKey, destination),
+    )
+  }
+
+  private livePreview() {
+    return livePreview((target) => this.input.resolveWikiLink(target))
+  }
+
+  private restoreScroll(noteKey: string, scrollTop: number) {
+    this.editor.requestMeasure({
+      read: () => null,
+      write: () => {
+        this.scrollElement.scrollTop = scrollTop
+        rememberEditorViewState(noteKey, this.editor.state, scrollTop)
+      },
+    })
+  }
+}
+
+/** Creates one CodeMirror document session with no React lifecycle dependency. */
+export function createMarkdownEditorSession(
+  parent: HTMLElement,
+  input: MarkdownEditorInput,
+): MarkdownEditorSession {
+  return new CodeMirrorDocumentSession(parent, input)
+}

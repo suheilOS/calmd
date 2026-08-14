@@ -1,8 +1,8 @@
 import { Button } from '@base-ui/react/button'
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { BacklinksPopover } from '../BacklinksPopover'
-import { EditorContextMenu } from '../EditorContextMenu'
-import type { MarkdownEditorHandle } from '../MarkdownEditor'
+import { EditorContextMenu } from '../markdown-editor/EditorContextMenu'
+import type { MarkdownEditorCommands } from '../markdown-editor/contracts'
 import { NotePreviewPopover } from '../NotePreviewPopover'
 import { handleTitleKeyDown } from '../titleKeyDown'
 import {
@@ -22,7 +22,7 @@ import {
 import { useNoteWorkspace } from './context'
 
 const MarkdownEditor = lazy(async () => {
-  const module = await import('../MarkdownEditor')
+  const module = await import('../markdown-editor/MarkdownEditor')
   return { default: module.MarkdownEditor }
 })
 
@@ -50,7 +50,7 @@ export function NoteEditor() {
   const { draft, key: noteKey } = state.note
   const saveMessage = state.note.failure?.message ?? state.message ?? meta.externalMessage
   const titleRef = useRef<HTMLTextAreaElement>(null)
-  const bodyEditorRef = useRef<MarkdownEditorHandle>(null)
+  const bodyEditorRef = useRef<MarkdownEditorCommands>(null)
   const titleSelectionRef = useRef({ start: 0, end: 0 })
   const [previewController] = useState(() => new NotePreviewController(loadNotePreview))
 

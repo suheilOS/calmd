@@ -3,7 +3,7 @@ import { markdown } from '@codemirror/lang-markdown'
 import { EditorState, type TransactionSpec } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
 import { describe, expect, test } from 'bun:test'
-import { wikiLinkCompletion } from '../src/wikiLinkCompletion'
+import { wikiLinkCompletion } from './wikiLinkCompletion'
 
 function context(doc: string, pos = doc.length) {
   const state = EditorState.create({ doc, extensions: [markdown()] })

@@ -10,6 +10,8 @@ const noteViewStates = new Map<string, StoredEditorViewState>()
 const discardedNoteKeys = new Set<string>()
 const MAX_REMEMBERED_NOTES = 100
 
+/** In-memory view state for editor document sessions in the active vault. */
+
 export function rememberEditorViewState(
   noteKey: string,
   state: EditorState,

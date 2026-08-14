@@ -2,6 +2,10 @@
 
 The note body uses CodeMirror 6 as a plain-Markdown editor with one Live Preview presentation. It is loaded only when a note opens so the composer remains lightweight.
 
+## Implementation structure
+
+Editor-owned code is co-located under `src/markdown-editor/`. A framework-neutral document session owns the CodeMirror view, extensions, document synchronization, history isolation, view-state restoration, and cleanup behind `update`, `commands`, and `destroy`. `MarkdownEditor.tsx` is only the React 19 mount adapter and remains the direct lazy-loading entrypoint. The Note workspace continues to own persistence, navigation, previews, and user-facing errors.
+
 ## Supported Markdown
 
 The editor parses CommonMark plus the GitHub Flavored Markdown extensions supplied by Lezer:

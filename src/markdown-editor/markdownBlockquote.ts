@@ -1,6 +1,7 @@
 import { insertNewlineContinueMarkup } from '@codemirror/lang-markdown'
 import type { StateCommand } from '@codemirror/state'
 
+/** Continues ordinary Markdown markup and exits an untouched empty blockquote. */
 export const insertNewlineContinueBlockquote: StateCommand = (target) =>
   exitEmptyBlockquote(target) || insertNewlineContinueMarkup(target)
 

@@ -89,10 +89,10 @@ only when their editing and scroll behavior are demonstrably stable.
 ## P0: Undo can cross note boundaries
 
 [App.tsx](../src/App.tsx#L439) keeps the same `NoteEditor` mounted while moving
-from one note to another. [MarkdownEditor.tsx](../src/MarkdownEditor.tsx#L587)
+from one note to another. [session.ts](../src/markdown-editor/session.ts)
 creates one `EditorView` for that component lifetime and enables
 `history()`. When `value` changes,
-[the complete document is replaced](../src/MarkdownEditor.tsx#L630) without
+[the complete document is replaced](../src/markdown-editor/session.ts) without
 clearing history or adding CodeMirror's `addToHistory: false` annotation.
 
 Using Calmd's installed CodeMirror version, the exact transaction shape was
@@ -124,7 +124,7 @@ This is a correctness prerequisite for further editor work.
 Calmd already uses Lezer rather than regular expressions for presentation. The
 current behavior is split between `markdownMarkerDecorations` and
 `inlineMarkdownDecorations` in
-[MarkdownEditor.tsx](../src/MarkdownEditor.tsx#L101). That is a sound parsing
+[session.ts](../src/markdown-editor/session.ts). That is a sound parsing
 choice, but the supported Markdown described in
 [markdown-editor.md](markdown-editor.md) is much broader than the presentation
 coverage.
@@ -154,13 +154,11 @@ why block preview is not merely syntax coloring.
 
 ## P1: Live Preview needs one interaction model
 
-The current `MarkdownEditor.tsx` performs separate syntax-tree passes and
-embeds the behavior, wiki-link resolution, pointer navigation, editor theme,
-and React lifecycle in one roughly 640-line component. Adding another `if
-(node.name === ...)` branch for every format would increase coupling without
-answering the difficult questions: what reveal zone belongs to a construct,
-whether a replacement affects layout, how the cursor enters it, and how a
-pointer drag behaves while syntax appears.
+Editor ownership is now explicit under `src/markdown-editor/`:
+`MarkdownEditor.tsx` is a thin React adapter, `session.ts` owns the CodeMirror
+document lifecycle, and `livePreview.ts` owns source visibility and semantic
+decorations. New preview behavior should extend that policy instead of entering
+the React lifecycle or Note workspace.
 
 Writer's reusable idea is not its feature count. It is the split between:
 
@@ -239,25 +237,20 @@ restores them after the view is ready; see its
 | Scroll is whatever the shared page retains | Each note restores a bounded scroll anchor or position after layout is stable |
 | Canonical external replacements use ordinary history semantics | Persistence reconciliation is mapped safely without becoming a user edit or merging document histories |
 
-## P1: integration tests do not cover the editor contract
+## Completed: integration coverage for the editor contract
 
-Calmd's 110 TypeScript tests all pass. The formatting-command suite is notably
-strong: parsed multi-block transformations, nesting, whitespace, code spans,
-multiple selections, and one-step undo are covered. Persistence and navigation
-are also well tested.
-
-There is no `MarkdownEditor` or live-decoration integration test. As a result,
-the suite does not exercise:
+Co-located session and `MarkdownEditor` integration tests now mount real
+`EditorView` instances and exercise:
 
 - history across document changes;
 - DOM decorations for active versus inactive syntax;
-- nested and adjacent syntax reveal;
 - pointer drag through changing replacements;
-- caret movement around hidden prefixes;
 - background parsing after scrolling into a long document;
 - focus, cursor, and scroll restoration;
-- IME composition while a syntax node becomes valid;
 - asynchronous wiki-link resolution after the editor changes notes.
+
+Nested and adjacent reveal, caret movement around hidden prefixes, and IME
+composition remain useful additions when those behaviors next change.
 
 Writer has focused tests for list geometry, drag freezing, heading caret guards,
 table folds, images, math, and formatting, but even Writer lacks broad E2E

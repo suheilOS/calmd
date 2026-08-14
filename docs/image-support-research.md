@@ -22,7 +22,7 @@ The current vault contains only top-level Markdown notes, so a vault-root-relati
 ## Current Calmd fit
 
 - `@lezer/markdown` already parses standard images as `Image` nodes. No parser replacement is needed.
-- `src/livePreview.ts` has no `Image` decoration rule, so image source currently remains literal Markdown.
+- `src/markdown-editor/livePreview.ts` has no `Image` decoration rule, so image source currently remains literal Markdown.
 - `MarkdownEditor` already owns the CodeMirror view and is the correct place for image decorations, paste handling, and insertion-position mapping.
 - Rust already owns vault filesystem access and atomic Markdown persistence.
 - `tauri-plugin-dialog` is installed and used by Rust for native folder selection.

@@ -2,7 +2,7 @@
 
 ## Implemented contract
 
-Calmd's formatting commands operate on CodeMirror's parsed Markdown ranges instead of blindly wrapping raw selections. The implementation lives in `src/markdownCommands.ts` and uses `EditorState.changeByRange` so a command is one undoable transaction across all selections.
+Calmd's formatting commands operate on CodeMirror's parsed Markdown ranges instead of blindly wrapping raw selections. The implementation lives in `src/markdown-editor/markdownCommands.ts` and uses `EditorState.changeByRange` so a command is one undoable transaction across all selections.
 
 The editor supports these commands:
 

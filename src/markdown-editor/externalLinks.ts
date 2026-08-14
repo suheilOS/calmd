@@ -1,7 +1,7 @@
 import { syntaxTree } from '@codemirror/language'
 import type { EditorState } from '@codemirror/state'
 import type { SyntaxNode } from '@lezer/common'
-import { isPrimaryNavigationClick, navigationPlatform } from './navigation'
+import { isPrimaryNavigationClick, navigationPlatform } from '../navigation'
 
 const markdownEscapableCharacters = new Set(
   "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~",

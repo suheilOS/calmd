@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import type { MarkdownEditorHandle } from '../src/MarkdownEditor'
+import type { MarkdownEditorCommands } from '../src/markdown-editor/contracts'
 import { handleTitleKeyDown } from '../src/titleKeyDown'
 
 function titleKeyEvent(key: string, isComposing = false) {
@@ -18,7 +18,7 @@ describe('handleTitleKeyDown', () => {
   test('prevents Enter and focuses the body at its end', () => {
     const keyEvent = titleKeyEvent('Enter')
     let focusAtEndCalls = 0
-    const bodyEditor: MarkdownEditorHandle = {
+    const bodyEditor: MarkdownEditorCommands = {
       applyBlock: () => {},
       focusAtEnd: () => { focusAtEndCalls += 1 },
     }
@@ -33,7 +33,7 @@ describe('handleTitleKeyDown', () => {
     const composingEnter = titleKeyEvent('Enter', true)
     const otherKey = titleKeyEvent('ArrowDown')
     let focusAtEndCalls = 0
-    const bodyEditor: MarkdownEditorHandle = {
+    const bodyEditor: MarkdownEditorCommands = {
       applyBlock: () => {},
       focusAtEnd: () => { focusAtEndCalls += 1 },
     }

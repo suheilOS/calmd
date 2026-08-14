@@ -8,7 +8,7 @@ import {
   useState,
 } from 'react'
 import { ComposerScreen } from './ComposerScreen'
-import { clearEditorViewState } from './editorViewState'
+import { clearEditorViewState } from './markdown-editor/editorViewState'
 import {
   isCreateUntitledShortcut,
   isNavigateHomeShortcut,

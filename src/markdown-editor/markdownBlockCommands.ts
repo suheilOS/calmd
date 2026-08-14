@@ -1,5 +1,6 @@
 import type { StateCommand } from '@codemirror/state'
 
+/** Structural source transformations available to editor callers. */
 export type MarkdownBlockKind =
   | 'paragraph'
   | `heading-${1 | 2 | 3 | 4 | 5 | 6}`

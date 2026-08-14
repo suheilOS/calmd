@@ -1,5 +1,5 @@
-import type { WikiLinkActivation } from '../MarkdownEditor'
-import { discardEditorViewState } from '../editorViewState'
+import type { WikiLinkActivation } from '../markdown-editor/contracts'
+import { discardEditorViewState } from '../markdown-editor/editorViewState'
 import type {
   Note,
   NoteDraft,

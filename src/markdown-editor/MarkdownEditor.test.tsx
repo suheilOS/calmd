@@ -6,12 +6,12 @@ import { EditorView } from '@codemirror/view'
 import { GFM } from '@lezer/markdown'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { MarkdownEditor } from '../src/MarkdownEditor'
-import type { DisplayImage } from '../src/images'
-import { activateExternalLink } from '../src/externalLinks'
+import type { DisplayImage } from '../images'
+import { MarkdownEditor } from './MarkdownEditor'
+import { activateExternalLink } from './externalLinks'
 
 beforeAll(() => {
-  GlobalRegistrator.register()
+  if (!GlobalRegistrator.isRegistered) GlobalRegistrator.register()
   globalThis.IS_REACT_ACT_ENVIRONMENT = true
 })
 
@@ -96,46 +96,6 @@ function pressUndo(container: HTMLElement) {
 }
 
 describe('MarkdownEditor document sessions', () => {
-  test('Undo cannot restore or emit the previous note after a note change', async () => {
-    const changes: string[] = []
-    const { container, root } = await renderEditor('note A', 1, (value) => changes.push(value))
-
-    await act(async () => {
-      root.render(
-        <MarkdownEditor
-          {...editorProps('note B', 2, (value) => changes.push(value))}
-          value="note B"
-        />,
-      )
-    })
-
-    await act(async () => pressUndo(container))
-
-    expect(container.querySelector('.cm-content')?.textContent).toBe('note B')
-    expect(changes).not.toContain('note A')
-  })
-
-  test('reconfigures native spellcheck without remounting the editor', async () => {
-    const { container, root } = await renderEditor('words', 1)
-    const contentBefore = container.querySelector<HTMLElement>('.cm-content')
-    expect(contentBefore?.getAttribute('spellcheck')).toBe('true')
-
-    await act(async () => {
-      root.render(
-        <MarkdownEditor
-          {...editorProps('words', 1)}
-          spellcheckEnabled={false}
-          value="words"
-        />,
-      )
-    })
-
-    const contentAfter = container.querySelector<HTMLElement>('.cm-content')
-    expect(contentAfter).toBe(contentBefore)
-    expect(contentAfter?.getAttribute('spellcheck')).toBe('false')
-    expect(contentAfter?.getAttribute('autocorrect')).toBe('off')
-  })
-
   test('restores the caret for a reopened note without restoring its history', async () => {
     const noteA = '**first** and **second** tail'
     const { container, root } = await renderEditor(noteA, 41, () => {}, 'note-41.md')

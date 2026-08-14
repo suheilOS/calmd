@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { markdown } from '@codemirror/lang-markdown'
 import { EditorSelection, EditorState, type StateCommand } from '@codemirror/state'
 import { GFM } from '@lezer/markdown'
-import { insertNewlineContinueBlockquote } from '../src/markdownBlockquote'
+import { insertNewlineContinueBlockquote } from './markdownBlockquote'
 
 function run(command: StateCommand, state: EditorState) {
   command({

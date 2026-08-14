@@ -13,7 +13,7 @@ import {
   parseWikiLinkText,
   selectionTouchesSourceRange,
   wikiLinkHiddenSyntaxRanges,
-} from './wikiLinks'
+} from '../wikiLinks'
 
 type SourceRange = { from: number; to: number }
 

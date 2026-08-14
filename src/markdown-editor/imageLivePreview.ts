@@ -9,13 +9,13 @@ import {
   type ViewUpdate,
   WidgetType,
 } from '@codemirror/view'
-import type { DisplayImage } from './images'
+import type { DisplayImage } from '../images'
 import {
   classifyLocalImageDestination,
   parseInlineImageSyntax,
   type InlineImageSyntax,
-} from './markdownImages'
-import { selectionTouchesSourceRange } from './wikiLinks'
+} from '../markdownImages'
+import { selectionTouchesSourceRange } from '../wikiLinks'
 
 type ImageRange = InlineImageSyntax & {
   from: number

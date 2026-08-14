@@ -1,7 +1,7 @@
 import type { EditorSelection } from '@codemirror/state'
 import { EditorView, ViewPlugin, type ViewUpdate } from '@codemirror/view'
-import type { ImportedAttachment } from './images'
-import { markdownImage } from './markdownImages'
+import type { ImportedAttachment } from '../images'
+import { markdownImage } from '../markdownImages'
 
 type PendingInsertion = {
   ranges: { from: number; to: number }[]

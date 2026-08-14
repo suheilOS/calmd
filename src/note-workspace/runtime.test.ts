@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import type { WikiLinkActivation } from '../MarkdownEditor'
+import type { WikiLinkActivation } from '../markdown-editor/contracts'
 import type { Note } from '../notes'
 import type { NoteWorkspaceAdapter } from './runtime'
 import { NoteWorkspaceRuntime } from './runtime'

@@ -34,7 +34,7 @@ The navigation owner also handles backlinks, modifier-click wiki links, and the 
 
 ## Current editor integration
 
-CodeMirror uses a small Lezer inline extension in `src/wikiLinks.ts`. It recognizes supported wiki links only in Markdown inline content and leaves code blocks and inline code alone. `src/MarkdownEditor.tsx` decorates inactive links as Live Preview text and restores the source syntax when the cursor or a selection touches a link.
+CodeMirror uses a small Lezer inline extension in `src/wikiLinks.ts`. It recognizes supported wiki links only in Markdown inline content and leaves code blocks and inline code alone. `src/markdown-editor/livePreview.ts` decorates inactive links as Live Preview text and restores the source syntax when the cursor or a selection touches a link.
 
 A primary Ctrl-click on Linux and Windows, or Cmd-click on macOS, captures the link's document range. CodeMirror changes map that range while the asynchronous operation runs. Before applying a canonical replacement, the editor checks the range, original text, target, and authoritative body. Rust receives link targets, never CodeMirror UTF-16 offsets.
 
