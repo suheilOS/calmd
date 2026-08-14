@@ -24,6 +24,10 @@ _Avoid_: AI answer, chat
 A saved, standalone piece of knowledge whose title identifies it.
 _Avoid_: Vault item, document
 
+**Note workspace**:
+The active environment in which a person develops one Note and moves safely between Notes or back to the Composer without losing edits.
+_Avoid_: Document workspace, file manager
+
 **Note title**:
 The human-readable identity of a note. Titles are unique without regard to casing or surrounding or repeated whitespace; punctuation remains meaningful.
 _Avoid_: Note ID

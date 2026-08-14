@@ -3,8 +3,8 @@ import {
   NoteEditingSession,
   type NoteEditingScheduler,
   type NotePersistenceAdapter,
-} from '../src/noteEditing'
-import type { Note, NoteDraft } from '../src/notes'
+} from './noteEditing'
+import type { Note, NoteDraft } from '../notes'
 
 const original: Note = {
   key: 'Patient thought.md',

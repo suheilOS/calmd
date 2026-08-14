@@ -1,52 +1,43 @@
 import { Button } from '@base-ui/react/button'
 import { Input } from '@base-ui/react/input'
-import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+} from 'react'
 import { ComposerScreen } from './ComposerScreen'
-import { createUntitledNote } from './createUntitledNote'
-import { openRandomNote } from './openRandomNote'
+import { clearEditorViewState } from './editorViewState'
 import {
   isCreateUntitledShortcut,
   isNavigateHomeShortcut,
   isOpenRandomNoteShortcut,
 } from './keyboardShortcuts'
-import { NoteEditor } from './NoteEditor'
-import { clearEditorViewState, discardEditorViewState } from './editorViewState'
-import { SubstackNoteActions } from './SubstackNoteActions'
-import type { WikiLinkActivation } from './MarkdownEditor'
-import { NoteNavigation } from './noteNavigation'
-import { resolveWikiLinkActivation } from './wikiLinkNavigation'
-import { AppShell, type TitleBarNavigation } from './TitleBar'
+import {
+  NoteWorkspace,
+  tauriNoteWorkspace,
+  useNoteWorkspace,
+} from './note-workspace'
 import {
   canonicalizeTitle,
-  type Note,
   type SearchHit,
   type SearchResponse,
 } from './notes'
 import {
-  createStoredNote,
-  createUntitledStoredNote,
-  deleteStoredNote,
   getStorageError,
   openVault,
-  openRandomStoredNote,
-  openStoredNoteLink,
-  readStoredNote,
   readStoredEditorSpellcheck,
   saveStoredEditorSpellcheck,
   searchStoredNotes,
   selectVault,
-  storedWikiLinkExists,
-  suggestStoredNotes,
-  tauriNotePersistence,
 } from './storage'
-import { useNoteEditing } from './useNoteEditing'
+import { AppShell, type TitleBarNavigation } from './TitleBar'
 import './App.css'
 
 type SearchView = SearchResponse & {
   query: string
 }
-
-type NavigationDirection = 'back' | 'forward'
 
 const EMPTY_SEARCH_VIEW: SearchView = {
   query: '',
@@ -54,402 +45,35 @@ const EMPTY_SEARCH_VIEW: SearchView = {
   hasExactMatch: false,
 }
 
-function App() {
-  const [vaultReady, setVaultReady] = useState<boolean | null>(null)
-  const [selectingVault, setSelectingVault] = useState(false)
-  const [vaultName, setVaultName] = useState('My vault')
-  const [thought, setThought] = useState('')
-  const [backlinksOpen, setBacklinksOpen] = useState(false)
-  const [deleteOpen, setDeleteOpen] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [activeResultIndex, setActiveResultIndex] = useState(-1)
-  const [storageMessage, setStorageMessage] = useState<string | null>(null)
-  const [spellcheckEnabled, setSpellcheckEnabled] = useState(true)
-  const [searchView, setSearchView] = useState<SearchView>(EMPTY_SEARCH_VIEW)
-  const [searchGeneration, setSearchGeneration] = useState(0)
-  const searchRequestRef = useRef(0)
-  const spellcheckRequestRef = useRef(0)
-  const lastPersistedSpellcheckRef = useRef(true)
-  const spellcheckSaveRef = useRef(Promise.resolve())
-  const [navigation] = useState(() => new NoteNavigation())
-  const [, setNavigationRevision] = useState(0)
-  const noteEditing = useNoteEditing(tauriNotePersistence, (oldKey, newKey) => {
-    navigation.rename(oldKey, newKey)
-    setNavigationRevision((revision) => revision + 1)
-  })
-  const editorDraft = noteEditing.snapshot?.draft ?? null
-  const handleCreateUntitledNote = useEffectEvent(async () => {
-    try {
-      await createUntitledNote({
-        navigation,
-        prepare: async () => (
-          noteEditing.snapshot === null || Boolean(await noteEditing.flush())
-        ),
-        create: createUntitledStoredNote,
-        open: beginEditing,
-      })
-    } catch (error) {
-      setStorageMessage(getStorageError(error).message)
-    }
-  })
-  const handleNavigateHome = useEffectEvent(() => {
-    void navigateHome()
-  })
-  async function handleOpenRandomNote() {
-    if (!vaultReady) return
+type ApplicationProps = {
+  chooseVault: () => Promise<void>
+  collectionRevision: number
+  selectingVault: boolean
+  setStorageMessage: (message: string | null) => void
+  setVaultName: (name: string) => void
+  storageMessage: string | null
+  vaultName: string
+  vaultReady: boolean | null
+}
 
-    try {
-      const result = await openRandomNote({
-        navigation,
-        prepare: async () => {
-          if (noteEditing.snapshot === null) return { currentKey: null }
-          const saved = await noteEditing.flush()
-          return saved ? { currentKey: saved.key } : null
-        },
-        pick: openRandomStoredNote,
-        open: beginEditing,
-      })
-      if (result === 'empty') setStorageMessage('No notes to rediscover yet.')
-    } catch (error) {
-      const message = getStorageError(error).message
-      await refreshVault()
-      setStorageMessage(message)
-    }
-  }
+function OpeningVaultScreen() {
+  return (
+    <AppShell>
+      <main aria-label="Opening vault" className="app bg-canvas" />
+    </AppShell>
+  )
+}
 
-  const handleOpenRandomNoteShortcut = useEffectEvent(() => {
-    void handleOpenRandomNote()
-  })
-
-  const searchQuery = canonicalizeTitle(thought)
-  const isEditing = editorDraft !== null
-  const currentSearch = searchView.query === searchQuery
-    ? searchView
-    : EMPTY_SEARCH_VIEW
-  const searchResults = currentSearch.results
-  const exactNote = currentSearch.hasExactMatch
-    ? currentSearch.results[0] ?? null
-    : null
-
-  const refreshVault = useCallback(async () => {
-    try {
-      const isReady = await openVault()
-      setVaultReady(isReady)
-      if (isReady) {
-        setSearchGeneration((generation) => generation + 1)
-        setStorageMessage(null)
-      }
-    } catch (error) {
-      setVaultReady(false)
-      setStorageMessage(getStorageError(error).message)
-    }
-  }, [])
-
-  useEffect(() => {
-    const startupTimer = window.setTimeout(() => void refreshVault(), 0)
-    return () => window.clearTimeout(startupTimer)
-  }, [refreshVault])
-
-  useEffect(() => {
-    const requestId = ++spellcheckRequestRef.current
-    void readStoredEditorSpellcheck().then(
-      (enabled) => {
-        if (spellcheckRequestRef.current === requestId) {
-          lastPersistedSpellcheckRef.current = enabled
-          setSpellcheckEnabled(enabled)
-        }
-      },
-      (error) => {
-        if (spellcheckRequestRef.current === requestId) {
-          setStorageMessage(getStorageError(error).message)
-        }
-      },
-    )
-  }, [])
-
-  async function updateSpellcheck(enabled: boolean) {
-    const requestId = ++spellcheckRequestRef.current
-    setSpellcheckEnabled(enabled)
-    try {
-      const operation = spellcheckSaveRef.current.then(() =>
-        saveStoredEditorSpellcheck(enabled),
-      )
-      spellcheckSaveRef.current = operation.then(() => undefined, () => undefined)
-      const saved = await operation
-      lastPersistedSpellcheckRef.current = saved
-      if (spellcheckRequestRef.current === requestId) setSpellcheckEnabled(saved)
-    } catch (error) {
-      if (spellcheckRequestRef.current === requestId) {
-        setSpellcheckEnabled(lastPersistedSpellcheckRef.current)
-        setStorageMessage(getStorageError(error).message)
-      }
-    }
-  }
-
-  useEffect(() => {
-    function handleFocus() {
-      void refreshVault()
-    }
-
-    window.addEventListener('focus', handleFocus)
-    return () => window.removeEventListener('focus', handleFocus)
-  }, [refreshVault])
-
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (isOpenRandomNoteShortcut(event)) {
-        event.preventDefault()
-        handleOpenRandomNoteShortcut()
-        return
-      }
-
-      if (isCreateUntitledShortcut(event)) {
-        event.preventDefault()
-        void handleCreateUntitledNote()
-        return
-      }
-
-      if (isNavigateHomeShortcut(event)) {
-        event.preventDefault()
-        handleNavigateHome()
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
-
-  useEffect(() => {
-    const requestId = ++searchRequestRef.current
-    if (!vaultReady || isEditing || !searchQuery) return
-
-    const searchTimer = window.setTimeout(() => {
-      void searchStoredNotes(searchQuery).then(
-        (response) => {
-          if (searchRequestRef.current !== requestId) return
-          setSearchView({ ...response, query: searchQuery })
-          setActiveResultIndex(-1)
-          setStorageMessage(null)
-        },
-        (error) => {
-          if (searchRequestRef.current !== requestId) return
-          setSearchView({ ...EMPTY_SEARCH_VIEW, query: searchQuery })
-          setStorageMessage(getStorageError(error).message)
-        },
-      )
-    }, 120)
-
-    return () => window.clearTimeout(searchTimer)
-  }, [isEditing, searchGeneration, searchQuery, vaultReady])
-
-  function beginEditing(note: Note, pushHistory = true) {
-    if (pushHistory) {
-      navigation.beginNote(note.key)
-      setNavigationRevision((revision) => revision + 1)
-    }
-    noteEditing.begin(note)
-    setBacklinksOpen(false)
-    setStorageMessage(null)
-  }
-
-  async function openNote(note: Pick<Note, 'key'>) {
-    const generation = navigation.startTransition()
-    if (generation === null) return
-    try {
-      if (isEditing && !(await noteEditing.flush())) return
-      if (!navigation.isCurrent(generation) || noteEditing.snapshot?.key === note.key) return
-      const destination = await readStoredNote(note.key)
-      if (!navigation.isCurrent(generation)) return
-      beginEditing(destination)
-    } catch (error) {
-      setStorageMessage(getStorageError(error).message)
-      await refreshVault()
-    } finally {
-      navigation.finishTransition()
-    }
-  }
-
-  async function createNote() {
-    const title = canonicalizeTitle(thought)
-    if (!title) return
-
-    if (exactNote) {
-      await openNote(exactNote)
-      return
-    }
-
-    try {
-      beginEditing(await createStoredNote(title))
-    } catch (error) {
-      setStorageMessage(getStorageError(error).message)
-    }
-  }
-
-  function selectSearchResult(index: number) {
-    const note: SearchHit | undefined = searchResults[index]
-    if (note) {
-      void openNote(note)
-      return
-    }
-
-    if (!exactNote && index === searchResults.length) void createNote()
-  }
-
-  async function reloadConflictedNote() {
-    if (await noteEditing.reload()) await refreshVault()
-  }
-
-  async function deleteCurrentNote() {
-    const generation = navigation.startTransition()
-    if (generation === null) return
-    setDeleting(true)
-    try {
-      const saved = await noteEditing.flush()
-      if (!saved) {
-        setDeleteOpen(false)
-        return
-      }
-      if (!navigation.isCurrent(generation)) return
-      await deleteStoredNote(saved.key, saved.revision)
-      if (!navigation.isCurrent(generation)) return
-      navigation.completeNoteDeletion(saved.key)
-      discardEditorViewState(saved.key)
-      setNavigationRevision((revision) => revision + 1)
-      noteEditing.close()
-      setThought('')
-      setBacklinksOpen(false)
-      setDeleteOpen(false)
-      setStorageMessage(null)
-      setSearchGeneration((searchGeneration) => searchGeneration + 1)
-    } catch (error) {
-      setDeleteOpen(false)
-      setStorageMessage(getStorageError(error).message)
-    } finally {
-      setDeleting(false)
-      navigation.finishTransition()
-    }
-  }
-
-  async function navigateHistory(direction: NavigationDirection) {
-    const generation = navigation.startTransition()
-    if (generation === null) return
-    try {
-      if (
-        (isEditing && !(await noteEditing.flush()))
-        || !navigation.isCurrent(generation)
-      ) return
-
-      const destination = direction === 'back'
-        ? navigation.previous()
-        : navigation.next()
-      if (!destination) return
-
-      if (destination.type === 'note') {
-        const note = await readStoredNote(destination.key)
-        if (!navigation.isCurrent(generation)) return
-        const didCommit = direction === 'back'
-          ? navigation.commitBack()
-          : navigation.commitForward()
-        if (!didCommit) return
-        setNavigationRevision((revision) => revision + 1)
-        beginEditing(note, false)
-      } else {
-        const didCommit = direction === 'back'
-          ? navigation.commitBack()
-          : navigation.commitForward()
-        if (!didCommit) return
-        setNavigationRevision((revision) => revision + 1)
-        noteEditing.close()
-        setThought(destination.thought)
-        setBacklinksOpen(false)
-      }
-    } catch (error) {
-      setStorageMessage(getStorageError(error).message)
-      await refreshVault()
-    } finally {
-      navigation.finishTransition()
-    }
-  }
-
-  async function navigateHome() {
-    if (navigation.current()?.type === 'composer') return
-
-    const generation = navigation.startTransition()
-    if (generation === null) return
-    try {
-      if (
-        (isEditing && !(await noteEditing.flush()))
-        || !navigation.isCurrent(generation)
-      ) return
-
-      navigation.beginComposer()
-      setNavigationRevision((revision) => revision + 1)
-      noteEditing.close()
-      setThought('')
-      setBacklinksOpen(false)
-      setStorageMessage(null)
-    } catch (error) {
-      setStorageMessage(getStorageError(error).message)
-      await refreshVault()
-    } finally {
-      navigation.finishTransition()
-    }
-  }
-
-  async function activateWikiLink(activation: WikiLinkActivation) {
-    const activatedKey = noteEditing.snapshot?.key
-    const generation = navigation.startTransition()
-    if (generation === null || !activatedKey) {
-      activation.finish()
-      return
-    }
-    try {
-      const destination = await resolveWikiLinkActivation({
-        activatedKey,
-        activation,
-        flush: noteEditing.flush,
-        open: openStoredNoteLink,
-        updateBody: noteEditing.updateBody,
-        isCurrent: () => navigation.isCurrent(generation),
-      })
-      if (destination) beginEditing(destination)
-    } catch (error) {
-      setStorageMessage(getStorageError(error).message)
-      await refreshVault()
-    } finally {
-      navigation.finishTransition()
-    }
-  }
-
-  async function chooseVault() {
-    setSelectingVault(true)
-    setStorageMessage(null)
-    try {
-      const didSelect = await selectVault(vaultName)
-      if (didSelect) {
-        clearEditorViewState()
-        setVaultReady(true)
-        setSearchGeneration((generation) => generation + 1)
-        setVaultName('')
-      }
-    } catch (error) {
-      setStorageMessage(getStorageError(error).message)
-    } finally {
-      setSelectingVault(false)
-    }
-  }
-
-  if (vaultReady === null) {
-    return (
-      <AppShell>
-        <main aria-label="Opening vault" className="app bg-canvas" />
-      </AppShell>
-    )
-  }
-
-  if (!vaultReady) {
-    return (
-      <AppShell>
+function VaultSelectionScreen({
+  chooseVault,
+  selectingVault,
+  setStorageMessage,
+  setVaultName,
+  storageMessage,
+  vaultName,
+}: Omit<ApplicationProps, 'collectionRevision' | 'vaultReady'>) {
+  return (
+    <AppShell>
       <main className="app flex items-center justify-center bg-canvas px-6 pb-[8svh] text-ink">
         <section className="w-full max-w-sm">
           <h1 className="sr-only">Calmd</h1>
@@ -501,79 +125,288 @@ function App() {
           </div>
         </section>
       </main>
-      </AppShell>
-    )
-  }
+    </AppShell>
+  )
+}
 
-  const currentLocation = navigation.current()
-  const titleBarNavigation: TitleBarNavigation = {
-    canGoBack: navigation.canGoBack(),
-    canGoForward: navigation.canGoForward(),
-    canGoHome: currentLocation?.type === 'note',
-    onBack: () => void navigateHistory('back'),
-    onForward: () => void navigateHistory('forward'),
-    onHome: () => void navigateHome(),
-  }
+function Application({
+  chooseVault,
+  collectionRevision,
+  selectingVault,
+  setStorageMessage,
+  setVaultName,
+  storageMessage,
+  vaultName,
+  vaultReady,
+}: ApplicationProps) {
+  const { actions, state } = useNoteWorkspace()
+  const [activeResultIndex, setActiveResultIndex] = useState(-1)
+  const [searchView, setSearchView] = useState<SearchView>(EMPTY_SEARCH_VIEW)
+  const searchRequestRef = useRef(0)
+  const thought = state.location.type === 'composer' ? state.location.thought : ''
+  const isEditing = state.note !== null
+  const searchQuery = canonicalizeTitle(thought)
+  const currentSearch = searchView.query === searchQuery
+    ? searchView
+    : EMPTY_SEARCH_VIEW
+  const searchResults = currentSearch.results
+  const exactNote = currentSearch.hasExactMatch
+    ? currentSearch.results[0] ?? null
+    : null
 
-  if (editorDraft) {
+  const createUntitled = useEffectEvent(() => {
+    void actions.createUntitled()
+  })
+  const navigateHome = useEffectEvent(() => {
+    void actions.home()
+  })
+  const openRandom = useEffectEvent(() => {
+    if (vaultReady) void actions.openRandom()
+  })
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (isOpenRandomNoteShortcut(event)) {
+        event.preventDefault()
+        openRandom()
+        return
+      }
+      if (isCreateUntitledShortcut(event)) {
+        event.preventDefault()
+        createUntitled()
+        return
+      }
+      if (isNavigateHomeShortcut(event)) {
+        event.preventDefault()
+        navigateHome()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  useEffect(() => {
+    const requestId = ++searchRequestRef.current
+    if (!vaultReady || isEditing || !searchQuery) return
+
+    const searchTimer = window.setTimeout(() => {
+      void searchStoredNotes(searchQuery).then(
+        (response) => {
+          if (searchRequestRef.current !== requestId) return
+          setSearchView({ ...response, query: searchQuery })
+          setActiveResultIndex(-1)
+          setStorageMessage(null)
+          actions.setMessage(null)
+        },
+        (error) => {
+          if (searchRequestRef.current !== requestId) return
+          setSearchView({ ...EMPTY_SEARCH_VIEW, query: searchQuery })
+          setStorageMessage(getStorageError(error).message)
+        },
+      )
+    }, 120)
+
+    return () => window.clearTimeout(searchTimer)
+  }, [
+    actions,
+    collectionRevision,
+    searchQuery,
+    setStorageMessage,
+    isEditing,
+    vaultReady,
+  ])
+
+  if (vaultReady === null) return <OpeningVaultScreen />
+  if (!vaultReady) {
     return (
-      <AppShell
-        navigation={titleBarNavigation}
-        noteActions={(
-          <SubstackNoteActions
-            deleteOpen={deleteOpen}
-            deleting={deleting}
-            flush={noteEditing.flush}
-            onDelete={() => void deleteCurrentNote()}
-            onDeleteOpenChange={setDeleteOpen}
-            onMessage={setStorageMessage}
-          />
-        )}
-      >
-      <NoteEditor
-        backlinksOpen={backlinksOpen}
-        draft={editorDraft}
-        editorSessionId={noteEditing.editorSessionId}
-        noteKey={noteEditing.snapshot!.key}
-        onBacklinksOpenChange={setBacklinksOpen}
-        onDraftChange={noteEditing.updateDraft}
-        onConflictReload={noteEditing.snapshot?.conflict ? reloadConflictedNote : null}
-        onExternalLinkError={(error) => setStorageMessage(getStorageError(error).message)}
-        onSpellcheckEnabledChange={(enabled) => void updateSpellcheck(enabled)}
-        onWikiLinkActivate={(activation) => void activateWikiLink(activation)}
-        onBacklinkSelect={(key) => void openNote({ key })}
-        resolveWikiLink={storedWikiLinkExists}
-        suggestWikiLinks={suggestStoredNotes}
-        saveMessage={noteEditing.snapshot?.failure?.message ?? storageMessage}
-        spellcheckEnabled={spellcheckEnabled}
+      <VaultSelectionScreen
+        chooseVault={chooseVault}
+        selectingVault={selectingVault}
+        setStorageMessage={setStorageMessage}
+        setVaultName={setVaultName}
+        storageMessage={state.message ?? storageMessage}
+        vaultName={vaultName}
       />
+    )
+  }
+
+  const navigation: TitleBarNavigation = {
+    canGoBack: state.canGoBack,
+    canGoForward: state.canGoForward,
+    canGoHome: state.canGoHome,
+    onBack: () => void actions.back(),
+    onForward: () => void actions.forward(),
+    onHome: () => void actions.home(),
+  }
+
+  if (state.note) {
+    return (
+      <AppShell navigation={navigation} noteActions={<NoteWorkspace.Actions />}>
+        <NoteWorkspace.Editor />
       </AppShell>
     )
+  }
+
+  function createNote() {
+    if (!searchQuery) return
+    if (exactNote) {
+      void actions.open(exactNote.key)
+      return
+    }
+    void actions.create(searchQuery)
+  }
+
+  function selectSearchResult(index: number) {
+    const note: SearchHit | undefined = searchResults[index]
+    if (note) {
+      void actions.open(note.key)
+      return
+    }
+    if (!exactNote && index === searchResults.length) createNote()
   }
 
   return (
-    <AppShell navigation={titleBarNavigation}>
+    <AppShell navigation={navigation}>
       <ComposerScreen
         activeResultIndex={activeResultIndex}
         hasExactMatch={Boolean(exactNote)}
         onActiveResultChange={setActiveResultIndex}
-        onRandomNote={() => void handleOpenRandomNote()}
+        onRandomNote={() => void actions.openRandom()}
         onResultSelect={selectSearchResult}
-        onSubmit={() => void createNote()}
+        onSubmit={createNote}
         onThoughtChange={(nextThought) => {
-          setThought(nextThought)
-          navigation.updateComposerThought(nextThought)
+          actions.updateComposerThought(nextThought)
           setActiveResultIndex(-1)
         }}
         results={searchResults}
         thought={thought}
       />
-      {storageMessage ? (
+      {state.message ?? storageMessage ? (
         <p className="fixed inset-x-6 bottom-6 text-center text-small text-secondary" role="alert">
-          {storageMessage}
+          {state.message ?? storageMessage}
         </p>
       ) : null}
     </AppShell>
+  )
+}
+
+function App() {
+  const [vaultReady, setVaultReady] = useState<boolean | null>(null)
+  const [selectingVault, setSelectingVault] = useState(false)
+  const [vaultName, setVaultName] = useState('My vault')
+  const [storageMessage, setStorageMessage] = useState<string | null>(null)
+  const [spellcheckEnabled, setSpellcheckEnabled] = useState(true)
+  const [collectionRevision, setCollectionRevision] = useState(0)
+  const spellcheckRequestRef = useRef(0)
+  const lastPersistedSpellcheckRef = useRef(true)
+  const spellcheckSaveRef = useRef(Promise.resolve())
+
+  const refreshVault = useCallback(async () => {
+    try {
+      const isReady = await openVault()
+      setVaultReady(isReady)
+      if (isReady) {
+        setCollectionRevision((revision) => revision + 1)
+        setStorageMessage(null)
+      }
+    } catch (error) {
+      setVaultReady(false)
+      setStorageMessage(getStorageError(error).message)
+    }
+  }, [])
+
+  const collectionChanged = useCallback(() => {
+    setCollectionRevision((revision) => revision + 1)
+  }, [])
+
+  useEffect(() => {
+    const startupTimer = window.setTimeout(() => void refreshVault(), 0)
+    return () => window.clearTimeout(startupTimer)
+  }, [refreshVault])
+
+  useEffect(() => {
+    function handleFocus() {
+      void refreshVault()
+    }
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [refreshVault])
+
+  useEffect(() => {
+    const requestId = ++spellcheckRequestRef.current
+    void readStoredEditorSpellcheck().then(
+      (enabled) => {
+        if (spellcheckRequestRef.current === requestId) {
+          lastPersistedSpellcheckRef.current = enabled
+          setSpellcheckEnabled(enabled)
+        }
+      },
+      (error) => {
+        if (spellcheckRequestRef.current === requestId) {
+          setStorageMessage(getStorageError(error).message)
+        }
+      },
+    )
+  }, [])
+
+  async function updateSpellcheck(enabled: boolean) {
+    const requestId = ++spellcheckRequestRef.current
+    setSpellcheckEnabled(enabled)
+    try {
+      const operation = spellcheckSaveRef.current.then(() =>
+        saveStoredEditorSpellcheck(enabled),
+      )
+      spellcheckSaveRef.current = operation.then(() => undefined, () => undefined)
+      const saved = await operation
+      lastPersistedSpellcheckRef.current = saved
+      if (spellcheckRequestRef.current === requestId) setSpellcheckEnabled(saved)
+    } catch (error) {
+      if (spellcheckRequestRef.current === requestId) {
+        setSpellcheckEnabled(lastPersistedSpellcheckRef.current)
+        setStorageMessage(getStorageError(error).message)
+      }
+    }
+  }
+
+  async function chooseVault() {
+    setSelectingVault(true)
+    setStorageMessage(null)
+    try {
+      const didSelect = await selectVault(vaultName)
+      if (didSelect) {
+        clearEditorViewState()
+        setVaultReady(true)
+        collectionChanged()
+        setVaultName('')
+      }
+    } catch (error) {
+      setStorageMessage(getStorageError(error).message)
+    } finally {
+      setSelectingVault(false)
+    }
+  }
+
+  return (
+    <NoteWorkspace.Provider
+      adapter={tauriNoteWorkspace}
+      externalMessage={storageMessage}
+      onCollectionChange={collectionChanged}
+      onSpellcheckEnabledChange={(enabled) => void updateSpellcheck(enabled)}
+      refreshVault={refreshVault}
+      spellcheckEnabled={spellcheckEnabled}
+    >
+      <Application
+        chooseVault={chooseVault}
+        collectionRevision={collectionRevision}
+        selectingVault={selectingVault}
+        setStorageMessage={setStorageMessage}
+        setVaultName={setVaultName}
+        storageMessage={storageMessage}
+        vaultName={vaultName}
+        vaultReady={vaultReady}
+      />
+    </NoteWorkspace.Provider>
   )
 }
 

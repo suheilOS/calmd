@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { NoteNavigation } from '../src/noteNavigation'
+import { NoteNavigation } from './noteNavigation'
 
 describe('NoteNavigation', () => {
   test('traverses backward and forward without discarding history', () => {

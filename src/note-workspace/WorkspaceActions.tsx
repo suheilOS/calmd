@@ -3,19 +3,14 @@ import { Dialog } from '@base-ui/react/dialog'
 import { Input } from '@base-ui/react/input'
 import { Menu } from '@base-ui/react/menu'
 import { useEffect, useState } from 'react'
-import type { NoteEditingSnapshot } from './noteEditing'
-import { NoteActions, type NoteActionsProps } from './NoteActions'
+import { NoteActions } from './NoteActions'
 import {
   getStorageError,
   readStoredSubstackPublicationUrl,
   saveStoredSubstackPublicationUrl,
-} from './storage'
-import { openNoteInSubstack } from './substack'
-
-type SubstackNoteActionsProps = Omit<NoteActionsProps, 'dialogs' | 'menuItems'> & {
-  flush: () => Promise<NoteEditingSnapshot | null>
-  onMessage: (message: string) => void
-}
+} from '../storage'
+import { openNoteInSubstack } from '../substack'
+import { useNoteWorkspace } from './context'
 
 type SubstackSettingsDialogProps = {
   message: string | null
@@ -112,11 +107,8 @@ function SubstackSettingsDialog({
   )
 }
 
-export function SubstackNoteActions({
-  flush,
-  onMessage,
-  ...noteActions
-}: SubstackNoteActionsProps) {
+export function WorkspaceActions() {
+  const { actions, state } = useNoteWorkspace()
   const [publicationUrl, setPublicationUrl] = useState<string | null>(null)
   const [settingsLoaded, setSettingsLoaded] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -161,22 +153,23 @@ export function SubstackNoteActions({
     }
 
     try {
-      const saved = await flush()
+      const saved = await actions.flush()
       if (!saved) {
-        onMessage('Save the note before opening Substack.')
+        actions.setMessage('Save the note before opening Substack.')
         return
       }
 
       await openNoteInSubstack(saved.draft.body, publicationUrl)
-      onMessage('Copied note content. Paste it into Substack.')
+      actions.setMessage('Copied note content. Paste it into Substack.')
     } catch (error) {
-      onMessage(getStorageError(error).message)
+      actions.setMessage(getStorageError(error).message)
     }
   }
 
   return (
     <NoteActions
-      {...noteActions}
+      deleteOpen={state.deleteOpen}
+      deleting={state.deleting}
       dialogs={(
         <SubstackSettingsDialog
           message={settingsMessage}
@@ -208,6 +201,8 @@ export function SubstackNoteActions({
           ) : null}
         </>
       )}
+      onDelete={() => void actions.deleteCurrent()}
+      onDeleteOpenChange={actions.setDeleteOpen}
     />
   )
 }

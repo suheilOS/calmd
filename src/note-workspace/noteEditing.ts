@@ -1,5 +1,5 @@
-import { canonicalizeTitle, type Note, type NoteDraft } from './notes'
-import { mergeConcurrentTextChanges } from './threeWayTextMerge'
+import { canonicalizeTitle, type Note, type NoteDraft } from '../notes'
+import { mergeConcurrentTextChanges } from '../threeWayTextMerge'
 
 export type NotePersistenceFailure = {
   code: string

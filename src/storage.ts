@@ -9,7 +9,6 @@ import {
   type SearchResponse,
   type UnlinkedMention,
 } from './notes'
-import type { NotePersistenceAdapter } from './noteEditing'
 
 export type StorageError = {
   code: string
@@ -141,7 +140,7 @@ function renameStoredNote(
   })
 }
 
-export const tauriNotePersistence: NotePersistenceAdapter = {
+export const tauriNotePersistence = {
   read: readStoredNote,
   save: saveStoredNote,
   rename: renameStoredNote,

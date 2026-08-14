@@ -1,29 +1,28 @@
 import { Button } from '@base-ui/react/button'
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { BacklinksPopover } from './BacklinksPopover'
-import { EditorContextMenu } from './EditorContextMenu'
-import { NotePreviewPopover } from './NotePreviewPopover'
-import type { MarkdownEditorHandle, WikiLinkActivation } from './MarkdownEditor'
-import { handleTitleKeyDown } from './titleKeyDown'
+import { BacklinksPopover } from '../BacklinksPopover'
+import { EditorContextMenu } from '../EditorContextMenu'
+import type { MarkdownEditorHandle } from '../MarkdownEditor'
+import { NotePreviewPopover } from '../NotePreviewPopover'
+import { handleTitleKeyDown } from '../titleKeyDown'
 import {
   constrainNoteTitle,
   MAX_NOTE_TITLE_LENGTH,
-  type NoteReference,
-  type NoteDraft,
-} from './notes'
+} from '../notes'
 import {
   NotePreviewController,
   type NotePreviewCandidate,
   type NotePreviewLoadResult,
-} from './notePreview'
+} from '../notePreview'
 import {
   getStorageError,
   readStoredNotePreview,
   resolveStoredNotePreview,
-} from './storage'
+} from '../storage'
+import { useNoteWorkspace } from './context'
 
 const MarkdownEditor = lazy(async () => {
-  const module = await import('./MarkdownEditor')
+  const module = await import('../MarkdownEditor')
   return { default: module.MarkdownEditor }
 })
 
@@ -43,41 +42,13 @@ async function loadNotePreview(
   }
 }
 
-type NoteEditorProps = {
-  draft: NoteDraft
-  editorSessionId: number
-  spellcheckEnabled: boolean
-  noteKey: string
-  backlinksOpen: boolean
-  onDraftChange: (draft: NoteDraft) => void
-  onBacklinksOpenChange: (open: boolean) => void
-  onConflictReload: (() => void) | null
-  onExternalLinkError: (error: unknown) => void
-  onSpellcheckEnabledChange: (enabled: boolean) => void
-  onWikiLinkActivate: (activation: WikiLinkActivation) => void
-  onBacklinkSelect: (key: string) => void
-  resolveWikiLink: (target: string) => Promise<boolean | null>
-  suggestWikiLinks: (query: string) => Promise<NoteReference[]>
-  saveMessage: string | null
-}
-
-export function NoteEditor({
-  draft,
-  editorSessionId,
-  spellcheckEnabled,
-  noteKey,
-  backlinksOpen,
-  onDraftChange,
-  onBacklinksOpenChange,
-  onConflictReload,
-  onExternalLinkError,
-  onSpellcheckEnabledChange,
-  onWikiLinkActivate,
-  onBacklinkSelect,
-  resolveWikiLink,
-  suggestWikiLinks,
-  saveMessage,
-}: NoteEditorProps) {
+export function NoteEditor() {
+  const { actions, meta, state } = useNoteWorkspace()
+  if (!state.note) {
+    throw new Error('NoteWorkspace.Editor requires an active Note.')
+  }
+  const { draft, key: noteKey } = state.note
+  const saveMessage = state.note.failure?.message ?? state.message ?? meta.externalMessage
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const bodyEditorRef = useRef<MarkdownEditorHandle>(null)
   const titleSelectionRef = useRef({ start: 0, end: 0 })
@@ -112,7 +83,7 @@ export function NoteEditor({
               start: event.target.selectionStart,
               end: event.target.selectionEnd,
             }
-            onDraftChange({
+            actions.updateDraft({
               ...draft,
               title: constrainNoteTitle(event.target.value),
             })
@@ -135,26 +106,26 @@ export function NoteEditor({
           <EditorContextMenu
             onBlockChange={(kind) => bodyEditorRef.current?.applyBlock(kind)}
             onInsertImage={() => bodyEditorRef.current?.insertImage()}
-            onSpellcheckChange={onSpellcheckEnabledChange}
-            spellcheckEnabled={spellcheckEnabled}
+            onSpellcheckChange={meta.onSpellcheckEnabledChange}
+            spellcheckEnabled={meta.spellcheckEnabled}
           />
         </div>
         <div className="mt-6 sm:mt-8">
           <Suspense fallback={<div aria-hidden="true" className="min-h-[58vh]" />}>
             <MarkdownEditor
-              editorSessionId={editorSessionId}
+              editorSessionId={state.editorSessionId}
               noteKey={noteKey}
               ref={bodyEditorRef}
-              onChange={(body) => onDraftChange({ ...draft, body })}
+              onChange={(body) => actions.updateDraft({ ...draft, body })}
               onPreviewCandidateEnter={previewController.enterSource}
               onPreviewCandidateLeave={previewController.leaveSource}
               onPreviewDismiss={previewController.dismiss}
-              onExternalLinkError={onExternalLinkError}
-              onImageError={onExternalLinkError}
-              onWikiLinkActivate={onWikiLinkActivate}
-              resolveWikiLink={resolveWikiLink}
-              spellcheckEnabled={spellcheckEnabled}
-              suggestWikiLinks={suggestWikiLinks}
+              onExternalLinkError={actions.reportError}
+              onImageError={actions.reportError}
+              onWikiLinkActivate={(activation) => void actions.activateWikiLink(activation)}
+              resolveWikiLink={meta.resolveWikiLink}
+              spellcheckEnabled={meta.spellcheckEnabled}
+              suggestWikiLinks={meta.suggestWikiLinks}
               value={draft.body}
             />
           </Suspense>
@@ -165,13 +136,13 @@ export function NoteEditor({
         noteKey={noteKey}
         onOpenChange={(open) => {
           if (!open) previewController.dismiss()
-          onBacklinksOpenChange(open)
+          actions.setBacklinksOpen(open)
         }}
         onPreviewCandidateEnter={previewController.enterSource}
         onPreviewCandidateLeave={previewController.leaveSource}
         onPreviewDismiss={previewController.dismiss}
-        onSelect={onBacklinkSelect}
-        open={backlinksOpen}
+        onSelect={(key) => void actions.open(key)}
+        open={state.backlinksOpen}
       />
 
       <NotePreviewPopover
@@ -183,10 +154,10 @@ export function NoteEditor({
       {saveMessage ? (
         <div className="fixed inset-x-16 bottom-6 flex items-center justify-center gap-3 text-small text-secondary" role="alert">
           <span>{saveMessage}</span>
-          {onConflictReload ? (
+          {state.note.conflict ? (
             <Button
               className="min-h-10 rounded-xl bg-surface px-3 text-ink transition-[background-color,transform] duration-150 ease-out hover:bg-hover focus-visible:bg-active focus-visible:text-active-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-faint active:scale-[0.96]"
-              onClick={onConflictReload}
+              onClick={() => void actions.reload()}
               type="button"
             >
               Reload from disk

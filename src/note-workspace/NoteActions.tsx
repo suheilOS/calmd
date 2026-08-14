@@ -3,7 +3,7 @@ import { Dialog } from '@base-ui/react/dialog'
 import { Menu } from '@base-ui/react/menu'
 import type { ReactNode } from 'react'
 
-export type NoteActionsProps = {
+type NoteActionsProps = {
   deleteOpen: boolean
   deleting: boolean
   dialogs?: ReactNode
