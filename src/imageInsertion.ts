@@ -66,16 +66,26 @@ export const trackedImageInsertion = insertionTracker
 
 export function imagePaste(
   importFile: (file: File) => Promise<ImportedAttachment>,
+  readClipboardImage: () => Promise<File>,
   onError: (error: unknown) => void,
 ) {
   return EditorView.domEventHandlers({
     paste(event, view) {
-      const item = Array.from(event.clipboardData?.items ?? [])
+      const clipboardData = event.clipboardData
+      const item = Array.from(clipboardData?.items ?? [])
         .find((candidate) => candidate.kind === 'file' && candidate.type.startsWith('image/'))
-      const file = item?.getAsFile()
-      if (!file) return false
+      const hasImageType = Array.from(clipboardData?.types ?? [])
+        .some((type) => type.startsWith('image/'))
+      const hasText = Boolean(
+        clipboardData?.getData('text/plain') || clipboardData?.getData('text/uri-list'),
+      )
+      if (!item && !hasImageType && hasText) return false
       event.preventDefault()
-      insertImportedImage(view, importFile(file), onError)
+      const file = item?.getAsFile()
+      const imported = file
+        ? importFile(file)
+        : readClipboardImage().then(importFile)
+      insertImportedImage(view, imported, onError)
       return true
     },
   })

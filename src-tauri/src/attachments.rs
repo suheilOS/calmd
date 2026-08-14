@@ -15,7 +15,7 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 use tauri::{
-    AppHandle, Manager, State,
+    AppHandle, Manager, State, Window,
     ipc::{InvokeBody, Request},
 };
 use tauri_plugin_dialog::{DialogExt, FilePath};
@@ -250,9 +250,9 @@ impl<'a> AttachmentService<'a> {
 }
 
 #[tauri::command]
-pub fn pick_attachment(
+pub async fn pick_attachment(
     note_key: String,
-    app: AppHandle,
+    window: Window,
     state: State<'_, VaultState>,
 ) -> AttachmentResult<Option<ImportedAttachment>> {
     let root = state
@@ -260,12 +260,14 @@ pub fn pick_attachment(
         .map_err(|message| AttachmentError::new("vault", message))?;
     let service = AttachmentService::new(&root);
     service.require_note(&note_key)?;
-    let selection = app
+    let dialog = window
         .dialog()
         .file()
         .set_title("Insert image")
-        .add_filter("Images", &["png", "jpg", "jpeg", "gif", "webp"])
-        .blocking_pick_file();
+        .add_filter("Images", &["png", "jpg", "jpeg", "gif", "webp"]);
+    #[cfg(any(windows, target_os = "macos"))]
+    let dialog = dialog.set_parent(&window);
+    let selection = dialog.blocking_pick_file();
     let Some(FilePath::Path(source)) = selection else {
         return Ok(None);
     };

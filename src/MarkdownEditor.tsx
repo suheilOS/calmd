@@ -66,6 +66,7 @@ import { imageLivePreview } from './imageLivePreview'
 import {
   importAttachmentBytes,
   pickAttachment,
+  readClipboardImageFile,
   resolveLocalImage,
   type DisplayImage,
 } from './images'
@@ -561,6 +562,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
           trackedImageInsertion,
           imagePaste(
             (file) => importAttachmentBytes(currentNoteKeyRef.current, file),
+            readClipboardImageFile,
             (error) => onImageErrorRef.current?.(error),
           ),
         ]),
@@ -687,6 +689,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
                       trackedImageInsertion,
                       imagePaste(
                         (file) => importAttachmentBytes(noteKey, file),
+                        readClipboardImageFile,
                         (error) => onImageErrorRef.current?.(error),
                       ),
                     ]),
