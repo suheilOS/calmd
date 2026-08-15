@@ -2,6 +2,7 @@ import { Button } from '@base-ui/react/button'
 import { Tooltip } from '@base-ui/react/tooltip'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useEffect, type ReactElement, type ReactNode } from 'react'
+import { KeyboardShortcutsDialog } from './KeyboardShortcutsDialog'
 
 const appWindow = getCurrentWindow()
 
@@ -160,8 +161,9 @@ export function TitleBar({
           </div>
         ) : null}
         <div className="ml-auto flex">
+          <KeyboardShortcutsDialog />
           {noteActions}
-          {noteActions ? <span aria-hidden="true" className="mx-1 h-5 w-px self-center bg-divider" /> : null}
+          <span aria-hidden="true" className="mx-1 h-5 w-px self-center bg-divider" />
           <div className="flex" role="group" aria-label="Window controls">
           <TitleBarTooltip label="Minimize">
             <Button aria-label="Minimize window" className={controlClassName} onClick={() => void appWindow.minimize()} type="button">
