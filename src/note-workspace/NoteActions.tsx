@@ -2,6 +2,7 @@ import { Button } from '@base-ui/react/button'
 import { Dialog } from '@base-ui/react/dialog'
 import { Menu } from '@base-ui/react/menu'
 import type { ReactNode } from 'react'
+import { MoreVerticalIcon } from '../MoreVerticalIcon'
 
 type NoteActionsProps = {
   deleteOpen: boolean
@@ -10,16 +11,6 @@ type NoteActionsProps = {
   menuItems?: ReactNode
   onDeleteOpenChange: (open: boolean) => void
   onDelete: () => void
-}
-
-function MoreIcon() {
-  return (
-    <svg aria-hidden="true" className="size-4" fill="currentColor" viewBox="0 0 16 16">
-      <circle cx="8" cy="3" r="1" />
-      <circle cx="8" cy="8" r="1" />
-      <circle cx="8" cy="13" r="1" />
-    </svg>
-  )
 }
 
 function TrashIcon() {
@@ -49,14 +40,15 @@ export function NoteActions({
           className={actionClassName}
           disabled={deleting}
         >
-          <MoreIcon />
+          <MoreVerticalIcon />
         </Menu.Trigger>
         <Menu.Portal>
           <Menu.Positioner align="end" className="z-40" side="bottom" sideOffset={6}>
             <Menu.Popup className="w-44 rounded-xl bg-surface p-1.5 text-small text-ink shadow-[0_8px_24px_oklch(0_0_0/0.18)] outline-none">
               {menuItems}
+              {menuItems ? <Menu.Separator className="mx-2 my-1 h-px bg-divider" /> : null}
               <Menu.Item
-                className="flex h-10 cursor-default select-none items-center gap-2 rounded-lg px-3 text-red-500 outline-none data-[highlighted]:bg-red-500 data-[highlighted]:text-white"
+                className="flex h-10 cursor-default select-none items-center gap-2 rounded-lg px-3 text-danger outline-none data-[highlighted]:bg-danger-surface data-[highlighted]:text-danger-ink"
                 onClick={() => onDeleteOpenChange(true)}
               >
                 <TrashIcon />

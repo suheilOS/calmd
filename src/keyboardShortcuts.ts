@@ -22,7 +22,7 @@ export function isNavigateHomeShortcut(event: KeyboardShortcut) {
     && !event.ctrlKey
     && !event.metaKey
     && !event.shiftKey
-    && event.key === 'Home'
+    && event.key.toLowerCase() === 'h'
 }
 
 export function isOpenRandomNoteShortcut(event: RandomNoteShortcut) {

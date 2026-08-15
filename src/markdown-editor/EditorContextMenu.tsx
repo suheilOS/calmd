@@ -1,4 +1,5 @@
 import { Menu } from '@base-ui/react/menu'
+import { MoreVerticalIcon } from '../MoreVerticalIcon'
 import type { MarkdownBlockKind } from './markdownBlockCommands'
 
 type EditorContextMenuProps = {
@@ -36,16 +37,6 @@ function IconFrame({ children }: { children: React.ReactNode }) {
       viewBox="0 0 16 16"
     >
       {children}
-    </svg>
-  )
-}
-
-function MoreVerticalIcon() {
-  return (
-    <svg aria-hidden="true" className="size-4" fill="currentColor" viewBox="0 0 16 16">
-      <circle cx="8" cy="3" r="1" />
-      <circle cx="8" cy="8" r="1" />
-      <circle cx="8" cy="13" r="1" />
     </svg>
   )
 }
@@ -152,7 +143,12 @@ export function EditorContextMenu({
         <MoreVerticalIcon />
       </Menu.Trigger>
       <Menu.Portal>
-        <Menu.Positioner className="z-50 outline-none">
+        <Menu.Positioner
+          align="end"
+          className="z-50 outline-none"
+          side="bottom"
+          sideOffset={6}
+        >
           <Menu.Popup className={popupClassName}>
             <Menu.Item
               className={itemClassName}

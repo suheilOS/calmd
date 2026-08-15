@@ -21,11 +21,11 @@ describe('application shortcuts', () => {
     expect(isCreateUntitledShortcut({ ...shortcut, repeat: true })).toBe(false)
   })
 
-  test('recognizes only an initial Alt+Home press', () => {
+  test('recognizes only an initial Alt+H press', () => {
     const shortcut = {
       altKey: true,
       ctrlKey: false,
-      key: 'Home',
+      key: 'h',
       metaKey: false,
       repeat: false,
       shiftKey: false,

@@ -54,7 +54,7 @@ The app opens to a single composer. As the user types, it searches existing note
 
 ## Current navigation
 
-Knowledge is accessed through literal retrieval, inline `[[links]]`, backlinks, random rediscovery, and application-owned back and forward navigation. While Calmd is focused, `Alt+Home` returns Home through the same save-gated navigation flow as the title-bar control, and `Cmd/Ctrl+Alt+R` opens a random indexed note through the same save-gated note transition. The random action prefers a different note from the current one and leaves a one-note editor unchanged. The full collection is never shown by default.
+Knowledge is accessed through literal retrieval, inline `[[links]]`, backlinks, random rediscovery, and application-owned back and forward navigation. While Calmd is focused, `Alt+H` returns Home through the same save-gated navigation flow as the title-bar control, and `Cmd/Ctrl+Alt+R` opens a random indexed note through the same save-gated note transition. The random action prefers a different note from the current one and leaves a one-note editor unchanged. The full collection is never shown by default.
 
 ## Current note storage
 
