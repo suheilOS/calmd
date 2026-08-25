@@ -37,7 +37,7 @@ export function NotePreviewPopover({
     }
 
     function handleBlur() {
-      controller.setModifierHeld(false)
+      controller.resetOnBlur()
     }
 
     window.addEventListener('keydown', updateModifier)
@@ -58,6 +58,7 @@ export function NotePreviewPopover({
   const preview = storedPreview?.key === currentNoteKey
     ? previewFromDraft(currentNoteKey, currentDraft)
     : storedPreview
+  const alignment = candidate?.source === 'backlink' ? 'end' : 'start'
 
   return (
     <Popover.Root
@@ -69,7 +70,7 @@ export function NotePreviewPopover({
     >
       <Popover.Portal>
         <Popover.Positioner
-          align="start"
+          align={alignment}
           anchor={candidate?.anchor ?? null}
           className="z-40"
           collisionAvoidance={{ side: 'flip', align: 'shift', fallbackAxisSide: 'end' }}
@@ -80,7 +81,7 @@ export function NotePreviewPopover({
         >
           <Popover.Popup
             aria-label="Note preview"
-            className="note-preview-popover w-[26rem] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl bg-surface text-ink shadow-[0_12px_36px_oklch(0_0_0/0.22)] outline-none"
+            className="note-preview-popover w-[24rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl bg-surface text-ink shadow-[0_12px_36px_oklch(0_0_0/0.22)] outline-none"
             finalFocus={false}
             initialFocus={false}
             onPointerEnter={(event) => {

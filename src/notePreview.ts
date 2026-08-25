@@ -115,10 +115,17 @@ export class NotePreviewController {
     if (this.modifierHeld === held) return
     this.modifierHeld = held
     if (!held) {
-      this.deactivate()
-    } else if (this.candidate && this.sourceHovered) {
+      if (this.state.status === 'waiting') this.deactivate()
+      return
+    }
+    if (this.candidate && this.sourceHovered) {
       this.waitToLoad()
     }
+  }
+
+  resetOnBlur = () => {
+    this.modifierHeld = false
+    this.dismiss()
   }
 
   dismiss = () => {

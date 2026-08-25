@@ -156,6 +156,10 @@ describe('note previews', () => {
     expect(controller.getSnapshot().status).toBe('visible')
 
     controller.setModifierHeld(false)
+    expect(controller.getSnapshot().status).toBe('visible')
+
+    controller.leavePreview()
+    scheduler.advance(NOTE_PREVIEW_CLOSE_DELAY_MS)
     expect(controller.getSnapshot().status).toBe('idle')
 
     const missing = deferred<NotePreviewLoadResult>()
@@ -166,6 +170,47 @@ describe('note previews', () => {
     missing.resolve({ kind: 'missing' })
     await settlePromises()
     expect(missingController.getSnapshot().status).toBe('armed')
+  })
+
+  test('cancels a pending preview when the modifier is released before opening', () => {
+    const scheduler = new FakeScheduler()
+    let loadCount = 0
+    const controller = new NotePreviewController(async () => {
+      loadCount += 1
+      return { kind: 'missing' }
+    }, scheduler.scheduler)
+
+    controller.enterSource(candidate('Pending'))
+    controller.setModifierHeld(true)
+    expect(controller.getSnapshot().status).toBe('waiting')
+
+    controller.setModifierHeld(false)
+    scheduler.advance(NOTE_PREVIEW_OPEN_DELAY_MS)
+
+    expect(loadCount).toBe(0)
+    expect(controller.getSnapshot().status).toBe('armed')
+  })
+
+  test('resets the preview and modifier state when the window loses focus', async () => {
+    const scheduler = new FakeScheduler()
+    const result = deferred<NotePreviewLoadResult>()
+    const controller = new NotePreviewController(() => result.promise, scheduler.scheduler)
+
+    controller.enterSource(candidate('Blurred'))
+    controller.setModifierHeld(true)
+    scheduler.advance(NOTE_PREVIEW_OPEN_DELAY_MS)
+    result.resolve({
+      kind: 'found',
+      preview: { key: 'Blurred.md', title: 'Blurred', excerpt: '', truncated: false },
+    })
+    await settlePromises()
+    expect(controller.getSnapshot().status).toBe('visible')
+
+    controller.resetOnBlur()
+
+    expect(controller.getSnapshot().status).toBe('idle')
+    controller.enterSource(candidate('After blur'))
+    expect(controller.getSnapshot().status).toBe('armed')
   })
 
   test('cancels intent and pending work when left, dismissed, or disposed', () => {
