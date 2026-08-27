@@ -119,16 +119,15 @@ const editorTheme = EditorView.theme({
   '&': {
     backgroundColor: 'transparent',
     color: 'var(--color-body)',
-    fontSize: '17px',
+    fontSize: 'var(--text-base)',
     minHeight: '58vh',
   },
   '&.cm-focused': {
     outline: 'none',
   },
   '.cm-scroller': {
-    fontFamily: 'Spectral, Georgia, serif',
+    fontFamily: 'inherit',
     fontKerning: 'normal',
-    fontWeight: '500',
     fontVariantLigatures: 'none',
     lineHeight: '1.6',
     overflow: 'visible',
