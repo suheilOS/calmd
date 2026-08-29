@@ -96,6 +96,45 @@ function pressUndo(container: HTMLElement) {
 }
 
 describe('MarkdownEditor document sessions', () => {
+  test('resolves Markdown direction per line and isolates mixed-direction syntax', async () => {
+    const source = [
+      'فقرة عربية مع CodeMirror 6.',
+      '',
+      'English paragraph with العربية.',
+      '',
+      '# عنوان عربي',
+      '',
+      '- بند عربي',
+      '',
+      '> اقتباس عربي',
+      '',
+      'نص `const value = "عربي"` و[رابط عربي](https://example.com) و[[ملاحظة عربية]] وhttps://example.org.',
+      '',
+      '```text',
+      'سطر شيفرة عربي = 42',
+      '```',
+    ].join('\n')
+    const { container } = await renderEditor(source, 31)
+    const content = container.querySelector<HTMLElement>('.cm-content')
+    if (!content) throw new Error('CodeMirror content was not mounted')
+    const view = EditorView.findFromDOM(content)
+
+    expect(view.state.facet(EditorView.perLineTextDirection)).toBe(true)
+    const lines = [...content.querySelectorAll<HTMLElement>('.cm-line')]
+    expect(lines.length).toBeGreaterThan(10)
+    expect(lines.every((line) => line.dir === 'auto')).toBe(true)
+    expect(lines.filter((line) => line.classList.contains('cm-fenced-code-line')).length).toBe(3)
+
+    const inlineCode = content.querySelector<HTMLElement>('.cm-inline-code')
+    const markdownLink = content.querySelector<HTMLElement>('.cm-link')
+    const url = content.querySelector<HTMLElement>('.cm-url[dir="ltr"]')
+    const wikiLink = content.querySelector<HTMLElement>('.cm-wiki-link')
+    expect(inlineCode?.dir).toBe('ltr')
+    expect(url?.dir).toBe('ltr')
+    expect(markdownLink?.dir).toBe('auto')
+    expect(wikiLink?.dir).toBe('auto')
+  })
+
   test('restores the caret for a reopened note without restoring its history', async () => {
     const noteA = '**first** and **second** tail'
     const { container, root } = await renderEditor(noteA, 41, () => {}, 'note-41.md')

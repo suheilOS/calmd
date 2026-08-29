@@ -17,7 +17,7 @@ type ComposerScreenProps = {
 }
 
 const RESULT_CLASS_NAME =
-  'group text-base block w-full rounded-xl bg-surface px-3 py-3 text-left text-ink transition-[background-color,color,transform] duration-150 ease-out aria-selected:bg-active aria-selected:text-active-ink focus-visible:bg-active focus-visible:text-active-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-faint active:scale-[0.97]'
+  'group text-base block w-full rounded-xl bg-surface px-3 py-3 text-start text-ink transition-[background-color,color,transform] duration-150 ease-out aria-selected:bg-active aria-selected:text-active-ink focus-visible:bg-active focus-visible:text-active-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-faint active:scale-[0.97]'
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
   day: 'numeric',
@@ -117,6 +117,7 @@ export function ComposerScreen({
             autoFocus
             autoComplete="off"
             className="w-full border-0 bg-transparent p-0 text-base text-ink outline-none placeholder:text-placeholder focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-faint"
+            dir="auto"
             id="thought"
             maxLength={MAX_NOTE_TITLE_LENGTH}
             name="thought"
@@ -158,8 +159,8 @@ export function ComposerScreen({
                 role="option"
                 type="button"
               >
-                <span className="block break-words font-semibold">{highlightedText(note.title, thought)}</span>
-                {note.excerpt ? <span className="mt-1 block truncate text-small text-faint group-aria-selected:text-active-muted group-focus-visible:text-active-muted">{highlightedText(note.excerpt, thought)}</span> : null}
+                <bdi className="block break-words font-semibold" dir="auto">{highlightedText(note.title, thought)}</bdi>
+                {note.excerpt ? <bdi className="mt-1 block truncate text-small text-faint group-aria-selected:text-active-muted group-focus-visible:text-active-muted" dir="auto">{highlightedText(note.excerpt, thought)}</bdi> : null}
               </Button>
             ))}
             {!hasExactMatch ? (
@@ -172,7 +173,7 @@ export function ComposerScreen({
                 role="option"
                 type="button"
               >
-                Create “{thought.trim()}”
+                Create “<bdi dir="auto">{thought.trim()}</bdi>”
               </Button>
             ) : null}
           </div>

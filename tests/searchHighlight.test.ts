@@ -32,4 +32,17 @@ describe('segmentSearchMatches', () => {
       { kind: 'match', text: 'Go' },
     ])
   })
+
+  test('ignores Arabic harakat and keeps them in the highlighted text', () => {
+    expect(segmentSearchMatches('عن التَّأملُ والإِصدار 6', 'التأمل الإصدار')).toEqual([
+      { kind: 'text', text: 'عن ' },
+      { kind: 'match', text: 'التَّأملُ' },
+      { kind: 'text', text: ' و' },
+      { kind: 'match', text: 'الإِصدار' },
+      { kind: 'text', text: ' 6' },
+    ])
+    expect(segmentSearchMatches('ن\u08D3ص\u{10EFC}', 'نص')).toEqual([
+      { kind: 'match', text: 'ن\u08D3ص\u{10EFC}' },
+    ])
+  })
 })

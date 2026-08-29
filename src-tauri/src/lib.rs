@@ -5,6 +5,7 @@ mod links;
 mod note_persistence;
 mod portable_filename;
 mod search;
+mod text_normalization;
 mod unlinked_mentions;
 
 use tauri::Manager;

@@ -50,7 +50,7 @@ function LinkButton({
 }: LinkButtonProps) {
   return (
     <button
-      className="block min-h-10 w-full select-none rounded-lg px-2 py-2 text-left text-small transition-[background-color,color,transform] duration-150 ease-out hover:bg-hover focus-visible:bg-active focus-visible:text-active-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-faint active:scale-[0.96]"
+      className="block min-h-10 w-full select-none rounded-lg px-2 py-2 text-start text-small transition-[background-color,color,transform] duration-150 ease-out hover:bg-hover focus-visible:bg-active focus-visible:text-active-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-faint active:scale-[0.96]"
       onClick={() => onSelect(note.key)}
       onPointerEnter={(event) => {
         if (event.pointerType !== 'mouse') return
@@ -190,7 +190,7 @@ export function BacklinksPopover({
                     <p className="px-2 py-2 text-small leading-normal text-secondary">No backlinks</p>
                   ) : backlinks.data.map((link) => (
                     <LinkButton {...buttonProps} id={`backlink:${link.key}`} key={link.key} note={link}>
-                      <span className="block break-words font-medium leading-snug text-pretty text-ink">{link.title}</span>
+                      <bdi className="block break-words font-medium leading-snug text-pretty text-ink" dir="auto">{link.title}</bdi>
                     </LinkButton>
                   ))}
                 </section>
@@ -202,10 +202,10 @@ export function BacklinksPopover({
                     <p className="px-2 py-2 text-small leading-normal text-secondary">No unlinked mentions</p>
                   ) : mentions.data.map((mention) => (
                     <LinkButton {...buttonProps} id={`unlinked-mention:${mention.key}`} key={mention.key} note={mention}>
-                      <span className="block break-words font-medium leading-snug text-pretty text-ink">{mention.title}</span>
-                      <span className="mt-1.5 block line-clamp-3 break-words leading-normal text-secondary">
+                      <bdi className="block break-words font-medium leading-snug text-pretty text-ink" dir="auto">{mention.title}</bdi>
+                      <bdi className="mt-1.5 block line-clamp-3 break-words leading-normal text-secondary" dir="auto">
                         {highlightedExcerpt(mention)}
-                      </span>
+                      </bdi>
                     </LinkButton>
                   ))}
                 </section>

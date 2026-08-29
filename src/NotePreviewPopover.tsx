@@ -98,7 +98,7 @@ export function NotePreviewPopover({
                 <p className="text-small text-secondary" role="status">{state.message}</p>
               ) : preview ? (
                 <>
-                  <Popover.Title className="text-base font-semibold leading-tight tracking-[-0.02em]">
+                  <Popover.Title className="text-base font-semibold leading-tight tracking-[-0.02em]" dir="auto">
                     {preview.title}
                   </Popover.Title>
                   <div className="note-preview-content mt-3 text-small text-secondary">
