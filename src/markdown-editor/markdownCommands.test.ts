@@ -4,7 +4,12 @@ import { markdown } from '@codemirror/lang-markdown'
 import { EditorSelection, EditorState, type StateCommand, type Transaction } from '@codemirror/state'
 import { GFM } from '@lezer/markdown'
 import { markdownHighlight } from './markdownHighlight'
-import { toggleLink, toggleMarkdown } from './markdownCommands'
+import {
+  markdownFormatStates,
+  toggleInlineFormat,
+  toggleLink,
+  toggleMarkdown,
+} from './markdownCommands'
 
 function runCommand(
   doc: string,
@@ -51,6 +56,48 @@ function runRanges(
   command({ state, dispatch: (transaction) => { state = transaction.state } })
   return { doc: state.doc.toString(), selection: state.selection }
 }
+
+function formattingState(doc: string, anchor: number, head: number) {
+  return markdownFormatStates(EditorState.create({
+    doc,
+    selection: EditorSelection.range(anchor, head),
+    extensions: [markdown({ extensions: [GFM, markdownHighlight] })],
+  }))
+}
+
+describe('markdownFormatStates', () => {
+  test('reports active, mixed, inactive, and unavailable selection formats', () => {
+    const source = '**bold** and plain'
+    expect(formattingState(source, 2, 6).bold).toBe('active')
+    expect(formattingState(source, 2, source.length).bold).toBe('mixed')
+    expect(formattingState(source, 13, source.length).italic).toBe('inactive')
+    expect(formattingState('one\n\ntwo', 0, 8).link).toBe('unavailable')
+    expect(formattingState('a   b', 1, 4).bold).toBe('unavailable')
+  })
+
+  test('reports a selected Markdown link as active', () => {
+    const source = '[Calmd](https://example.com)'
+    expect(formattingState(source, 1, 6).link).toBe('active')
+  })
+
+  test('makes unavailable dominant across multiple selections', () => {
+    const source = 'valid\n\ncross one\n\ncross two'
+    const state = EditorState.create({
+      doc: source,
+      selection: EditorSelection.create([
+        EditorSelection.range(0, 5),
+        EditorSelection.range(7, source.length),
+      ]),
+      extensions: [
+        EditorState.allowMultipleSelections.of(true),
+        markdown({ extensions: [GFM, markdownHighlight] }),
+      ],
+    })
+
+    expect(markdownFormatStates(state).link).toBe('unavailable')
+    expect(toggleInlineFormat('link')({ state, dispatch: () => {} })).toBe(false)
+  })
+})
 
 describe('toggleMarkdown', () => {
   test('formats a paragraph while flattening existing spans of the same format', () => {

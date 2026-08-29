@@ -101,4 +101,5 @@ describe('NoteWorkspaceProvider', () => {
     expect(workspace.meta.spellcheckEnabled).toBe(false)
     expect(await workspace.meta.resolveWikiLink('Existing')).toBe(true)
   })
+
 })

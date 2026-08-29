@@ -77,9 +77,9 @@ only when their editing and scroll behavior are demonstrably stable.
 - On an inactive task line, clicking the rendered checkbox toggles the task
   without entering source editing. Clicking the task text instead activates the
   line and reveals its Markdown prefix.
-- Structural formatting is discoverable through one quiet editor context menu,
-  backed by the same commands as keyboard shortcuts. Calmd does not add a
-  persistent formatting toolbar or a second command-palette surface for these
+- Inline and structural formatting are discoverable through one quiet selection
+  toolbar, backed by the same commands as keyboard shortcuts. Calmd does not add
+  a persistent formatting toolbar or a second command-palette surface for these
   actions.
 - Native spellcheck is enabled for prose by default, while autocorrect and
   automatic text replacement remain disabled. A simple editor setting lets the

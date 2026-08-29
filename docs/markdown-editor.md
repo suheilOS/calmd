@@ -4,7 +4,7 @@ The note body uses CodeMirror 6 as a plain-Markdown editor with one Live Preview
 
 ## Implementation structure
 
-Editor-owned code is co-located under `src/markdown-editor/`. A framework-neutral document session owns the CodeMirror view, extensions, document synchronization, history isolation, view-state restoration, and cleanup behind `update`, `commands`, and `destroy`. `MarkdownEditor.tsx` is only the React 19 mount adapter and remains the direct lazy-loading entrypoint. The Note workspace continues to own persistence, navigation, previews, and user-facing errors.
+Editor-owned code is co-located under `src/markdown-editor/`. A framework-neutral document session owns the CodeMirror view, extensions, document synchronization, history isolation, view-state restoration, selection-toolbar state, and cleanup behind `update`, `commands`, and `destroy`. `MarkdownEditor.tsx` is the React 19 mount adapter and owns the floating Base UI toolbar while remaining the direct lazy-loading entrypoint. The Note workspace continues to own persistence, navigation, previews, and user-facing errors.
 
 ## Supported Markdown
 
@@ -42,10 +42,11 @@ The document remains plain Markdown. Supported wiki links use `[[target]]` or `[
 - Undo, redo, find, replace, multiple selections, bracket matching, bracket closing, and Tab indentation use CodeMirror's standard commands and keymaps.
 - Each opened note has an isolated undo timeline. Note changes and canonical persistence reconciliation are not undoable user edits, and stale asynchronous link resolution cannot cross the editor-session seam.
 - Selection and scroll position are remembered for up to 100 opened notes during the current app run, migrate with renames, and are discarded with deleted notes.
-- Native spellcheck is enabled for prose by default and can be disabled from the editor context menu. The preference is stored in Tauri settings; autocorrect, autocapitalization, code, and link destinations remain excluded where the webview supports those attributes.
-- The editor context menu exposes paragraph, heading, quote, list, task, and native image-picker actions. Pasted or picked images are validated and atomically imported into the vault-root `attachments/` directory, then inserted as portable standard Markdown. Asynchronous imports map their captured selections through intervening edits and cannot cross note sessions.
+- Native spellcheck is enabled for prose by default and can be disabled from the title-bar Note actions menu. The preference is stored in Tauri settings; autocorrect, autocapitalization, code, and link destinations remain excluded where the webview supports those attributes.
+- A floating toolbar appears after a non-empty body selection is completed. It exposes bold, italic, link, highlight, inline code, and strikethrough commands plus a compact block-style menu for paragraph, headings, quote, lists, and tasks. The toolbar uses the same Markdown-aware commands as the keyboard shortcuts, stays hidden for a collapsed caret and the plain-text title, and can receive keyboard focus with `Alt+F10`.
+- The title-bar Note actions menu exposes the native image picker. Pasted or picked images are validated and atomically imported into the vault-root `attachments/` directory, then inserted as portable standard Markdown. Asynchronous imports map their captured selections through intervening edits and cannot cross note sessions.
 - The editor owns its document state while typing. React receives document changes through an update listener and only dispatches an external replacement when the incoming value actually differs.
 
 ## Benchmarks
 
-iA Writer informs the restrained, full-page writing surface: no toolbar, gutter, preview split, or persistent controls. Obsidian informs Live Preview: plain Markdown remains the source of truth while inactive syntax recedes and active syntax remains directly editable. Calmd uses those precedents without reproducing either product's file-management or plugin features.
+iA Writer informs the restrained, full-page writing surface: no persistent toolbar, gutter, or preview split. Obsidian informs Live Preview: plain Markdown remains the source of truth while inactive syntax recedes and active syntax remains directly editable. Calmd uses those precedents without reproducing either product's file-management or plugin features.

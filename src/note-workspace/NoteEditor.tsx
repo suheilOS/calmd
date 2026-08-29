@@ -1,10 +1,10 @@
 import { Button } from '@base-ui/react/button'
-import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { BacklinksPopover } from '../BacklinksPopover'
-import { EditorContextMenu } from '../markdown-editor/EditorContextMenu'
 import type { MarkdownEditorCommands } from '../markdown-editor/contracts'
 import { NotePreviewPopover } from '../NotePreviewPopover'
 import { handleTitleKeyDown } from '../titleKeyDown'
+import { useEditorChrome } from './editorChromeContext'
 import {
   constrainNoteTitle,
   MAX_NOTE_TITLE_LENGTH,
@@ -44,6 +44,7 @@ async function loadNotePreview(
 
 export function NoteEditor() {
   const { actions, meta, state } = useNoteWorkspace()
+  const { registerInsertImage } = useEditorChrome()
   if (!state.note) {
     throw new Error('NoteWorkspace.Editor requires an active Note.')
   }
@@ -53,6 +54,11 @@ export function NoteEditor() {
   const bodyEditorRef = useRef<MarkdownEditorCommands>(null)
   const titleSelectionRef = useRef({ start: 0, end: 0 })
   const [previewController] = useState(() => new NotePreviewController(loadNotePreview))
+
+  const setBodyEditor = useCallback((commands: MarkdownEditorCommands | null) => {
+    bodyEditorRef.current = commands
+    registerInsertImage(commands ? commands.insertImage : null)
+  }, [registerInsertImage])
 
   useEffect(() => () => previewController.dispose(), [previewController])
 
@@ -69,9 +75,8 @@ export function NoteEditor() {
   return (
     <main className="app bg-canvas text-ink">
       <article className="note-editor-page mx-auto w-full max-w-[65ch] px-6 pb-24 pt-[15vh] sm:px-8">
-        <div className="flex items-start gap-2">
-          <label className="sr-only" htmlFor="note-title">Note title</label>
-          <textarea
+        <label className="sr-only" htmlFor="note-title">Note title</label>
+        <textarea
           aria-label="Note title"
           autoComplete="off"
           className="block min-w-0 flex-1 resize-none overflow-hidden border-0 bg-transparent p-0 text-large text-ink outline-none break-words placeholder:text-placeholder focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-faint [field-sizing:content]"
@@ -102,20 +107,13 @@ export function NoteEditor() {
           ref={titleRef}
           rows={1}
           value={draft.title}
-          />
-          <EditorContextMenu
-            onBlockChange={(kind) => bodyEditorRef.current?.applyBlock(kind)}
-            onInsertImage={() => bodyEditorRef.current?.insertImage()}
-            onSpellcheckChange={meta.onSpellcheckEnabledChange}
-            spellcheckEnabled={meta.spellcheckEnabled}
-          />
-        </div>
+        />
         <div className="mt-6 sm:mt-8">
           <Suspense fallback={<div aria-hidden="true" className="min-h-[58vh]" />}>
             <MarkdownEditor
               editorSessionId={state.editorSessionId}
               noteKey={noteKey}
-              ref={bodyEditorRef}
+              ref={setBodyEditor}
               onChange={(body) => actions.updateDraft({ ...draft, body })}
               onPreviewCandidateEnter={previewController.enterSource}
               onPreviewCandidateLeave={previewController.leaveSource}

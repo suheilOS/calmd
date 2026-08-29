@@ -3,6 +3,28 @@ import type { NoteReference } from '../notes'
 import type { NotePreviewCandidate } from '../notePreview'
 import type { MarkdownBlockKind } from './markdownBlockCommands'
 
+export type MarkdownInlineFormat =
+  | 'bold'
+  | 'italic'
+  | 'highlight'
+  | 'link'
+  | 'code'
+  | 'strikethrough'
+
+export type MarkdownFormatState = 'active' | 'inactive' | 'mixed' | 'unavailable'
+
+export type FormattingToolbarSnapshot = {
+  anchor: {
+    height: number
+    width: number
+    x: number
+    y: number
+  }
+  blockKind: MarkdownBlockKind | 'mixed'
+  formats: Record<MarkdownInlineFormat, MarkdownFormatState>
+  selectionRevision: number
+}
+
 export type WikiLinkActivation = {
   target: string
   validateCurrentOccurrence: (authoritativeBody: string) => boolean
@@ -12,8 +34,10 @@ export type WikiLinkActivation = {
 
 export type MarkdownEditorCommands = {
   applyBlock: (kind: MarkdownBlockKind) => void
+  focus: () => void
   focusAtEnd: () => void
   insertImage: () => void
+  toggleInline: (format: MarkdownInlineFormat) => void
 }
 
 export type MarkdownEditorInput = {

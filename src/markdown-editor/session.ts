@@ -63,8 +63,10 @@ import {
   wikiLinkMarkdown,
 } from '../wikiLinks'
 import type {
+  FormattingToolbarSnapshot,
   MarkdownEditorCommands,
   MarkdownEditorInput,
+  MarkdownInlineFormat,
   WikiLinkActivation,
 } from './contracts'
 import { insertNewlineContinueBlockquote } from './markdownBlockquote'
@@ -75,7 +77,7 @@ import {
   renameEditorViewState,
 } from './editorViewState'
 import { markdownHighlight } from './markdownHighlight'
-import { toggleLink, toggleMarkdown } from './markdownCommands'
+import { toggleInlineFormat } from './markdownCommands'
 import {
   imagePaste,
   insertImportedImage,
@@ -85,6 +87,7 @@ import { imageLivePreview } from './imageLivePreview'
 import { livePreview } from './livePreview'
 import { activateExternalLink as activateExternalUrl } from './externalLinks'
 import { wikiLinkCompletion } from './wikiLinkCompletion'
+import { selectionToolbar } from './selectionToolbar'
 
 const externalSync = Annotation.define<boolean>()
 
@@ -399,12 +402,12 @@ const editorExtensions = [
   keymap.of([
     ...completionKeymap,
     { key: 'Enter', run: insertNewlineContinueBlockquote },
-    { key: 'Mod-b', run: toggleMarkdown('**') },
-    { key: 'Mod-i', run: toggleMarkdown('*') },
-    { key: 'Mod-Shift-h', run: toggleMarkdown('==') },
-    { key: 'Mod-k', run: toggleLink },
-    { key: 'Mod-`', run: toggleMarkdown('`') },
-    { key: 'Mod-Shift-x', run: toggleMarkdown('~~') },
+    { key: 'Mod-b', run: toggleInlineFormat('bold') },
+    { key: 'Mod-i', run: toggleInlineFormat('italic') },
+    { key: 'Mod-Shift-h', run: toggleInlineFormat('highlight') },
+    { key: 'Mod-k', run: toggleInlineFormat('link') },
+    { key: 'Mod-`', run: toggleInlineFormat('code') },
+    { key: 'Mod-Shift-x', run: toggleInlineFormat('strikethrough') },
     ...([1, 2, 3, 4, 5, 6] as const).map((level) => ({
       key: `Mod-Alt-${level}`,
       run: setMarkdownBlock(`heading-${level}`),
@@ -432,6 +435,11 @@ export type MarkdownEditorSession = {
   destroy: () => void
 }
 
+export type MarkdownEditorSessionInput = MarkdownEditorInput & {
+  onFormattingToolbarChange?: (snapshot: FormattingToolbarSnapshot | null) => void
+  onFormattingToolbarFocusRequest?: () => void
+}
+
 class CodeMirrorDocumentSession implements MarkdownEditorSession {
   private input: MarkdownEditorInput
   private readonly editor: EditorView
@@ -445,6 +453,9 @@ class CodeMirrorDocumentSession implements MarkdownEditorSession {
   private readonly imageInsertionCompartment = new Compartment()
   private readonly imagePreviewCompartment = new Compartment()
   private readonly livePreviewCompartment = new Compartment()
+  private readonly onFormattingToolbarChange: (
+    snapshot: FormattingToolbarSnapshot | null,
+  ) => void
 
   readonly commands: MarkdownEditorCommands = {
     applyBlock: (kind) => {
@@ -452,6 +463,9 @@ class CodeMirrorDocumentSession implements MarkdownEditorSession {
         state: this.editor.state,
         dispatch: (transaction) => this.editor.dispatch(transaction),
       })
+      this.editor.focus()
+    },
+    focus: () => {
       this.editor.focus()
     },
     focusAtEnd: () => {
@@ -465,13 +479,21 @@ class CodeMirrorDocumentSession implements MarkdownEditorSession {
         (error) => this.input.onImageError?.(error),
       )
     },
+    toggleInline: (format: MarkdownInlineFormat) => {
+      toggleInlineFormat(format)({
+        state: this.editor.state,
+        dispatch: (transaction) => this.editor.dispatch(transaction),
+      })
+      this.editor.focus()
+    },
   }
 
-  constructor(parent: HTMLElement, input: MarkdownEditorInput) {
+  constructor(parent: HTMLElement, input: MarkdownEditorSessionInput) {
     this.input = input
     this.currentSessionId = input.editorSessionId
     this.currentNoteKey = input.noteKey
     this.spellcheckEnabled = input.spellcheckEnabled
+    this.onFormattingToolbarChange = input.onFormattingToolbarChange ?? (() => {})
 
     const recalled = recallEditorViewState(input.noteKey, input.value.length)
     this.editor = new EditorView({
@@ -479,6 +501,10 @@ class CodeMirrorDocumentSession implements MarkdownEditorSession {
       selection: recalled?.selection ?? { anchor: input.value.length },
       extensions: [
         editorExtensions,
+        selectionToolbar({
+          onChange: this.onFormattingToolbarChange,
+          onFocusRequest: input.onFormattingToolbarFocusRequest ?? (() => {}),
+        }),
         this.historyCompartment.of(history()),
         this.imageInsertionCompartment.of(this.imageInsertion(input.noteKey)),
         this.contentAttributesCompartment.of(
@@ -539,6 +565,7 @@ class CodeMirrorDocumentSession implements MarkdownEditorSession {
       })
     }
     if (sessionChanged) {
+      this.onFormattingToolbarChange(null)
       this.rememberScroll()
       this.currentSessionId = input.editorSessionId
       this.currentNoteKey = input.noteKey
@@ -643,7 +670,7 @@ class CodeMirrorDocumentSession implements MarkdownEditorSession {
 /** Creates one CodeMirror document session with no React lifecycle dependency. */
 export function createMarkdownEditorSession(
   parent: HTMLElement,
-  input: MarkdownEditorInput,
+  input: MarkdownEditorSessionInput,
 ): MarkdownEditorSession {
   return new CodeMirrorDocumentSession(parent, input)
 }

@@ -11,6 +11,7 @@ import {
 } from '../storage'
 import { openNoteInSubstack } from '../substack'
 import { useNoteWorkspace } from './context'
+import { useEditorChrome } from './editorChromeContext'
 
 type SubstackSettingsDialogProps = {
   message: string | null
@@ -27,6 +28,32 @@ function SubstackIcon() {
       <path d="M22.539 8.242H1.46V5.406h21.08v2.836zM1.46 10.812V24L12 18.11 22.54 24V10.812H1.46zM22.54 0H1.46v2.836h21.08V0z" />
     </svg>
   )
+}
+
+function EditorActionIcon({ children }: { children: React.ReactNode }) {
+  return (
+    <svg aria-hidden="true" className="size-4 shrink-0" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" viewBox="0 0 16 16">
+      {children}
+    </svg>
+  )
+}
+
+function ImageIcon() {
+  return (
+    <EditorActionIcon>
+      <rect height="11" rx="1.5" width="13" x="1.5" y="2.5" />
+      <circle cx="5" cy="6" r="1" />
+      <path d="m3 12 3.25-3 2.25 2 1.5-1.5 3 2.5" />
+    </EditorActionIcon>
+  )
+}
+
+function SpellcheckIcon() {
+  return <EditorActionIcon><path d="m2.25 10 3-7 3 7M3.25 7.75h4M9.5 10.5l1.5 1.5 3-3.5" /></EditorActionIcon>
+}
+
+function CheckIcon() {
+  return <EditorActionIcon><path d="m3.5 8 3 3 6-6" /></EditorActionIcon>
 }
 
 function SubstackSettingsDialog({
@@ -108,7 +135,8 @@ function SubstackSettingsDialog({
 }
 
 export function WorkspaceActions() {
-  const { actions, state } = useNoteWorkspace()
+  const { actions, meta, state } = useNoteWorkspace()
+  const { insertImage } = useEditorChrome()
   const [publicationUrl, setPublicationUrl] = useState<string | null>(null)
   const [settingsLoaded, setSettingsLoaded] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -182,6 +210,27 @@ export function WorkspaceActions() {
       )}
       menuItems={(
         <>
+          <Menu.Item
+            className="flex h-10 cursor-default select-none items-center gap-2 rounded-lg px-3 outline-none data-[highlighted]:bg-hover disabled:cursor-not-allowed disabled:text-faint"
+            disabled={!insertImage}
+            onClick={() => insertImage?.()}
+          >
+            <ImageIcon />
+            <span>Insert image…</span>
+          </Menu.Item>
+          <Menu.CheckboxItem
+            checked={meta.spellcheckEnabled}
+            className="grid h-10 cursor-default select-none grid-cols-[1rem_1fr_1rem] items-center gap-2 rounded-lg px-3 outline-none data-[highlighted]:bg-hover"
+            closeOnClick
+            onCheckedChange={meta.onSpellcheckEnabledChange}
+          >
+            <SpellcheckIcon />
+            <span>Spellcheck</span>
+            <Menu.CheckboxItemIndicator className="text-accent">
+              <CheckIcon />
+            </Menu.CheckboxItemIndicator>
+          </Menu.CheckboxItem>
+          <Menu.Separator className="mx-2 my-1 h-px bg-divider" />
           <Menu.Item
             className="flex h-10 cursor-default select-none items-center gap-2 rounded-lg px-3 outline-none data-[highlighted]:bg-hover disabled:cursor-not-allowed disabled:text-faint"
             disabled={!settingsLoaded}

@@ -2,6 +2,10 @@ import { syntaxTree } from '@codemirror/language'
 import { markdown } from '@codemirror/lang-markdown'
 import { EditorSelection, EditorState, type StateCommand } from '@codemirror/state'
 import { GFM } from '@lezer/markdown'
+import type {
+  MarkdownFormatState,
+  MarkdownInlineFormat,
+} from './contracts'
 import { markdownHighlight } from './markdownHighlight'
 
 type MarkdownDelimiter = '*' | '**' | '~~' | '`' | '=='
@@ -14,6 +18,14 @@ const syntaxByDelimiter: Record<MarkdownDelimiter, { mark: string; node: string 
   '~~': { mark: 'StrikethroughMark', node: 'Strikethrough' },
   '`': { mark: 'CodeMark', node: 'InlineCode' },
   '==': { mark: 'HighlightMark', node: 'Highlight' },
+}
+
+const delimiterByFormat: Record<Exclude<MarkdownInlineFormat, 'link'>, MarkdownDelimiter> = {
+  bold: '**',
+  code: '`',
+  highlight: '==',
+  italic: '*',
+  strikethrough: '~~',
 }
 
 function parse(text: string) {
@@ -365,6 +377,86 @@ function isRangeFullyCovered(
   }
 
   return nodes.some((node) => node.contentFrom < range.to && node.contentTo > range.from)
+}
+
+function delimiterStateForRange(
+  state: EditorState,
+  range: { empty: boolean; from: number; to: number },
+  delimiter: MarkdownDelimiter,
+): MarkdownFormatState {
+  if (range.empty) {
+    if (containingFormat(state, range.from, delimiter)) return 'active'
+    return isInlinePosition(state, range.from) ? 'inactive' : 'unavailable'
+  }
+
+  if (isRangeFullyCovered(state, range, delimiter)) return 'active'
+  if (crossesProtectedSyntax(state, range)) return 'unavailable'
+  const intervals = inlineIntervals(state, range)
+  if (
+    intervals.length === 0
+    || !intervals.some((interval) => contentBounds(state.sliceDoc(interval.from, interval.to)))
+  ) return 'unavailable'
+
+  const overlapsFormat = formattedNodes(state, delimiter).some(
+    (node) => node.contentFrom < range.to && node.contentTo > range.from,
+  )
+  return overlapsFormat ? 'mixed' : 'inactive'
+}
+
+function linkStateForRange(
+  state: EditorState,
+  range: { empty: boolean; from: number; to: number },
+): MarkdownFormatState {
+  if (linkAt(state, range)) return 'active'
+  if (range.empty) return isInlinePosition(state, range.from) ? 'inactive' : 'unavailable'
+
+  const intervals = inlineIntervals(state, range)
+  return overlapsLink(state, range)
+    || intervals.length !== 1
+    || intervals[0].from > range.from
+    || intervals[0].to < range.to
+    ? 'unavailable'
+    : 'inactive'
+}
+
+function mergeFormatStates(states: readonly MarkdownFormatState[]): MarkdownFormatState {
+  const first = states[0]
+  if (!first) return 'unavailable'
+  if (states.includes('unavailable')) return 'unavailable'
+  const distinct = new Set(states)
+  if (distinct.size === 1) return first
+  return 'mixed'
+}
+
+function markdownFormatState(
+  state: EditorState,
+  format: MarkdownInlineFormat,
+): MarkdownFormatState {
+  const states = state.selection.ranges.map((range) => format === 'link'
+    ? linkStateForRange(state, range)
+    : delimiterStateForRange(state, range, delimiterByFormat[format]))
+  return mergeFormatStates(states)
+}
+
+/** Describes the inline formatting represented by the editor's current selections. */
+export function markdownFormatStates(
+  state: EditorState,
+): Record<MarkdownInlineFormat, MarkdownFormatState> {
+  return {
+    bold: markdownFormatState(state, 'bold'),
+    italic: markdownFormatState(state, 'italic'),
+    highlight: markdownFormatState(state, 'highlight'),
+    link: markdownFormatState(state, 'link'),
+    code: markdownFormatState(state, 'code'),
+    strikethrough: markdownFormatState(state, 'strikethrough'),
+  }
+}
+
+/** Runs the Markdown command shared by selection-toolbar and keyboard formatting. */
+export function toggleInlineFormat(format: MarkdownInlineFormat): StateCommand {
+  const command = format === 'link' ? toggleLink : toggleMarkdown(delimiterByFormat[format])
+  return (target) => markdownFormatState(target.state, format) !== 'unavailable'
+    && command(target)
 }
 
 function removeFormatAcrossRange(

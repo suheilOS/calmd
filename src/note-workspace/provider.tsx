@@ -13,6 +13,7 @@ import {
   type NoteWorkspaceSnapshot,
 } from './runtime'
 import { NoteWorkspaceContext } from './context'
+import { EditorChromeProvider } from './EditorChromeProvider'
 
 export type NoteWorkspaceActions = {
   activateWikiLink: (activation: WikiLinkActivation) => Promise<boolean>
@@ -73,7 +74,6 @@ export function NoteWorkspaceProvider({
     refreshVault,
   }))
   const state = useSyncExternalStore(runtime.subscribe, runtime.current)
-
   useEffect(() => () => runtime.dispose(), [runtime])
 
   const actions = useMemo<NoteWorkspaceActions>(() => ({
@@ -117,7 +117,7 @@ export function NoteWorkspaceProvider({
 
   return (
     <NoteWorkspaceContext value={value}>
-      {children}
+      <EditorChromeProvider>{children}</EditorChromeProvider>
     </NoteWorkspaceContext>
   )
 }

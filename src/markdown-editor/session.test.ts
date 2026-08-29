@@ -1,11 +1,11 @@
 import { afterEach, beforeAll, describe, expect, test } from 'bun:test'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { EditorView } from '@codemirror/view'
-import type { MarkdownEditorInput } from './contracts'
 import { clearEditorViewState } from './editorViewState'
 import {
   createMarkdownEditorSession,
   type MarkdownEditorSession,
+  type MarkdownEditorSessionInput,
 } from './session'
 
 beforeAll(() => {
@@ -23,8 +23,8 @@ afterEach(() => {
 function input(
   value: string,
   editorSessionId = 1,
-  overrides: Partial<MarkdownEditorInput> = {},
-): MarkdownEditorInput {
+  overrides: Partial<MarkdownEditorSessionInput> = {},
+): MarkdownEditorSessionInput {
   return {
     editorSessionId,
     noteKey: `note-${editorSessionId}.md`,
@@ -41,7 +41,7 @@ function input(
   }
 }
 
-function createSession(initialInput: MarkdownEditorInput) {
+function createSession(initialInput: MarkdownEditorSessionInput) {
   const scrollContainer = document.createElement('div')
   scrollContainer.className = 'app-scroll-container'
   const host = document.createElement('div')

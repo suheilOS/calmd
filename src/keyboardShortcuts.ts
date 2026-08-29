@@ -48,6 +48,7 @@ export const KEYBOARD_SHORTCUT_SECTIONS: readonly KeyboardShortcutSection[] = [
       { label: 'Bulleted list', keys: 'Ctrl/Cmd + Shift + 8' },
       { label: 'Quote', keys: 'Ctrl/Cmd + Shift + 9' },
       { label: 'Task list', keys: 'Ctrl/Cmd + Shift + L' },
+      { label: 'Focus the selection toolbar', keys: 'Alt + F10' },
     ],
   },
   {

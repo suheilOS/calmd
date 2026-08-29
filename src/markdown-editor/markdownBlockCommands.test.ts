@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'bun:test'
+import { markdown } from '@codemirror/lang-markdown'
 import { EditorSelection, EditorState } from '@codemirror/state'
 import {
+  selectedMarkdownBlockKind,
   setMarkdownBlock,
   type MarkdownBlockKind,
 } from './markdownBlockCommands'
@@ -18,6 +20,30 @@ function apply(text: string, kind: MarkdownBlockKind, from = 0, to = text.length
 }
 
 describe('setMarkdownBlock', () => {
+  test('describes uniform and mixed selected block styles', () => {
+    const heading = EditorState.create({
+      doc: '## One\n## Two',
+      selection: EditorSelection.range(0, 13),
+    })
+    const mixed = EditorState.create({
+      doc: 'Plain\n- Listed',
+      selection: EditorSelection.range(0, 14),
+    })
+
+    expect(selectedMarkdownBlockKind(heading)).toBe('heading-2')
+    expect(selectedMarkdownBlockKind(mixed)).toBe('mixed')
+  })
+
+  test('recognizes Setext headings through the Markdown parse tree', () => {
+    const state = EditorState.create({
+      doc: 'Setext heading\n--------------',
+      extensions: [markdown()],
+      selection: EditorSelection.range(0, 14),
+    })
+
+    expect(selectedMarkdownBlockKind(state)).toBe('heading-2')
+  })
+
   test('changes every selected line with one structural command', () => {
     expect(apply('one\ntwo', 'bullet')).toEqual({
       changed: true,
