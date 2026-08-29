@@ -1,6 +1,6 @@
 use crate::{
     links::{NoteReference, extract_links, normalize_key},
-    text_normalization::{find_folded_literal, fold_literal_search},
+    text_normalization::{find_folded_literal, fold_literal_search, strip_literal_search_marks},
     unlinked_mentions::{UnlinkedMention, excerpt, first_occurrence},
 };
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
@@ -15,7 +15,7 @@ use std::{
 };
 
 const DATABASE_FILE: &str = "search-index.sqlite3";
-const SCHEMA_VERSION: i64 = 3;
+const SCHEMA_VERSION: i64 = 4;
 const APPLICATION_ID: i64 = 0x4341_4c4d;
 const MAX_QUERY_CHARACTERS: usize = 120;
 const MAX_EXCERPT_CHARACTERS: usize = 240;
@@ -25,11 +25,12 @@ const SUGGESTION_LIMIT: i64 = 8;
 
 const UPSERT_NOTE: &str = "
     INSERT INTO notes (
-        key, normalized_key, title, normalized_title, body,
+        key, normalized_key, search_key, title, normalized_title, body,
         search_title, search_body, revision, modified_at_ms
-    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
     ON CONFLICT(key) DO UPDATE SET
         normalized_key = excluded.normalized_key,
+        search_key = excluded.search_key,
         title = excluded.title,
         normalized_title = excluded.normalized_title,
         body = excluded.body,
@@ -385,6 +386,7 @@ fn initialize_schema(connection: &Connection) -> Result<(), SearchError> {
                 id INTEGER PRIMARY KEY,
                 key TEXT NOT NULL UNIQUE,
                 normalized_key TEXT NOT NULL,
+                search_key TEXT NOT NULL,
                 title TEXT NOT NULL,
                 normalized_title TEXT NOT NULL,
                 body TEXT NOT NULL,
@@ -436,7 +438,7 @@ fn initialize_schema(connection: &Connection) -> Result<(), SearchError> {
                 VALUES (new.id, new.search_title, new.search_body);
             END;
 
-            PRAGMA user_version = 3;
+            PRAGMA user_version = 4;
             ",
         )
         .map_err(|error| SearchError::sqlite("Could not initialize the search index", error))
@@ -688,11 +690,12 @@ fn upsert_note(connection: &Connection, note: &IndexedNote) -> Result<(), Search
             params![
                 note.key,
                 normalize_key(&note.key),
+                fold_literal_search(&normalize_key(&note.key)),
                 note.title,
                 normalize_title(&note.title),
                 note.body,
-                fold_literal_search(&note.title),
-                fold_literal_search(&note.body),
+                strip_literal_search_marks(&note.title),
+                strip_literal_search_marks(&note.body),
                 note.revision,
                 note.modified_at_ms,
             ],
@@ -826,11 +829,11 @@ fn suggest_notes_connection(
              FROM notes
              WHERE ?1 = ''
                 OR instr(normalized_title, ?1) > 0
-                OR instr(normalized_key, ?1) > 0
+                OR instr(search_key, ?1) > 0
              ORDER BY CASE
                         WHEN normalized_title = ?1 THEN 0
                         WHEN instr(normalized_title, ?1) = 1 THEN 1
-                        WHEN instr(normalized_key, ?1) = 1 THEN 2
+                        WHEN instr(search_key, ?1) = 1 THEN 2
                         ELSE 3
                       END,
                       normalized_title,
@@ -860,6 +863,7 @@ fn search_connection(
             "SELECT key, title, substr(body, 1, ?2)
              FROM notes
              WHERE normalized_title = ?1
+               AND (SELECT count(*) FROM notes WHERE normalized_title = ?1) = 1
              ORDER BY key COLLATE NOCASE, key
              LIMIT 1",
             params![normalized_title, EXACT_EXCERPT_SOURCE_CHARACTERS],
@@ -881,7 +885,7 @@ fn search_connection(
         });
     }
 
-    let search_query = fold_literal_search(canonical_query);
+    let search_query = strip_literal_search_marks(canonical_query);
     let Some(expression) = fts_expression(&search_query) else {
         return Ok(SearchResponse::empty());
     };

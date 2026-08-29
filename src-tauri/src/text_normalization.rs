@@ -7,6 +7,12 @@ pub fn fold_literal_search(text: &str) -> String {
         .collect()
 }
 
+pub fn strip_literal_search_marks(text: &str) -> String {
+    text.chars()
+        .filter(|character| !is_ignored_arabic_mark(*character))
+        .collect()
+}
+
 pub fn find_folded_literal(
     text: &str,
     needle: &str,
@@ -78,6 +84,7 @@ mod tests {
             fold_literal_search("Markdown عربي 2026"),
             "markdown عربي 2026"
         );
+        assert_eq!(strip_literal_search_marks("My التَّأمل"), "My التأمل");
     }
 
     #[test]

@@ -141,7 +141,7 @@ fn trigram_search_handles_unicode_diacritics_and_metacharacters() {
                 note(
                     "Cafe.md",
                     "Café notes",
-                    "C++ and quoted \"text\". A long opening before the matching résumé passage",
+                    "C++ and quoted \"text\". A long opening before My Résumé Uses LaTeX",
                     "two",
                 ),
             ],
@@ -155,7 +155,11 @@ fn trigram_search_handles_unicode_diacritics_and_metacharacters() {
     assert_eq!(search.search("cafe").unwrap().results[0].key, "Cafe.md");
     let diacritic_match = search.search("resume").unwrap();
     assert_eq!(diacritic_match.results[0].key, "Cafe.md");
-    assert!(diacritic_match.results[0].excerpt.contains("résumé"));
+    assert!(
+        diacritic_match.results[0]
+            .excerpt
+            .contains("My Résumé Uses LaTeX")
+    );
     assert_eq!(search.search("C++").unwrap().results[0].key, "Cafe.md");
     assert_eq!(
         search.search("quoted \"text\"").unwrap().results[0].key,
@@ -194,6 +198,28 @@ fn arabic_search_handles_titles_bodies_diacritics_and_mixed_text() {
 }
 
 #[test]
+fn folded_title_collisions_do_not_claim_an_exact_match() {
+    let data = tempdir().unwrap();
+    let vault = tempdir().unwrap();
+    let search = state(data.path());
+    search
+        .reconcile(
+            vault.path(),
+            &[
+                note("Marked.md", "عِلْم", "", "one"),
+                note("Plain.md", "علم", "", "two"),
+            ],
+        )
+        .unwrap();
+
+    let response = search.search("علم").unwrap();
+    assert!(!response.has_exact_match);
+    assert_eq!(response.results.len(), 2);
+    assert!(response.results.iter().any(|note| note.key == "Marked.md"));
+    assert!(response.results.iter().any(|note| note.key == "Plain.md"));
+}
+
+#[test]
 fn note_suggestions_match_titles_and_keys_without_searching_bodies() {
     let data = tempdir().unwrap();
     let vault = tempdir().unwrap();
@@ -205,6 +231,7 @@ fn note_suggestions_match_titles_and_keys_without_searching_bodies() {
                 note("Field-guide.md", "Guide", "orchard", "one"),
                 note("Orchard.md", "Orchard notes", "", "two"),
                 note("Other.md", "Other", "orchard", "three"),
+                note("التَّأمل.md", "Different title", "", "four"),
             ],
         )
         .unwrap();
@@ -222,7 +249,9 @@ fn note_suggestions_match_titles_and_keys_without_searching_bodies() {
         search.suggest_notes("field").unwrap()[0].key,
         "Field-guide.md"
     );
-    assert_eq!(search.suggest_notes("").unwrap().len(), 3);
+    assert_eq!(search.suggest_notes("التأمل").unwrap()[0].key, "التَّأمل.md");
+    assert_eq!(search.suggest_notes("التَّأمل").unwrap()[0].key, "التَّأمل.md");
+    assert_eq!(search.suggest_notes("").unwrap().len(), 4);
 }
 
 #[test]

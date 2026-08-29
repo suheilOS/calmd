@@ -2,10 +2,26 @@ export type SearchTextSegment =
   | { kind: 'text'; text: string }
   | { kind: 'match'; text: string }
 
-const IGNORED_ARABIC_MARK = /[\u0610-\u061A\u0640\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7-\u06E8\u06EA-\u06ED\u0897-\u089F\u08CA-\u08E1\u08E3-\u08FF\u{10EFA}-\u{10EFF}]/u
+const IGNORED_ARABIC_MARK_RANGES = [
+  [0x0610, 0x061a],
+  [0x0640, 0x0640],
+  [0x064b, 0x065f],
+  [0x0670, 0x0670],
+  [0x06d6, 0x06dc],
+  [0x06df, 0x06e4],
+  [0x06e7, 0x06e8],
+  [0x06ea, 0x06ed],
+  [0x0897, 0x089f],
+  [0x08ca, 0x08e1],
+  [0x08e3, 0x08ff],
+  [0x10efa, 0x10eff],
+] satisfies ReadonlyArray<readonly [number, number]>
 
 function isIgnoredArabicMark(character: string) {
-  return IGNORED_ARABIC_MARK.test(character)
+  const codePoint = character.codePointAt(0)
+  return codePoint !== undefined && IGNORED_ARABIC_MARK_RANGES.some(
+    ([first, last]) => codePoint >= first && codePoint <= last,
+  )
 }
 
 type FoldedText = {

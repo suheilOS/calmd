@@ -20,10 +20,12 @@ export default function NotePreviewContent({ excerpt }: NotePreviewContentProps)
         h6: ({ children }) => <h6 dir="auto">{children}</h6>,
         img: ({ alt }) => alt ? <bdi className="note-preview-image-alt" dir="auto">{alt}</bdi> : null,
         li: ({ children }) => <li dir="auto">{children}</li>,
+        ol: ({ children }) => <ol dir="auto">{children}</ol>,
         p: ({ children }) => <p dir="auto">{children}</p>,
         pre: ({ children }) => <pre dir="ltr">{children}</pre>,
         td: ({ children }) => <td dir="auto">{children}</td>,
         th: ({ children }) => <th dir="auto">{children}</th>,
+        ul: ({ children }) => <ul dir="auto">{children}</ul>,
       }}
       remarkPlugins={[remarkGfm]}
       skipHtml

@@ -75,7 +75,11 @@
 }
 
 .note-preview-content :is(ul, ol) {
-  padding-inline-start: 1.5rem;
+  padding-inline-start: 0;
+}
+
+.note-preview-content :is(ul, ol) > li {
+  margin-inline-start: 1.5rem;
 }
 
 .note-preview-content li + li {
