@@ -1,5 +1,6 @@
 use crate::{
     links::{NoteReference, extract_links, normalize_key},
+    text_normalization::{find_folded_literal, fold_literal_search},
     unlinked_mentions::{UnlinkedMention, excerpt, first_occurrence},
 };
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
@@ -14,7 +15,7 @@ use std::{
 };
 
 const DATABASE_FILE: &str = "search-index.sqlite3";
-const SCHEMA_VERSION: i64 = 2;
+const SCHEMA_VERSION: i64 = 3;
 const APPLICATION_ID: i64 = 0x4341_4c4d;
 const MAX_QUERY_CHARACTERS: usize = 120;
 const MAX_EXCERPT_CHARACTERS: usize = 240;
@@ -24,13 +25,16 @@ const SUGGESTION_LIMIT: i64 = 8;
 
 const UPSERT_NOTE: &str = "
     INSERT INTO notes (
-        key, normalized_key, title, normalized_title, body, revision, modified_at_ms
-    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+        key, normalized_key, title, normalized_title, body,
+        search_title, search_body, revision, modified_at_ms
+    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
     ON CONFLICT(key) DO UPDATE SET
         normalized_key = excluded.normalized_key,
         title = excluded.title,
         normalized_title = excluded.normalized_title,
         body = excluded.body,
+        search_title = excluded.search_title,
+        search_body = excluded.search_body,
         revision = excluded.revision,
         modified_at_ms = excluded.modified_at_ms
     WHERE notes.normalized_key <> excluded.normalized_key
@@ -247,7 +251,7 @@ impl SearchState {
     }
 
     pub fn suggest_notes(&self, query: &str) -> Result<Vec<NoteReference>, SearchError> {
-        let canonical_query = canonicalize_query(query)?.to_lowercase();
+        let canonical_query = fold_literal_search(&canonicalize_query(query)?);
         self.query(|connection| suggest_notes_connection(connection, &canonical_query))
     }
 
@@ -384,6 +388,8 @@ fn initialize_schema(connection: &Connection) -> Result<(), SearchError> {
                 title TEXT NOT NULL,
                 normalized_title TEXT NOT NULL,
                 body TEXT NOT NULL,
+                search_title TEXT NOT NULL,
+                search_body TEXT NOT NULL,
                 revision TEXT NOT NULL,
                 modified_at_ms INTEGER NOT NULL
             );
@@ -406,31 +412,31 @@ fn initialize_schema(connection: &Connection) -> Result<(), SearchError> {
             ON note_links(target_normalized_key);
 
             CREATE VIRTUAL TABLE note_fts USING fts5(
-                title,
-                body,
+                search_title,
+                search_body,
                 content='notes',
                 content_rowid='id',
                 tokenize='trigram case_sensitive 0 remove_diacritics 1'
             );
 
             CREATE TRIGGER notes_ai AFTER INSERT ON notes BEGIN
-                INSERT INTO note_fts(rowid, title, body)
-                VALUES (new.id, new.title, new.body);
+                INSERT INTO note_fts(rowid, search_title, search_body)
+                VALUES (new.id, new.search_title, new.search_body);
             END;
 
             CREATE TRIGGER notes_ad AFTER DELETE ON notes BEGIN
-                INSERT INTO note_fts(note_fts, rowid, title, body)
-                VALUES ('delete', old.id, old.title, old.body);
+                INSERT INTO note_fts(note_fts, rowid, search_title, search_body)
+                VALUES ('delete', old.id, old.search_title, old.search_body);
             END;
 
-            CREATE TRIGGER notes_au AFTER UPDATE OF title, body ON notes BEGIN
-                INSERT INTO note_fts(note_fts, rowid, title, body)
-                VALUES ('delete', old.id, old.title, old.body);
-                INSERT INTO note_fts(rowid, title, body)
-                VALUES (new.id, new.title, new.body);
+            CREATE TRIGGER notes_au AFTER UPDATE OF search_title, search_body ON notes BEGIN
+                INSERT INTO note_fts(note_fts, rowid, search_title, search_body)
+                VALUES ('delete', old.id, old.search_title, old.search_body);
+                INSERT INTO note_fts(rowid, search_title, search_body)
+                VALUES (new.id, new.search_title, new.search_body);
             END;
 
-            PRAGMA user_version = 2;
+            PRAGMA user_version = 3;
             ",
         )
         .map_err(|error| SearchError::sqlite("Could not initialize the search index", error))
@@ -685,6 +691,8 @@ fn upsert_note(connection: &Connection, note: &IndexedNote) -> Result<(), Search
                 note.title,
                 normalize_title(&note.title),
                 note.body,
+                fold_literal_search(&note.title),
+                fold_literal_search(&note.body),
                 note.revision,
                 note.modified_at_ms,
             ],
@@ -756,6 +764,7 @@ fn unlinked_mentions_connection(
         return Ok(Vec::new());
     };
     let normalized_title = normalize_title(&title);
+    let search_title = fold_literal_search(&title);
     let title_count: i64 = connection
         .query_row(
             "SELECT count(*) FROM notes WHERE normalized_title = ?1",
@@ -763,11 +772,11 @@ fn unlinked_mentions_connection(
             |row| row.get(0),
         )
         .map_err(|error| SearchError::sqlite("Could not resolve unlinked mention title", error))?;
-    if title_count != 1 || title.is_empty() {
+    if title_count != 1 || search_title.is_empty() {
         return Ok(Vec::new());
     }
 
-    let query = if title.chars().count() >= 3 {
+    let query = if search_title.chars().count() >= 3 {
         "SELECT notes.key, notes.title, notes.body
          FROM note_fts JOIN notes ON notes.id = note_fts.rowid
          WHERE note_fts MATCH ?1 AND notes.key <> ?2
@@ -776,7 +785,7 @@ fn unlinked_mentions_connection(
         "SELECT key, title, body FROM notes
          WHERE key <> ?2 ORDER BY normalized_title, key"
     };
-    let expression = format!("body : \"{}\"", title.replace('"', "\"\""));
+    let expression = format!("search_body : \"{}\"", search_title.replace('"', "\"\""));
     let mut statement = connection
         .prepare(query)
         .map_err(|error| SearchError::sqlite("Could not prepare unlinked mentions", error))?;
@@ -872,13 +881,15 @@ fn search_connection(
         });
     }
 
-    let Some(expression) = fts_expression(canonical_query) else {
+    let search_query = fold_literal_search(canonical_query);
+    let Some(expression) = fts_expression(&search_query) else {
         return Ok(SearchResponse::empty());
     };
     let mut statement = connection
         .prepare(
             "SELECT notes.key,
                     notes.title,
+                    notes.body,
                     snippet(note_fts, 1, '', '', ' … ', 96)
              FROM note_fts
              JOIN notes ON notes.id = note_fts.rowid
@@ -889,11 +900,12 @@ fn search_connection(
         .map_err(|error| SearchError::sqlite("Could not prepare note search", error))?;
     let rows = statement
         .query_map(params![expression, RESULT_LIMIT], |row| {
-            let excerpt: String = row.get(2)?;
+            let body: String = row.get(2)?;
+            let fallback_excerpt: String = row.get(3)?;
             Ok(SearchHit {
                 key: row.get(0)?,
                 title: row.get(1)?,
-                excerpt: clean_excerpt(&excerpt),
+                excerpt: matching_excerpt(&body, canonical_query, &fallback_excerpt),
             })
         })
         .map_err(|error| SearchError::sqlite("Could not search notes", error))?;
@@ -920,11 +932,21 @@ fn canonicalize_query(query: &str) -> Result<String, SearchError> {
 }
 
 fn normalize_title(title: &str) -> String {
-    title
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        .to_lowercase()
+    fold_literal_search(&title.split_whitespace().collect::<Vec<_>>().join(" "))
+}
+
+fn matching_excerpt(body: &str, query: &str, fallback: &str) -> String {
+    let mut phrases = std::iter::once(query)
+        .chain(query.split_whitespace())
+        .filter(|phrase| phrase.chars().count() >= 3)
+        .collect::<Vec<_>>();
+    phrases.sort_by_key(|phrase| std::cmp::Reverse(phrase.chars().count()));
+    for phrase in phrases {
+        if let Some(occurrence) = find_folded_literal(body, phrase, |_| true) {
+            return excerpt(body, occurrence).text;
+        }
+    }
+    clean_excerpt(fallback)
 }
 
 fn fts_expression(query: &str) -> Option<String> {

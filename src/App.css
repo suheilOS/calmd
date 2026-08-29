@@ -95,6 +95,11 @@
   font-size: 0.92em;
 }
 
+.note-preview-content :not(pre) > code,
+.note-preview-link {
+  unicode-bidi: isolate;
+}
+
 .note-preview-content :not(pre) > code {
   background: var(--color-active);
   padding: 0.1em 0.3em;
@@ -162,6 +167,10 @@
   color: var(--color-active-ink);
 }
 
+.markdown-editor .cm-line {
+  text-align: start;
+}
+
 .markdown-editor .cm-heading,
 .markdown-editor .cm-heading-source {
   color: var(--color-ink);
@@ -216,6 +225,13 @@
   text-decoration-skip-ink: auto;
   text-decoration-thickness: from-font;
   text-underline-position: from-font;
+}
+
+.markdown-editor .cm-inline-code,
+.markdown-editor .cm-link,
+.markdown-editor .cm-url,
+.markdown-editor .cm-wiki-link {
+  unicode-bidi: isolate;
 }
 
 .markdown-editor .cm-wiki-link {
@@ -301,10 +317,12 @@
 .markdown-editor .cm-heading-source-6 { font-size: var(--text-editor-heading-3); margin-inline-start: -7ch; width: 7ch; }
 
 .markdown-editor .cm-fenced-code-line {
+  direction: ltr;
   font-family: var(--font-code);
   font-size: 0.9em;
   line-height: 1.45;
   padding-inline: 0.75rem;
+  text-align: left;
 }
 
 .markdown-editor .cm-fenced-code-line .cm-monospace {
@@ -398,6 +416,7 @@
   color: var(--color-syntax);
   display: inline-block;
   text-align: start;
+  unicode-bidi: isolate;
 }
 
 .markdown-editor .cm-task-marker {
@@ -409,7 +428,8 @@
   block-size: 1em;
   cursor: pointer;
   inline-size: 1em;
-  margin: 0 0.5ch 0 0;
+  margin-block: 0;
+  margin-inline: 0 0.5ch;
   vertical-align: -0.08em;
 }
 

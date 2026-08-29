@@ -81,6 +81,7 @@ export function NoteEditor() {
           autoComplete="off"
           className="block min-w-0 flex-1 resize-none overflow-hidden border-0 bg-transparent p-0 text-large text-ink outline-none break-words placeholder:text-placeholder focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-faint [field-sizing:content]"
           id="note-title"
+          dir="auto"
           maxLength={MAX_NOTE_TITLE_LENGTH}
           name="title"
           onChange={(event) => {
@@ -151,7 +152,7 @@ export function NoteEditor() {
 
       {saveMessage ? (
         <div className="fixed inset-x-16 bottom-6 flex items-center justify-center gap-3 text-small text-secondary" role="alert">
-          <span>{saveMessage}</span>
+          <bdi dir="auto">{saveMessage}</bdi>
           {state.note.conflict ? (
             <Button
               className="min-h-10 rounded-xl bg-surface px-3 text-ink transition-[background-color,transform] duration-150 ease-out hover:bg-hover focus-visible:bg-active focus-visible:text-active-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-faint active:scale-[0.96]"

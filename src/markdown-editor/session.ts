@@ -32,6 +32,7 @@ import {
   Transaction,
 } from '@codemirror/state'
 import {
+  Decoration,
   Direction,
   drawSelection,
   dropCursor,
@@ -382,6 +383,27 @@ const markdownBackgroundLayer = layer({
   },
 })
 
+const automaticDirectionLine = Decoration.line({ attributes: { dir: 'auto' } })
+
+const markdownLineDirection = [
+  EditorView.perLineTextDirection.of(true),
+  EditorView.decorations.of((view) => {
+    const lineStarts = new Set<number>()
+    for (const range of view.visibleRanges) {
+      let line = view.state.doc.lineAt(range.from)
+      while (true) {
+        lineStarts.add(line.from)
+        if (line.to >= range.to || line.number === view.state.doc.lines) break
+        line = view.state.doc.line(line.number + 1)
+      }
+    }
+    return Decoration.set(
+      [...lineStarts].map((from) => automaticDirectionLine.range(from)),
+      true,
+    )
+  }),
+]
+
 const editorExtensions = [
   highlightSpecialChars(),
   drawSelection(),
@@ -424,6 +446,7 @@ const editorExtensions = [
     indentWithTab,
   ]),
   EditorView.lineWrapping,
+  markdownLineDirection,
   placeholder('Start writing…'),
   editorTheme,
   markdownBackgroundLayer,

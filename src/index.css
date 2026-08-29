@@ -4,7 +4,7 @@
 @import 'tailwindcss';
 
 @theme {
-  --font-code: "JetBrains Mono Variable", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --font-code: "JetBrains Mono Variable", "Rubik Variable", ui-monospace, "SFMono-Regular", Consolas, monospace;
 
   --text-large: clamp(1.5rem, 3vw, 1.75rem);
   --text-large--font-weight: 500;

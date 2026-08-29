@@ -4,6 +4,7 @@ import type { SyntaxNode } from '@lezer/common'
 import {
   Decoration,
   type DecorationSet,
+  Direction,
   EditorView,
   ViewPlugin,
   type ViewUpdate,
@@ -54,6 +55,7 @@ class ListMarkerWidget extends WidgetType {
   toDOM(view: EditorView) {
     const marker = view.dom.ownerDocument.createElement('span')
     marker.className = 'cm-list-marker'
+    marker.dir = 'ltr'
     marker.textContent = this.label
     marker.style.width = `${Math.max(1, this.label.length)}ch`
     marker.setAttribute('aria-hidden', 'true')
@@ -88,6 +90,7 @@ class TaskMarkerWidget extends WidgetType {
     const document = view.dom.ownerDocument
     const wrapper = document.createElement('span')
     wrapper.className = 'cm-task-marker'
+    wrapper.dir = 'ltr'
     wrapper.style.width = `${this.sourceWidth}ch`
     const checkbox = document.createElement('input')
     checkbox.className = 'cm-task-checkbox'
@@ -181,6 +184,7 @@ function livePreviewDecorations(
   resolvedTargets: ReadonlyMap<string, boolean | null>,
 ) {
   const decorations: Range<Decoration>[] = []
+  const bidiIsolates: Range<Decoration>[] = []
   const ranges = decorationRanges(view)
 
   for (const visible of ranges) {
@@ -193,9 +197,13 @@ function livePreviewDecorations(
         if (node.name === 'WikiLink') {
           const parsed = parseWikiLinkText(view.state.sliceDoc(node.from, node.to))
           const missing = parsed && resolvedTargets.get(parsed.target) === false
-          decorations.push(Decoration.mark({
+          const link = Decoration.mark({
+            attributes: { dir: 'auto' },
+            bidiIsolate: null,
             class: missing ? 'cm-wiki-link cm-wiki-link-missing' : 'cm-wiki-link',
-          }).range(node.from, node.to))
+          }).range(node.from, node.to)
+          decorations.push(link)
+          bidiIsolates.push(link)
           for (const range of wikiLinkHiddenSyntaxRanges(
             node,
             childRanges(node),
@@ -215,10 +223,16 @@ function livePreviewDecorations(
         }
 
         if (node.name === 'InlineCode' || node.name === 'URL') {
-          decorations.push(Decoration.mark({
-            attributes: { spellcheck: 'false' },
-            class: node.name === 'InlineCode' ? 'cm-inline-code' : undefined,
-          }).range(node.from, node.to))
+          const codeOrUrl = Decoration.mark({
+            attributes: {
+              dir: 'ltr',
+              spellcheck: 'false',
+            },
+            bidiIsolate: Direction.LTR,
+            class: node.name === 'InlineCode' ? 'cm-inline-code' : 'cm-url',
+          }).range(node.from, node.to)
+          decorations.push(codeOrUrl)
+          bidiIsolates.push(codeOrUrl)
         }
 
         if (node.name === 'Highlight') {
@@ -239,7 +253,13 @@ function livePreviewDecorations(
         }
 
         if (node.name === 'Link') {
-          decorations.push(Decoration.mark({ class: 'cm-link' }).range(node.from, node.to))
+          const link = Decoration.mark({
+            attributes: { dir: 'auto' },
+            bidiIsolate: null,
+            class: 'cm-link',
+          }).range(node.from, node.to)
+          decorations.push(link)
+          bidiIsolates.push(link)
           if (selectionsTouch(view, node)) return
           const marks = childRanges(node).filter((child) => child.name === 'LinkMark')
           if (marks.length >= 4) {
@@ -407,7 +427,10 @@ function livePreviewDecorations(
     })
   }
 
-  return Decoration.set(decorations, true)
+  return {
+    bidiIsolates: Decoration.set(bidiIsolates, true),
+    decorations: Decoration.set(decorations, true),
+  }
 }
 
 function wikiLinkTargets(view: EditorView) {
@@ -430,8 +453,9 @@ function wikiLinkTargets(view: EditorView) {
 export function livePreview(
   resolveWikiLink: (target: string) => Promise<boolean | null>,
 ) {
-  return ViewPlugin.fromClass(class {
-    decorations: DecorationSet
+  const plugin = ViewPlugin.fromClass(class {
+    decorations: DecorationSet = Decoration.none
+    bidiIsolates: DecorationSet = Decoration.none
     private active = true
     private dragging = false
     private parseFrame: number | null = null
@@ -445,7 +469,7 @@ export function livePreview(
     constructor(view: EditorView) {
       this.view = view
       this.window = view.dom.ownerDocument.defaultView ?? window
-      this.decorations = livePreviewDecorations(view, this.resolvedTargets)
+      this.rebuildDecorations(view)
       view.dom.addEventListener('pointerdown', this.startDrag)
       this.window.addEventListener('pointerup', this.finishDrag)
       this.window.addEventListener('pointercancel', this.finishDrag)
@@ -476,7 +500,7 @@ export function livePreview(
         || dragFinished
         || (update.selectionSet && !this.dragging)
       ) {
-        this.decorations = livePreviewDecorations(update.view, this.resolvedTargets)
+        this.rebuildDecorations(update.view)
       }
       if (
         update.docChanged
@@ -508,6 +532,12 @@ export function livePreview(
       if (!this.dragging || !this.active) return
       this.dragging = false
       this.view.dispatch({ effects: reconcileAfterDrag.of(null) })
+    }
+
+    private rebuildDecorations(view: EditorView) {
+      const built = livePreviewDecorations(view, this.resolvedTargets)
+      this.decorations = built.decorations
+      this.bidiIsolates = built.bidiIsolates
     }
 
     private scheduleParse(view: EditorView) {
@@ -570,6 +600,13 @@ export function livePreview(
   }, {
     decorations: (plugin) => plugin.decorations,
   })
+
+  return [
+    plugin,
+    EditorView.bidiIsolatedRanges.of((view) =>
+      view.plugin(plugin)?.bidiIsolates ?? Decoration.none,
+    ),
+  ]
 }
 
 const wikiLinkResolutionChanged = StateEffect.define<null>()

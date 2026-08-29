@@ -1,4 +1,4 @@
-use crate::links::non_prose_ranges;
+use crate::{links::non_prose_ranges, text_normalization::find_folded_literal};
 use serde::Serialize;
 use std::ops::Range;
 
@@ -22,36 +22,21 @@ pub struct MentionExcerpt {
 }
 
 pub fn first_occurrence(body: &str, title: &str) -> Option<Range<usize>> {
-    let folded_title = title.to_lowercase();
     let excluded = non_prose_ranges(body);
 
-    for (start, _) in body.char_indices() {
-        let mut end = start;
-        let mut folded = String::new();
-        for character in body[start..].chars() {
-            end += character.len_utf8();
-            folded.extend(character.to_lowercase());
-            if folded.len() >= folded_title.len() {
-                break;
-            }
-        }
-        if folded == folded_title
-            && !excluded
-                .iter()
-                .any(|range| range.start < end && start < range.end)
-            && !body[..start]
+    find_folded_literal(body, title, |range| {
+        !excluded
+            .iter()
+            .any(|excluded| excluded.start < range.end && range.start < excluded.end)
+            && !body[..range.start]
                 .chars()
                 .next_back()
                 .is_some_and(char::is_alphanumeric)
-            && !body[end..]
+            && !body[range.end..]
                 .chars()
                 .next()
                 .is_some_and(char::is_alphanumeric)
-        {
-            return Some(start..end);
-        }
-    }
-    None
+    })
 }
 
 pub fn excerpt(body: &str, occurrence: Range<usize>) -> MentionExcerpt {
@@ -136,6 +121,9 @@ mod tests {
             first_occurrence("NotTarget Targeted Target", "Target"),
             Some(19..25)
         );
+        let arabic = "يفيد التأملُ في الكتابة";
+        let occurrence = first_occurrence(arabic, "التَّأمل").unwrap();
+        assert_eq!(&arabic[occurrence], "التأملُ");
     }
 
     #[test]

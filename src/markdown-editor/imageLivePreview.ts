@@ -134,6 +134,7 @@ class ImageWidget extends WidgetType {
     const document = view.dom.ownerDocument
     const wrapper = document.createElement('span')
     wrapper.className = this.range.block ? 'cm-image cm-image-block' : 'cm-image cm-image-inline'
+    wrapper.dir = 'auto'
     wrapper.addEventListener('mousedown', (event) => {
       event.preventDefault()
       view.dom.ownerDocument.defaultView?.setTimeout(() => {

@@ -138,7 +138,12 @@ fn trigram_search_handles_unicode_diacritics_and_metacharacters() {
             vault.path(),
             &[
                 note("Japanese.md", "静かな考え", "検索できる本文", "one"),
-                note("Cafe.md", "Café notes", "C++ and quoted \"text\"", "two"),
+                note(
+                    "Cafe.md",
+                    "Café notes",
+                    "C++ and quoted \"text\". A long opening before the matching résumé passage",
+                    "two",
+                ),
             ],
         )
         .unwrap();
@@ -148,12 +153,44 @@ fn trigram_search_handles_unicode_diacritics_and_metacharacters() {
         "Japanese.md"
     );
     assert_eq!(search.search("cafe").unwrap().results[0].key, "Cafe.md");
+    let diacritic_match = search.search("resume").unwrap();
+    assert_eq!(diacritic_match.results[0].key, "Cafe.md");
+    assert!(diacritic_match.results[0].excerpt.contains("résumé"));
     assert_eq!(search.search("C++").unwrap().results[0].key, "Cafe.md");
     assert_eq!(
         search.search("quoted \"text\"").unwrap().results[0].key,
         "Cafe.md"
     );
     assert!(search.search("\"").is_ok());
+}
+
+#[test]
+fn arabic_search_handles_titles_bodies_diacritics_and_mixed_text() {
+    let data = tempdir().unwrap();
+    let vault = tempdir().unwrap();
+    let search = state(data.path());
+    search
+        .reconcile(
+            vault.path(),
+            &[
+                note(
+                    "Arabic.md",
+                    "التَّأمل الهادئ",
+                    "ملاحظات عن Markdown والإِصدار 6 في عام 2026",
+                    "one",
+                ),
+                note("Other.md", "ملاحظة أخرى", "نص مختلف", "two"),
+            ],
+        )
+        .unwrap();
+
+    let title_match = search.search("التأمل الهادئ").unwrap();
+    assert!(title_match.has_exact_match);
+    assert_eq!(title_match.results[0].key, "Arabic.md");
+    let body_match = search.search("Markdown والإصدار 6").unwrap();
+    assert_eq!(body_match.results[0].key, "Arabic.md");
+    assert!(body_match.results[0].excerpt.contains("الإِصدار"));
+    assert_eq!(search.suggest_notes("الهاد").unwrap()[0].key, "Arabic.md");
 }
 
 #[test]
@@ -341,6 +378,31 @@ fn unlinked_mentions_support_short_titles_and_reject_ambiguous_titles() {
         )
         .unwrap();
     assert!(search.unlinked_mentions("AI.md").unwrap().is_empty());
+}
+
+#[test]
+fn unlinked_mentions_ignore_arabic_harakat_but_preserve_the_excerpt() {
+    let data = tempdir().unwrap();
+    let vault = tempdir().unwrap();
+    let search = state(data.path());
+    search
+        .reconcile(
+            vault.path(),
+            &[
+                note("Target.md", "التَّأمل", "", "one"),
+                note("Source.md", "مصدر", "يفيد التأملُ في ترتيب الأفكار", "two"),
+                note("Short-target.md", "نَص", "", "three"),
+                note("Short-source.md", "قصير", "هذا نصٌ واضح", "four"),
+            ],
+        )
+        .unwrap();
+
+    let mentions = search.unlinked_mentions("Target.md").unwrap();
+    assert_eq!(mentions[0].key, "Source.md");
+    assert!(mentions[0].excerpt.contains("التأملُ"));
+    let short_mentions = search.unlinked_mentions("Short-target.md").unwrap();
+    assert_eq!(short_mentions[0].key, "Short-source.md");
+    assert!(short_mentions[0].excerpt.contains("نصٌ"));
 }
 
 #[test]
