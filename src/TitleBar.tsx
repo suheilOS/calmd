@@ -3,6 +3,7 @@ import { Tooltip } from '@base-ui/react/tooltip'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useEffect, type ReactElement, type ReactNode } from 'react'
 import { KeyboardShortcutsDialog } from './KeyboardShortcutsDialog'
+import { Kbd } from './Kbd'
 
 const appWindow = getCurrentWindow()
 
@@ -69,14 +70,17 @@ const controlClassName =
 const navigationControlClassName =
   `${controlClassName} disabled:cursor-default disabled:text-faint disabled:hover:bg-transparent disabled:hover:text-faint disabled:active:scale-100`
 
-function TitleBarTooltip({ children, label }: { children: ReactElement; label: string }) {
+function TitleBarTooltip({ children, label, shortcut }: { children: ReactElement; label: string; shortcut?: string }) {
   return (
     <Tooltip.Root>
       <Tooltip.Trigger render={children} />
       <Tooltip.Portal>
         <Tooltip.Positioner className="z-50" side="bottom" sideOffset={6}>
-          <Tooltip.Popup className="origin-[var(--transform-origin)] rounded-lg bg-surface px-2 py-1 text-small text-ink shadow-[0_8px_20px_rgb(0_0_0/0.20)] transition-[opacity,scale] duration-100 ease-out data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
-            {label}
+          <Tooltip.Popup className="origin-[var(--transform-origin)] rounded-lg bg-surface p-1.5 text-sm text-ink shadow-[0_8px_20px_rgb(0_0_0/0.20)] transition-[opacity,scale] duration-100 ease-out data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
+            <span className="inline-flex items-center gap-1.5">
+              <span>{label}</span>
+              {shortcut ? <Kbd>{shortcut}</Kbd> : null}
+            </span>
           </Tooltip.Popup>
         </Tooltip.Positioner>
       </Tooltip.Portal>
@@ -122,7 +126,7 @@ export function TitleBar({
       <Tooltip.Provider delay={500} timeout={300}>
         {navigation ? (
           <div className="flex" role="group" aria-label="Navigation controls">
-            <TitleBarTooltip label="Back (Ctrl+[)">
+            <TitleBarTooltip label="Back" shortcut="Ctrl+[">
               <Button
                 aria-keyshortcuts="Control+[ Meta+["
                 aria-label="Back"
@@ -134,7 +138,7 @@ export function TitleBar({
                 <BackIcon />
               </Button>
             </TitleBarTooltip>
-            <TitleBarTooltip label="Forward (Ctrl+])">
+            <TitleBarTooltip label="Forward" shortcut="Ctrl+]">
               <Button
                 aria-keyshortcuts="Control+] Meta+]"
                 aria-label="Forward"
@@ -146,7 +150,7 @@ export function TitleBar({
                 <ForwardIcon />
               </Button>
             </TitleBarTooltip>
-            <TitleBarTooltip label="Home (Alt+H)">
+            <TitleBarTooltip label="Home" shortcut="Alt+H">
               <Button
                 aria-keyshortcuts="Alt+H"
                 aria-label="Home"

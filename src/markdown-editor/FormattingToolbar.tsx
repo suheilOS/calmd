@@ -8,6 +8,7 @@ import type {
   MarkdownInlineFormat,
 } from './contracts'
 import type { MarkdownBlockKind } from './markdownBlockCommands'
+import { Kbd } from '../Kbd'
 
 type FormattingToolbarProps = {
   focusRequested: boolean
@@ -165,8 +166,11 @@ function FormatButton({ format, icon, label, onChange, shortcut, snapshot }: For
       </Toolbar.Button>
       <Tooltip.Portal>
         <Tooltip.Positioner className="z-[70]" side="bottom" sideOffset={6}>
-          <Tooltip.Popup className="rounded-lg bg-surface px-2 py-1 text-small text-ink shadow-[0_8px_20px_rgb(0_0_0/0.20)]">
-            {label} <span className="text-faint">{shortcut}</span>
+          <Tooltip.Popup className="rounded-lg bg-surface p-1.5 text-sm text-ink shadow-[0_8px_20px_rgb(0_0_0/0.20)]">
+            <span className="inline-flex items-center gap-1.5">
+              <span>{label}</span>
+              <Kbd>{shortcut}</Kbd>
+            </span>
           </Tooltip.Popup>
         </Tooltip.Positioner>
       </Tooltip.Portal>

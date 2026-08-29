@@ -169,7 +169,7 @@ export function BacklinksPopover({
         />
         <Tooltip.Portal>
           <Tooltip.Positioner className="z-50" side="top" sideOffset={6}>
-            <Tooltip.Popup className="origin-[var(--transform-origin)] rounded-lg bg-surface px-2 py-1 text-small text-ink shadow-[0_8px_20px_rgb(0_0_0/0.20)] transition-[opacity,scale] duration-100 ease-out data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
+            <Tooltip.Popup className="origin-[var(--transform-origin)] rounded-lg bg-surface p-1.5 text-sm text-ink shadow-[0_8px_20px_rgb(0_0_0/0.20)] transition-[opacity,scale] duration-100 ease-out data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
               Links
             </Tooltip.Popup>
           </Tooltip.Positioner>
