@@ -138,7 +138,7 @@
   background: var(--color-surface);
   border: 0;
   border-radius: 0.75rem;
-  box-shadow: 0 8px 24px oklch(0 0 0 / 0.18);
+  box-shadow: 0 8px 20px rgb(0 0 0 / 20%);
   color: var(--color-ink);
   padding: 0.5rem;
 }

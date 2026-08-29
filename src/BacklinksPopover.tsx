@@ -169,7 +169,7 @@ export function BacklinksPopover({
         />
         <Tooltip.Portal>
           <Tooltip.Positioner className="z-50" side="top" sideOffset={6}>
-            <Tooltip.Popup className="origin-[var(--transform-origin)] rounded-lg bg-surface px-2 py-1 text-small text-ink shadow-[0_4px_12px_oklch(0_0_0/0.16)] transition-[opacity,scale] duration-100 ease-out data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
+            <Tooltip.Popup className="origin-[var(--transform-origin)] rounded-lg bg-surface px-2 py-1 text-small text-ink shadow-[0_8px_20px_rgb(0_0_0/0.20)] transition-[opacity,scale] duration-100 ease-out data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
               Links
             </Tooltip.Popup>
           </Tooltip.Positioner>
@@ -177,7 +177,7 @@ export function BacklinksPopover({
       </Tooltip.Root>
       <Popover.Portal>
         <Popover.Positioner align="end" positionMethod="fixed" side="top" sideOffset={8}>
-          <Popover.Popup className="backlinks-popover max-h-[min(28rem,calc(100vh-5rem))] w-72 max-w-[calc(100vw-2.5rem)] overflow-y-auto rounded-2xl bg-surface p-2 text-ink shadow-[0_8px_24px_oklch(0_0_0/0.18)] outline-none">
+          <Popover.Popup className="backlinks-popover max-h-[min(28rem,calc(100vh-5rem))] w-72 max-w-[calc(100vw-2.5rem)] overflow-y-auto rounded-2xl bg-surface p-2 text-ink shadow-[0_25px_50px_-12px_rgb(0_0_0/0.22)] outline-none">
             {hasNoLinksOrMentions ? (
               <p className="px-2 py-2 text-small leading-normal text-secondary">No links or mentions</p>
             ) : (

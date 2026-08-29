@@ -81,7 +81,7 @@ export function NotePreviewPopover({
         >
           <Popover.Popup
             aria-label="Note preview"
-            className="note-preview-popover w-[24rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl bg-surface text-ink shadow-[0_12px_36px_oklch(0_0_0/0.22)] outline-none"
+            className="note-preview-popover w-[24rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl bg-surface text-ink shadow-[0_16px_40px_rgb(0_0_0/0.22)] outline-none"
             finalFocus={false}
             initialFocus={false}
             onPointerEnter={(event) => {

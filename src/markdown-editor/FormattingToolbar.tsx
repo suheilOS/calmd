@@ -26,7 +26,7 @@ const itemClassName =
   'grid h-10 cursor-default select-none grid-cols-[1rem_1fr_1rem] items-center gap-2.5 rounded-lg px-3 text-small text-ink outline-none data-[highlighted]:bg-hover'
 
 const popupClassName =
-  'origin-[var(--transform-origin)] min-w-48 rounded-[0.875rem] bg-surface p-1.5 text-ink shadow-[0_8px_24px_oklch(0_0_0/0.18)] outline-none transition-[scale,opacity] duration-100 ease-out data-[ending-style]:scale-[0.98] data-[ending-style]:opacity-0 data-[starting-style]:scale-[0.98] data-[starting-style]:opacity-0 motion-reduce:transition-opacity'
+  'origin-[var(--transform-origin)] min-w-48 rounded-[0.875rem] bg-surface p-1.5 text-ink shadow-[0_8px_20px_rgb(0_0_0/0.20)] outline-none transition-[scale,opacity] duration-100 ease-out data-[ending-style]:scale-[0.98] data-[ending-style]:opacity-0 data-[starting-style]:scale-[0.98] data-[starting-style]:opacity-0 motion-reduce:transition-opacity'
 
 const headingNumberPaths = {
   1: 'M11.5 6.5 13 5v6',
@@ -165,7 +165,7 @@ function FormatButton({ format, icon, label, onChange, shortcut, snapshot }: For
       </Toolbar.Button>
       <Tooltip.Portal>
         <Tooltip.Positioner className="z-[70]" side="bottom" sideOffset={6}>
-          <Tooltip.Popup className="rounded-lg bg-surface px-2 py-1 text-small text-ink shadow-[0_4px_12px_oklch(0_0_0/0.16)]">
+          <Tooltip.Popup className="rounded-lg bg-surface px-2 py-1 text-small text-ink shadow-[0_8px_20px_rgb(0_0_0/0.20)]">
             {label} <span className="text-faint">{shortcut}</span>
           </Tooltip.Popup>
         </Tooltip.Positioner>
@@ -220,7 +220,7 @@ export function FormattingToolbar({
           sideOffset={8}
         >
           <Popover.Popup
-            className="rounded-xl bg-surface p-1 shadow-[0_8px_24px_oklch(0_0_0/0.18)] outline-none transition-[scale,opacity] duration-100 ease-out data-[ending-style]:scale-[0.98] data-[ending-style]:opacity-0 data-[starting-style]:scale-[0.98] data-[starting-style]:opacity-0 motion-reduce:transition-opacity"
+            className="rounded-xl bg-surface p-1 shadow-[0_8px_20px_rgb(0_0_0/0.20)] outline-none transition-[scale,opacity] duration-100 ease-out data-[ending-style]:scale-[0.98] data-[ending-style]:opacity-0 data-[starting-style]:scale-[0.98] data-[starting-style]:opacity-0 motion-reduce:transition-opacity"
             finalFocus={false}
             initialFocus={false}
             onKeyDown={(event) => {

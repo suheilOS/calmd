@@ -23,8 +23,8 @@
   --text-editor-heading-3: 1.125rem;
 
   /* Flexoki light: paper, ink, and warm interface neutrals. */
-  --color-canvas: oklch(0.990 0.016 95.219);
-  --color-page: oklch(0.990 0.016 95.219);
+  --color-canvas: oklch(0.985 0 0);
+  --color-page: oklch(0.985 0 0);
   --color-ink: oklch(0.170 0.002 17.321);
   --color-body: oklch(0.365 0.004 67.689);
   --color-secondary: oklch(0.538 0.008 97.449);
@@ -32,9 +32,9 @@
   --color-faint: oklch(0.772 0.013 96.470);
   --color-placeholder: oklch(0.772 0.013 96.470);
   --color-syntax: oklch(0.772 0.013 96.470);
-  --color-border: oklch(0.917 0.015 98.298);
-  --color-divider: oklch(0.917 0.015 98.298 / 0.7);
-  --color-surface: oklch(0.954 0.015 98.288);
+  --color-border: oklch(0.900 0 0);
+  --color-divider: oklch(0.900 0 0 / 0.7);
+  --color-surface: oklch(1 0 0);
   --color-hover: oklch(0.881 0.014 97.463);
   --color-active: oklch(0.846 0.014 102.053);
   --color-active-ink: oklch(0.170 0.002 17.321);
@@ -91,8 +91,8 @@ html {
 @media (prefers-color-scheme: dark) {
   :root {
     /* Substack-inspired dark neutrals: near-black canvas and soft editorial text. */
-    --color-canvas: oklch(0.190 0 0);
-    --color-page: oklch(0.190 0 0);
+    --color-canvas: oklch(0.180 0 0);
+    --color-page: oklch(0.180 0 0);
     --color-ink: oklch(0.960 0.010 85);
     --color-body: oklch(0.920 0.012 85);
     --color-secondary: oklch(0.780 0.008 85);
@@ -100,9 +100,9 @@ html {
     --color-faint: oklch(0.500 0 0);
     --color-placeholder: oklch(0.500 0 0);
     --color-syntax: oklch(0.500 0 0);
-    --color-border: oklch(0.300 0 0);
-    --color-divider: oklch(0.300 0 0 / 0.7);
-    --color-surface: oklch(0.220 0 0);
+    --color-border: oklch(0.360 0 0);
+    --color-divider: oklch(0.360 0 0 / 0.7);
+    --color-surface: oklch(0.240 0 0);
     --color-hover: oklch(0.280 0 0);
     --color-active: oklch(0.350 0 0);
     --color-active-ink: oklch(0.960 0.010 85);

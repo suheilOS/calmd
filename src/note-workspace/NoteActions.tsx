@@ -44,7 +44,7 @@ export function NoteActions({
         </Menu.Trigger>
         <Menu.Portal>
           <Menu.Positioner align="end" className="z-40" side="bottom" sideOffset={6}>
-            <Menu.Popup className="w-44 rounded-xl bg-surface p-1.5 text-small text-ink shadow-[0_8px_24px_oklch(0_0_0/0.18)] outline-none">
+            <Menu.Popup className="w-44 rounded-xl bg-surface p-1.5 text-small text-ink shadow-[0_8px_20px_rgb(0_0_0/0.20)] outline-none">
               {menuItems}
               {menuItems ? <Menu.Separator className="mx-2 my-1 h-px bg-divider" /> : null}
               <Menu.Item
