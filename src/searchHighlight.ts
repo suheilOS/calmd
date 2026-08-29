@@ -92,9 +92,8 @@ export function segmentSearchMatches(text: string, query: string): SearchTextSeg
 
   const matches: Array<{ from: number; to: number }> = []
   for (const candidate of occurrences) {
-    if (!matches.some((accepted) =>
-      accepted.from < candidate.to && candidate.from < accepted.to,
-    )) {
+    const lastAccepted = matches.at(-1)
+    if (!lastAccepted || candidate.from >= lastAccepted.to) {
       matches.push(candidate)
     }
   }

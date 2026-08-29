@@ -1,4 +1,7 @@
-use crate::{links::non_prose_ranges, text_normalization::find_folded_literal};
+use crate::{
+    links::non_prose_ranges,
+    text_normalization::{find_folded_literal, is_ignored_arabic_mark},
+};
 use serde::Serialize;
 use std::ops::Range;
 
@@ -30,7 +33,8 @@ pub fn first_occurrence(body: &str, title: &str) -> Option<Range<usize>> {
             .any(|excluded| excluded.start < range.end && range.start < excluded.end)
             && !body[..range.start]
                 .chars()
-                .next_back()
+                .rev()
+                .find(|character| !is_ignored_arabic_mark(*character))
                 .is_some_and(char::is_alphanumeric)
             && !body[range.end..]
                 .chars()
@@ -124,6 +128,10 @@ mod tests {
         let arabic = "يفيد التأملُ في الكتابة";
         let occurrence = first_occurrence(arabic, "التَّأمل").unwrap();
         assert_eq!(&arabic[occurrence], "التأملُ");
+        assert_eq!(first_occurrence("الـتأمل", "تأمل"), None);
+        let embedded_then_standalone = "الـتأمل ثم تأمل";
+        let occurrence = first_occurrence(embedded_then_standalone, "تأمل").unwrap();
+        assert_eq!(&embedded_then_standalone[occurrence], "تأمل");
     }
 
     #[test]

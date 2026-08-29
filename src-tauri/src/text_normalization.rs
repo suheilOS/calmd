@@ -54,7 +54,7 @@ pub fn find_folded_literal(
         .next()
 }
 
-fn is_ignored_arabic_mark(character: char) -> bool {
+pub(crate) fn is_ignored_arabic_mark(character: char) -> bool {
     matches!(
         character,
         '\u{0610}'..='\u{061a}'
