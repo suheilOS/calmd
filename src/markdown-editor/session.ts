@@ -77,6 +77,7 @@ import {
   rememberEditorViewState,
   renameEditorViewState,
 } from './editorViewState'
+import { markdownBacktickPairing } from './markdownBackticks'
 import { markdownHighlight } from './markdownHighlight'
 import { toggleInlineFormat } from './markdownCommands'
 import {
@@ -411,6 +412,7 @@ const editorExtensions = [
   EditorState.allowMultipleSelections.of(true),
   indentOnInput(),
   bracketMatching(),
+  markdownBacktickPairing,
   closeBrackets(),
   highlightSelectionMatches(),
   syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
