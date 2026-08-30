@@ -166,6 +166,10 @@ const editorTheme = EditorView.theme({
     padding: '0',
   },
   '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--color-ink)' },
+  '.cm-cursor': {
+    transform: 'scaleY(0.8)',
+    transformOrigin: 'center',
+  },
   '.cm-selectionBackground': {
     backgroundColor: 'var(--color-selection)',
   },

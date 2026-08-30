@@ -313,18 +313,15 @@
 
 .markdown-editor .cm-heading-source {
   color: var(--color-syntax);
-  display: inline-block;
   line-height: 1.15;
-  position: relative;
-  text-align: end;
 }
 
-.markdown-editor .cm-heading-source-1 { font-size: var(--text-editor-heading-1); margin-inline-start: -2ch; width: 2ch; }
-.markdown-editor .cm-heading-source-2 { font-size: var(--text-editor-heading-2); margin-inline-start: -3ch; width: 3ch; }
-.markdown-editor .cm-heading-source-3 { font-size: var(--text-editor-heading-3); margin-inline-start: -4ch; width: 4ch; }
-.markdown-editor .cm-heading-source-4 { font-size: var(--text-editor-heading-3); margin-inline-start: -5ch; width: 5ch; }
-.markdown-editor .cm-heading-source-5 { font-size: var(--text-editor-heading-3); margin-inline-start: -6ch; width: 6ch; }
-.markdown-editor .cm-heading-source-6 { font-size: var(--text-editor-heading-3); margin-inline-start: -7ch; width: 7ch; }
+.markdown-editor .cm-heading-source-1 { font-size: var(--text-editor-heading-1); }
+.markdown-editor .cm-heading-source-2 { font-size: var(--text-editor-heading-2); }
+.markdown-editor .cm-heading-source-3,
+.markdown-editor .cm-heading-source-4,
+.markdown-editor .cm-heading-source-5,
+.markdown-editor .cm-heading-source-6 { font-size: var(--text-editor-heading-3); }
 
 .markdown-editor .cm-fenced-code-line {
   color: var(--color-code-normal);
