@@ -143,6 +143,12 @@
   font-style: italic;
 }
 
+#note-title,
+.markdown-editor {
+  font-family: var(--font-editor);
+  font-synthesis: style;
+}
+
 .markdown-editor .cm-tooltip.cm-tooltip-autocomplete {
   background: var(--color-surface);
   border: 0;
@@ -178,7 +184,7 @@
 .markdown-editor .cm-heading,
 .markdown-editor .cm-heading-source {
   color: var(--color-ink);
-  font-family: "Rubik Variable", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-editor);
   font-weight: 600;
   line-height: 1.15;
 }
@@ -428,13 +434,33 @@
 }
 
 .markdown-editor .cm-task-checkbox {
-  accent-color: var(--color-accent);
+  appearance: none;
+  background-color: var(--color-surface);
   block-size: 1em;
+  border: 1.5px solid var(--color-faint);
+  border-radius: 50%;
   cursor: pointer;
   inline-size: 1em;
   margin-block: 0;
-  margin-inline: 0 0.5ch;
+  margin-inline: 0;
   vertical-align: -0.08em;
+}
+
+.markdown-editor .cm-task-checkbox:checked {
+  background-color: var(--color-accent);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m4 8.25 2.5 2.5L12 5.5' fill='none' stroke='white' stroke-linecap='round' stroke-linejoin='round' stroke-width='2'/%3E%3C/svg%3E");
+  border-color: var(--color-accent);
+}
+
+.markdown-editor .cm-task-checkbox:focus-visible {
+  outline: 2px solid var(--color-faint);
+  outline-offset: 2px;
+}
+
+@media (forced-colors: active) {
+  .markdown-editor .cm-task-checkbox {
+    appearance: auto;
+  }
 }
 
 .markdown-editor .cm-editor.cm-live-preview-pending .cm-content {

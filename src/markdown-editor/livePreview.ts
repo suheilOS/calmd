@@ -71,19 +71,16 @@ class TaskMarkerWidget extends WidgetType {
   private readonly from: number
   private readonly to: number
   private readonly checked: boolean
-  private readonly sourceWidth: number
 
   constructor(
     from: number,
     to: number,
     checked: boolean,
-    sourceWidth: number,
   ) {
     super()
     this.from = from
     this.to = to
     this.checked = checked
-    this.sourceWidth = sourceWidth
   }
 
   toDOM(view: EditorView) {
@@ -91,7 +88,7 @@ class TaskMarkerWidget extends WidgetType {
     const wrapper = document.createElement('span')
     wrapper.className = 'cm-task-marker'
     wrapper.dir = 'ltr'
-    wrapper.style.width = `${this.sourceWidth}ch`
+    wrapper.style.width = '1.15em'
     const checkbox = document.createElement('input')
     checkbox.className = 'cm-task-checkbox'
     checkbox.type = 'checkbox'
@@ -121,7 +118,6 @@ class TaskMarkerWidget extends WidgetType {
     return this.from === other.from
       && this.to === other.to
       && this.checked === other.checked
-      && this.sourceWidth === other.sourceWidth
   }
 }
 
@@ -365,7 +361,6 @@ function livePreviewDecorations(
                   taskMarker.from,
                   taskMarker.to,
                   checked,
-                  taskMarker.to - listMark.from,
                 ),
               }).range(listMark.from, taskMarker.to))
               return false

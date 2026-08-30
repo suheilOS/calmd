@@ -235,9 +235,11 @@ function Application({
     canGoBack: state.canGoBack,
     canGoForward: state.canGoForward,
     canGoHome: state.canGoHome,
+    canOpenRandomNote: isEditing,
     onBack: () => void actions.back(),
     onForward: () => void actions.forward(),
     onHome: () => void actions.home(),
+    onOpenRandomNote: isEditing ? () => void actions.openRandom() : undefined,
   }
 
   if (state.note) {
