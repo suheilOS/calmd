@@ -12,7 +12,6 @@ import {
 } from '@codemirror/commands'
 import {
   bracketMatching,
-  defaultHighlightStyle,
   HighlightStyle,
   indentOnInput,
   syntaxTree,
@@ -119,6 +118,26 @@ const markdownHighlighting = syntaxHighlighting(HighlightStyle.define([
   { tag: tags.quote, class: 'cm-quote' },
   { tag: tags.meta, class: 'cm-markup' },
 ], { scope: commonmarkLanguage }))
+
+const codeHighlighting = syntaxHighlighting(HighlightStyle.define([
+  { tag: tags.comment, class: 'cm-code-comment' },
+  { tag: tags.keyword, class: 'cm-code-keyword' },
+  { tag: tags.propertyName, class: 'cm-code-property' },
+  {
+    tag: [tags.string, tags.regexp, tags.escape, tags.special(tags.string)],
+    class: 'cm-code-string',
+  },
+  { tag: [tags.number, tags.bool, tags.null, tags.atom], class: 'cm-code-value' },
+  {
+    tag: [tags.typeName, tags.className, tags.namespace, tags.tagName],
+    class: 'cm-code-type',
+  },
+  { tag: tags.operator, class: 'cm-code-operator' },
+  { tag: tags.punctuation, class: 'cm-code-punctuation' },
+  { tag: tags.function(tags.variableName), class: 'cm-code-function' },
+  { tag: tags.function(tags.propertyName), class: 'cm-code-function' },
+  { tag: tags.invalid, class: 'cm-code-invalid' },
+]))
 
 const editorTheme = EditorView.theme({
   '&': {
@@ -415,8 +434,8 @@ const editorExtensions = [
   markdownBacktickPairing,
   closeBrackets(),
   highlightSelectionMatches(),
-  syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
   markdownHighlighting,
+  codeHighlighting,
   markdown({
     addKeymap: false,
     base: commonmarkLanguage,

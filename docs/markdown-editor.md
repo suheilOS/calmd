@@ -33,7 +33,7 @@ The document remains plain Markdown. Supported wiki links use `[[target]]` or `[
 - Pointer-drag selections freeze the pre-drag presentation until the gesture completes, preventing source delimiters from moving text under the pointer.
 - Strong, emphasis, highlight, strikethrough, inline code, standard links, wiki links, escapes, ATX and Setext headings, blockquotes, fenced code, thematic breaks, lists, and tasks use the shared Live Preview policy. Malformed or incomplete Markdown remains literal source.
 - Valid vault-relative PNG, JPEG, GIF, and WebP images render through Tauri's exact-file-scoped asset protocol. Image source returns on caret or selection contact; unavailable images retain an accessible alt-text fallback. Remote, absolute, traversal, SVG, and reference-style destinations remain literal source.
-- Activating any part of a fenced code block reveals the entire source unit: opening fence, language identifier, content, and closing fence.
+- An inactive labeled code fence keeps its exact language identifier visible at the block's upper-right. Activating any part of the block reveals the entire source unit: opening fence, complete info string, content, and closing fence.
 - Inactive list lines render source-backed bullets, numbers, or task checkboxes. Activating the line reveals the literal prefix. Clicking an inactive checkbox performs one undoable Markdown edit without entering source editing.
 - Programming ligatures are disabled in the Markdown surface so punctuation remains literal, while normal kerning remains enabled.
 - Long URLs and identifiers can wrap without widening the writing column.

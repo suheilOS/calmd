@@ -74,6 +74,21 @@ async function renderEditor(
   return { container, root, scrollContainer }
 }
 
+async function waitForEditorState(predicate: () => boolean) {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    if (predicate()) return
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 10))
+    })
+  }
+  throw new Error('Editor state did not settle')
+}
+
+function fencedLineContaining(container: HTMLElement, text: string) {
+  return [...container.querySelectorAll<HTMLElement>('.cm-fenced-code-line')]
+    .find((line) => line.textContent?.includes(text))
+}
+
 const resolvedImage: DisplayImage = {
   absolutePath: '/vault/attachments/photo.png',
   assetUrl: 'asset://localhost/photo.png?revision=abc',
@@ -463,15 +478,16 @@ describe('MarkdownEditor Live Preview', () => {
   })
 
   test('previews escapes, Setext headings, fenced code, and thematic breaks', async () => {
-    const source = 'Heading\n---\n\\*literal\\*\n```ts\nconst value = 1\n```\n***\ntail'
+    const source = 'Heading\n---\n\\*literal\\*\n```ts title="Example"\nconst value = 1\n```\n***\ntail'
     const { container } = await renderEditor(source, 1)
     const content = container.querySelector<HTMLElement>('.cm-content')
     if (!content) throw new Error('CodeMirror content was not mounted')
 
     expect(content.textContent).not.toContain('---')
     expect(content.textContent).not.toContain('```')
-    expect(content.textContent).not.toContain('ts')
+    expect(content.textContent).not.toContain('title="Example"')
     expect(content.textContent).toContain('*literal*')
+    expect(container.querySelector('.cm-code-language')?.textContent).toBe('ts')
     expect(container.querySelector('.cm-thematic-break')).not.toBeNull()
     expect(container.querySelectorAll('.cm-fenced-code-background')).toHaveLength(3)
 
@@ -479,8 +495,82 @@ describe('MarkdownEditor Live Preview', () => {
     view.contentDOM.blur()
     const codePosition = source.indexOf('const')
     await act(async () => view.dispatch({ selection: { anchor: codePosition } }))
-    expect(content.textContent).toContain('```ts')
+    expect(container.querySelector('.cm-code-language')).toBeNull()
+    expect(content.textContent).toContain('```ts title="Example"')
     expect(content.textContent).toContain('```')
+  })
+
+  test('highlights recognized fenced languages and aliases with semantic classes', async () => {
+    const source = [
+      '**prose**',
+      '```ts',
+      'const shortAlias = "short"',
+      '```',
+      '```typescript',
+      'function longAlias(value: number) { return value + 1 }',
+      '```',
+      '```rust',
+      'fn rust_example() { let value = 2; }',
+      '```',
+      '```json',
+      '{"enabled": true, "count": 3}',
+      '```',
+    ].join('\n')
+    const { container } = await renderEditor(source, 1)
+    const content = container.querySelector<HTMLElement>('.cm-content')
+    if (!content) throw new Error('CodeMirror content was not mounted')
+    const view = EditorView.findFromDOM(content)
+    await act(async () => view.dispatch({ selection: { anchor: 0 } }))
+
+    await waitForEditorState(() => {
+      const shortAlias = fencedLineContaining(container, 'shortAlias')
+      const longAlias = fencedLineContaining(container, 'longAlias')
+      const rust = fencedLineContaining(container, 'rust_example')
+      const json = fencedLineContaining(container, 'enabled')
+      return Boolean(
+        shortAlias?.querySelector('.cm-code-keyword')
+        && shortAlias.querySelector('.cm-code-string')
+        && longAlias?.querySelector('.cm-code-function')
+        && rust?.querySelector('.cm-code-keyword')
+        && json?.querySelector('.cm-code-property')
+        && json.querySelector('.cm-code-value'),
+      )
+    })
+
+    expect(container.querySelector('.cm-strong')).not.toBeNull()
+    expect(container.querySelector('.cm-strong')?.closest('.cm-fenced-code-line')).toBeNull()
+    expect(
+      [...container.querySelectorAll('.cm-code-language')].map((label) => label.textContent),
+    ).toEqual(['ts', 'typescript', 'rust', 'json'])
+
+    await act(async () => view.dispatch({
+      selection: { anchor: source.indexOf('shortAlias') },
+    }))
+
+    expect(content.textContent).toContain('```ts')
+    expect(container.querySelectorAll('.cm-code-language')).toHaveLength(3)
+    expect(fencedLineContaining(container, 'shortAlias')?.querySelector('.cm-code-keyword'))
+      .not.toBeNull()
+  })
+
+  test('leaves unknown and unlabeled fenced languages as plain code', async () => {
+    const source = [
+      '```unknown-language',
+      'unknown_token = 1',
+      '```',
+      '```',
+      'unlabeled_token = 2',
+      '```',
+    ].join('\n')
+    const { container } = await renderEditor(source, 1)
+
+    const unknown = fencedLineContaining(container, 'unknown_token')
+    const unlabeled = fencedLineContaining(container, 'unlabeled_token')
+    expect(unknown).not.toBeUndefined()
+    expect(unlabeled).not.toBeUndefined()
+    expect(container.querySelector('.cm-code-language')?.textContent).toBe('unknown-language')
+    expect(unknown?.querySelector('[class*="cm-code-"]:not(.cm-code-language)')).toBeNull()
+    expect(unlabeled?.querySelector('[class*="cm-code-"]')).toBeNull()
   })
 
   test('renders inactive list prefixes and a source-backed task checkbox', async () => {

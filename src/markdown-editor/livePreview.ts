@@ -405,8 +405,24 @@ function livePreviewDecorations(
           }
           if (!active) {
             for (const child of childRanges(node)) {
-              if (child.name === 'CodeMark' || child.name === 'CodeInfo') {
+              if (child.name === 'CodeMark') {
                 decorations.push(Decoration.replace({}).range(child.from, child.to))
+                continue
+              }
+              if (child.name === 'CodeInfo') {
+                const info = view.state.sliceDoc(child.from, child.to)
+                const language = /^\S+/.exec(info)?.[0]
+                if (!language) {
+                  decorations.push(Decoration.replace({}).range(child.from, child.to))
+                  continue
+                }
+                const languageEnd = child.from + language.length
+                decorations.push(Decoration.mark({
+                  class: 'cm-code-language',
+                }).range(child.from, languageEnd))
+                if (languageEnd < child.to) {
+                  decorations.push(Decoration.replace({}).range(languageEnd, child.to))
+                }
               }
             }
           }

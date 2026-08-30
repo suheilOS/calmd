@@ -327,6 +327,7 @@
 .markdown-editor .cm-heading-source-6 { font-size: var(--text-editor-heading-3); margin-inline-start: -7ch; width: 7ch; }
 
 .markdown-editor .cm-fenced-code-line {
+  color: var(--color-code-normal);
   direction: ltr;
   font-family: var(--font-code);
   font-size: 0.9em;
@@ -340,8 +341,66 @@
   padding: 0;
 }
 
+.markdown-editor .cm-fenced-code-line .cm-code-comment {
+  color: var(--color-code-comment);
+}
+
+.markdown-editor .cm-fenced-code-line .cm-code-keyword {
+  color: var(--color-code-keyword);
+}
+
+.markdown-editor .cm-fenced-code-line .cm-code-property {
+  color: var(--color-code-property);
+}
+
+.markdown-editor .cm-fenced-code-line .cm-code-string {
+  color: var(--color-code-string);
+}
+
+.markdown-editor .cm-fenced-code-line .cm-code-value {
+  color: var(--color-code-value);
+}
+
+.markdown-editor .cm-fenced-code-line .cm-code-type {
+  color: var(--color-code-type);
+}
+
+.markdown-editor .cm-fenced-code-line .cm-code-operator {
+  color: var(--color-code-operator);
+}
+
+.markdown-editor .cm-fenced-code-line .cm-code-punctuation {
+  color: var(--color-code-punctuation);
+}
+
+.markdown-editor .cm-fenced-code-line .cm-code-function {
+  color: var(--color-code-function);
+}
+
+.markdown-editor .cm-fenced-code-line .cm-code-invalid {
+  color: var(--color-code-invalid);
+  text-decoration-line: underline;
+  text-decoration-style: wavy;
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.16em;
+}
+
 .markdown-editor .cm-fenced-code-first-line {
-  padding-block-start: 0.25rem;
+  padding-block-start: 0.5rem;
+  position: relative;
+}
+
+.markdown-editor .cm-code-language {
+  color: var(--color-code-language);
+  font-size: 0.75rem;
+  font-weight: 500;
+  inset-block-start: 0.5rem;
+  inset-inline-end: 1rem;
+  max-inline-size: calc(100% - 1.5rem);
+  overflow: hidden;
+  position: absolute;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .markdown-editor .cm-fenced-code-last-line {
