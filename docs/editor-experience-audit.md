@@ -1,6 +1,8 @@
 # Editor experience audit
 
-Status: evidence and decision interview complete; recommended editor phases implemented on 2026-08-09.
+Status: historical audit; its recommended editor phases are implemented. Updated 2026-08-30 to distinguish the audited baseline from the current editor.
+
+> The defect descriptions, "Calmd now" comparisons, and Before columns below describe the pre-implementation editor audited in early August 2026. They are retained as decision history, not as a current defect list. See [Markdown editor](markdown-editor.md) for the current contract, which includes isolated per-note history, shared Live Preview rules, pointer-drag stability, lists and tasks, local images, configurable spellcheck, a selection toolbar, syntax-highlighted fenced code, and in-memory cursor and scroll restoration.
 
 This audit compares Calmd's note editor with Writer at commit
 [`eef8455`](https://github.com/joelbqz/writer-computer/commit/eef84557429ee1897c4c0b9eeec39af80cfe199e)
@@ -86,7 +88,7 @@ only when their editing and scroll behavior are demonstrably stable.
   user turn spellcheck off; code spans and link destinations are excluded where
   the platform permits it.
 
-## P0: Undo can cross note boundaries
+## Resolved P0: Undo crossed note boundaries in the audited baseline
 
 [App.tsx](../src/App.tsx#L439) keeps the same `NoteEditor` mounted while moving
 from one note to another. [session.ts](../src/markdown-editor/session.ts)
@@ -119,7 +121,7 @@ restores that file's cursor and scroll position. See Writer's
 
 This is a correctness prerequisite for further editor work.
 
-## Current Live Preview coverage
+## Audited baseline Live Preview coverage
 
 Calmd already uses Lezer rather than regular expressions for presentation. The
 current behavior is split between `markdownMarkerDecorations` and
@@ -152,7 +154,7 @@ Writer's default hide policy is visible in its
 Its tables and media demonstrate what is possible, but they also demonstrate
 why block preview is not merely syntax coloring.
 
-## P1: Live Preview needs one interaction model
+## Resolved P1: Live Preview needed one interaction model
 
 Editor ownership is now explicit under `src/markdown-editor/`:
 `MarkdownEditor.tsx` is a thin React adapter, `session.ts` owns the CodeMirror
@@ -185,7 +187,7 @@ already installed. Writer vendored and heavily modified ProseMark; importing
 that layer would bring much more behavior and maintenance surface than Calmd's
 scope needs.
 
-## P1: syntax reveal currently moves text during selection
+## Resolved P1: syntax reveal moved text during selection
 
 `Decoration.replace({})` removes delimiters from layout. When a selection
 touches a format, Calmd drops the replacement and the delimiters return to
@@ -215,7 +217,7 @@ CodeMirror documents that replacement decorations hide source ranges, while
 `atomicRanges` makes decorated ranges act as units for cursor motion. See the
 [CodeMirror reference](https://codemirror.net/docs/ref/#view.EditorView^atomicRanges).
 
-## P1: document state should be restored deliberately
+## Resolved P1: document state needed deliberate restoration
 
 Calmd opens the CodeMirror view with its cursor at the end and does not record
 per-note selection or scroll. On a value replacement, CodeMirror maps the
@@ -266,7 +268,7 @@ lesson, not its remaining gap.
 | No long-document live-preview case | A deterministic long document scrolls from an initially unparsed region and proves syntax converges without a raw flash |
 | No cross-note history case | Note A and note B cannot affect each other through Undo, Redo, canonical sync, delayed link resolution, or async save completion |
 
-## P2: performance and long-note behavior
+## Implemented P2: performance and long-note behavior
 
 `inlineMarkdownDecorations` walks the complete current syntax tree whenever the
 document, viewport, selection, or a link-resolution effect changes. It does not
@@ -290,7 +292,7 @@ tree for every selection transaction. That is not a pattern to copy blindly.
 | Wiki-link existence cache survives unrelated documents indefinitely | Cache ownership and invalidation follow the vault/document session; unused targets are pruned or the cache is bounded |
 | Performance changes are justified by Writer's experience alone | Add a long-note benchmark and reproduce a parse/scroll defect before adopting forced parsing or idle whole-document work |
 
-## P2: writing polish and discoverability
+## Implemented P2: writing polish and discoverability
 
 Calmd already gets several typographic fundamentals right: a 65-character
 measure, 16px body text, 1.6 body leading, tighter headings, a restrained type
@@ -340,7 +342,7 @@ Live Preview work:
    abstraction is small enough to express with Calmd's current CodeMirror and
    Lezer dependencies.
 
-## Recommended order
+## Historical implementation order
 
 1. **P0 — isolate document history.** Add the cross-note Undo regression first,
    then correct the editor-session lifecycle.
@@ -362,8 +364,7 @@ Live Preview work:
 9. **Later — decide on images and tables separately.** Each needs a block-widget
    contract and should not hold the prose experience hostage.
 
-No ADR was added because the selected approach remains replaceable within the
+No editor-specific ADR was added because the selected approach remains replaceable within the
 editor module and does not change Markdown storage. The resolved Live Preview
 term is recorded in [CONTEXT.md](../CONTEXT.md); the implementation follows the
-document-session and interaction decisions above. Images and rendered tables
-remain intentionally deferred.
+document-session and interaction decisions above. Portable inline local images are now implemented through the contract in [ADR 0003](adr/0003-portable-local-images.md). Rendered tables, reference-style images, and OS image drag-and-drop remain deferred.

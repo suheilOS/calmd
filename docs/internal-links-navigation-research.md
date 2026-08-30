@@ -19,7 +19,7 @@ A missing target is created only after the source note flushes successfully. Rus
 
 ## Current navigation flow
 
-`NoteNavigation` in `src/noteNavigation.ts` owns an application history containing composer and note locations. Transitions begin with a generation token and are committed only after the current editing session flushes and the destination reads successfully.
+`NoteNavigation` in `src/note-workspace/noteNavigation.ts` owns an application history containing composer and note locations. `NoteWorkspaceRuntime` in `src/note-workspace/runtime.ts` coordinates transitions. They begin with a generation token and commit only after the current editing session flushes and the destination reads successfully.
 
 The current flow is:
 
@@ -30,7 +30,7 @@ The current flow is:
 
 Back and Forward move through note locations and saved composer thoughts. Home adds a blank composer location, so returning Home is reversible. New destinations truncate forward history. Renames update every historical occurrence of the old key. Self-navigation does not add a duplicate note entry.
 
-The navigation owner also handles backlinks, modifier-click wiki links, and the title-bar controls. A conflict or failed save leaves the current note open and prevents a destination from being created or opened.
+The workspace runtime also handles backlinks, unlinked mentions, modifier-click wiki links, random-note navigation, deletion, and the title-bar controls. A conflict or failed save leaves the current note open and prevents a destination from being created, opened, or deleted.
 
 ## Current editor integration
 
@@ -40,11 +40,13 @@ A primary Ctrl-click on Linux and Windows, or Cmd-click on macOS, captures the l
 
 ## Current derived index
 
-The schema-version-2 SQLite database stores normalized filename identities and outgoing links beside the title, body, revision, and modification time used for literal retrieval. FTS5 indexes titles and bodies. `note_links` supports on-demand backlinks, and foreign keys remove link rows with their source notes.
+The schema-version-4 SQLite database stores normalized filename identities, folded search fields, and outgoing links beside the original title, body, revision, and modification time used for literal retrieval. FTS5 indexes folded titles and bodies. `note_links` supports on-demand backlinks, and foreign keys remove link rows with their source notes.
 
 Reconciliation scans the vault directly, parses links from every top-level Markdown note, and replaces note and link rows in one transaction. Create and save update one note best-effort. Rename triggers a full rescan because rename propagation cannot depend on derived state. A dirty or recoverable index is reconciled before search or backlink reads. Index failures do not roll back a successful Markdown write.
 
 Backlink resolution requires one unambiguous target filename identity and returns each source note once. Broken links become backlinks after the target exists and the index reconciles. Ambiguous case-folded filenames return no backlinks.
+
+The same on-demand popover independently loads title-based unlinked mentions. A mention must occur in another note's body outside supported wiki links and Markdown code, match the current note's unambiguous visible title case-insensitively, and respect alphanumeric token boundaries. Results are deduplicated by source note and include a bounded excerpt. Selecting either kind of result uses the same save-gated navigation and preview paths.
 
 ## Current coordinated rename
 
@@ -54,17 +56,22 @@ Ordinary failures restore the original files. If the process stops before the jo
 
 The complete original file remains recoverable because the rename strategy uses same-filesystem hard-link backups. A filesystem cannot atomically replace a file and change its name in one portable operation, so the journal covers the multi-file installation window.
 
+## Current deletion behavior
+
+The note actions menu exposes permanent deletion behind a confirmation dialog. The workspace flushes pending edits first and passes the authoritative key and revision to Rust. `NotePersistence::delete` validates the top-level Markdown key and verifies the expected content revision before unlinking the source. A conflict or failure leaves the editor open. After success, Calmd removes every history entry for the deleted key, discards its in-memory editor view state, returns to a blank composer, and removes the derived index row best-effort. Other notes and their wiki links remain unchanged, and attachments are not deleted. There is no trash or restore flow.
+
 ## Remaining limitations
 
-- Filesystem watching and deletion are not implemented.
+- Filesystem watching is not implemented.
 - Only one selected vault and top-level Markdown files are supported.
-- Browser or operating-system history, persisted history, cursor restoration, and scroll restoration are deferred.
+- Browser or operating-system history and persisted navigation or editor-view history are deferred. Cursor, selection, and scroll positions are remembered only in memory for up to 100 opened notes during the current app run.
+- Deletion is permanent; trash, restore, automatic attachment cleanup, and automatic source-link cleanup are not implemented.
 - Paths, headings, blocks, embeds, multiline links, links in code, and ambiguous filename identities remain unsupported.
-- Semantic retrieval was considered, but literal title and body search is effective, predictable, and lightweight for the intended workflow and better aligned with Calmd's minimal product philosophy. It is outside Calmd's current product direction and is not planned unless usage evidence shows repeated retrieval failures caused by differences in wording. The supported retrieval paths are exact-title handling, literal title and body search, wiki links, and on-demand backlinks.
+- Semantic retrieval was considered, but literal title and body search is effective, predictable, and lightweight for the intended workflow and better aligned with Calmd's minimal product philosophy. It is outside Calmd's current product direction and is not planned unless usage evidence shows repeated retrieval failures caused by differences in wording. The supported retrieval paths are exact-title handling, literal title and body search, wiki links, on-demand backlinks, title-based unlinked mentions, and random-note rediscovery.
 
 ## Validation
 
-Rust and TypeScript tests cover link extraction, code exclusion, aliases, Unicode and `.md` targets, ambiguous filenames, unsafe-title canonicalization, flush-gated navigation, failed transitions, mapped concurrent edits, rename propagation, journal recovery, backlink deduplication, index rebuilds, and stale outgoing links.
+Rust and TypeScript tests cover link extraction, code exclusion, aliases, Unicode and `.md` targets, ambiguous filenames, unsafe-title canonicalization, flush-gated navigation, failed transitions, mapped concurrent edits, rename propagation, journal recovery, backlink deduplication, title-based unlinked mentions, deletion, editor-view restoration, index rebuilds, and stale outgoing links.
 
 The end-to-end check is:
 

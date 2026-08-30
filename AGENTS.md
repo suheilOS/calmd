@@ -1,6 +1,6 @@
 ## Project State
 
-Calmd is currently a Tauri 2 desktop application backed by top-level Markdown files in one user-selected, portable vault. Rust owns filesystem access through dedicated commands; a framework-independent Note persistence module owns Markdown parsing, filename policy, revisions, and atomic create/read/save/rename behavior. Vault selection is persisted separately. A rebuildable SQLite/FTS5 index under Tauri app data provides ranked literal search and excerpts; Markdown remains the sole source of truth. Frontend Note editing is a framework-neutral session module with autosave, save sequencing, and conflict handling behind a local-substitutable persistence seam. Supported wiki links use cursor-sensitive Live Preview and platform-specific modifier navigation through the conflict-safe persistence flow. Backlinks are derived from the rebuildable index and remain collapsed until requested. Literal retrieval is the supported search model. Semantic retrieval and embeddings were considered, but current literal retrieval is effective, predictable, and lightweight for the intended workflow and better aligned with Calmd's minimal product philosophy. They are outside Calmd's current product direction and are not planned unless usage evidence shows repeated retrieval failures caused by differences in wording.
+Calmd is currently a Tauri 2 desktop application backed by top-level Markdown files in one user-selected, portable vault. Rust owns filesystem access through dedicated commands; a framework-independent Note persistence module owns Markdown parsing, filename policy, revisions, and atomic create/read/save/rename/delete behavior. Vault selection and editor settings are persisted separately. A rebuildable schema-version-4 SQLite/FTS5 index under Tauri app data provides ranked literal search, title suggestions, excerpts, backlinks, and title-based unlinked mentions; Markdown remains the sole source of truth. Frontend Note editing is a framework-neutral session module with autosave, save sequencing, conflict handling, and bounded in-memory view-state restoration behind a local-substitutable persistence seam. Supported wiki links use cursor-sensitive Live Preview and platform-specific modifier navigation through the conflict-safe persistence flow. Backlinks and unlinked mentions are derived from the rebuildable index and remain collapsed until requested. Validated local images use portable Markdown destinations, Rust-owned imports, exact-file asset authorization, and Live Preview rendering. Literal retrieval is the supported search model. Semantic retrieval and embeddings were considered, but current literal retrieval is effective, predictable, and lightweight for the intended workflow and better aligned with Calmd's minimal product philosophy. They are outside Calmd's current product direction and are not planned unless usage evidence shows repeated retrieval failures caused by differences in wording.
 
 Current UI stack:
 
@@ -22,11 +22,11 @@ Focus only on:
 
 - A plain composer-style home screen
 - Ranked literal retrieval through a derived index reconciled from the selected vault
-- Creating and renaming portable Markdown notes through Rust
-- A minimal full-page note editor with conflict-safe saving
-- A backlinks popover revealed only when requested
+- Creating, renaming, and permanently deleting portable Markdown notes through Rust
+- A minimal full-page note editor with conflict-safe saving, portable local images, configurable spellcheck, and restrained formatting controls
+- A links popover with backlinks and title-based unlinked mentions, revealed only when requested
 
-Do not introduce another search backend or ranking architecture beyond the existing derived literal-search and backlink index during this phase.
+Do not introduce another search backend or ranking architecture beyond the existing derived literal-search, backlink, and unlinked-mention index during this phase.
 
 ## Constraints
 

@@ -1,5 +1,7 @@
 # Delete note
 
+Status: implemented. This file is retained as the historical implementation plan; the current behavior is documented in [the implementation brief](../implementation-brief.md) and [internal links and navigation research](../internal-links-navigation-research.md).
+
 ## Goal
 
 Complete note CRUD by allowing the currently open note to be permanently deleted from Calmd without requiring the user to use a file explorer.
@@ -30,10 +32,10 @@ Complete note CRUD by allowing the currently open note to be permanently deleted
 - `src-tauri/src/note_persistence.rs` owns safe Markdown filesystem behavior, revisions, and path validation.
 - Rust Note operations own Markdown-first deletion and best-effort derived-index updates; `commands.rs` is the Tauri adapter.
 - `src-tauri/src/search.rs` owns the rebuildable SQLite/FTS5 index.
-- `src/useNoteEditing.ts` and `src/noteEditing.ts` own autosave, flush, and conflict handling.
-- `src/TitleBar.tsx` owns the title-bar controls.
-- `src/App.tsx` owns note-level orchestration, navigation, and return-to-composer behavior.
-- `src/noteNavigation.ts` owns application history and must gain deletion-aware history handling.
+- `src/note-workspace/noteEditing.ts` owns autosave, flush, and conflict handling.
+- `src/note-workspace/runtime.ts` owns note-level orchestration, deletion, navigation, and return-to-composer behavior.
+- `src/note-workspace/noteNavigation.ts` owns application history and deletion-aware history cleanup.
+- `src/note-workspace/NoteActions.tsx` owns the action menu and confirmation dialog; `src/TitleBar.tsx` owns the title-bar shell.
 
 ## Implementation steps
 
@@ -87,7 +89,7 @@ In the existing React/Base UI layer:
 
 ### 5. Coordinate deletion with editing and navigation
 
-In `src/App.tsx` and `src/noteNavigation.ts`:
+In the implemented workspace architecture, primarily `src/note-workspace/runtime.ts` and `src/note-workspace/noteNavigation.ts`:
 
 1. Open the confirmation dialog from the note-actions menu without mutating the note.
 2. After confirmation, start a save-gated transition and flush the active `NoteEditingSession` before calling the backend, using the returned authoritative key and revision in case a pending rename completed.
@@ -100,11 +102,7 @@ Add focused TypeScript tests for removing deleted notes from history and preserv
 
 ### 6. Update durable documentation
 
-After implementation is accepted:
-
-- Update `docs/implementation-brief.md` to list deletion among completed storage capabilities and remove it from remaining limitations.
-- Document the permanent-delete, revision-check, confirmation, and link-preservation behavior in the relevant storage/internal-linking documentation.
-- Remove this in-progress plan after the permanent documentation is updated.
+Completed. `docs/implementation-brief.md` and `docs/internal-links-navigation-research.md` now document permanent deletion, revision checks, confirmation, navigation cleanup, index cleanup, and link and attachment preservation.
 
 ## Validation
 

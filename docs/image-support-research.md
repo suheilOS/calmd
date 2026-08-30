@@ -2,6 +2,8 @@
 
 Status: phases 1–5 implemented; OS drag-and-drop and reference-style images remain deferred.
 
+This document preserves the research and implementation plan. The current contract is in [ADR 0003](adr/0003-portable-local-images.md) and [Markdown editor](markdown-editor.md). The shipped implementation lives in `src-tauri/src/attachments.rs`, `src/images.ts`, `src/markdown-editor/imageInsertion.ts`, and `src/markdown-editor/imageLivePreview.ts`. Tauri's asset protocol and exact-file runtime authorization are enabled. Paste uses browser clipboard files with the Tauri clipboard-image fallback, and the Note actions menu exposes the native picker.
+
 ## Conclusion
 
 Calmd should add **portable local Markdown images**, not a second document model or a general media system.
@@ -19,22 +21,22 @@ Recommended contract:
 
 The current vault contains only top-level Markdown notes, so a vault-root-relative `attachments/` path is portable and remains stable when a note is renamed. If nested notes are introduced later, path semantics should be revisited before allowing them.
 
-## Current Calmd fit
+## Pre-implementation Calmd fit
 
 - `@lezer/markdown` already parses standard images as `Image` nodes. No parser replacement is needed.
-- `src/markdown-editor/livePreview.ts` has no `Image` decoration rule, so image source currently remains literal Markdown.
+- `src/markdown-editor/livePreview.ts` had no `Image` decoration rule, so image source remained literal Markdown.
 - `MarkdownEditor` already owns the CodeMirror view and is the correct place for image decorations, paste handling, and insertion-position mapping.
 - Rust already owns vault filesystem access and atomic Markdown persistence.
-- `tauri-plugin-dialog` is installed and used by Rust for native folder selection.
-- `tauri-plugin-clipboard-manager` is installed, but the current capability only grants `clipboard-manager:allow-write-html`.
-- The current CSP already permits `asset:` and `http://asset.localhost` in `img-src`.
-- The Tauri `protocol-asset` feature and `assetProtocol` configuration are not currently enabled.
+- `tauri-plugin-dialog` was already installed and used by Rust for native folder selection.
+- `tauri-plugin-clipboard-manager` was installed, but the capability initially granted only `clipboard-manager:allow-write-html`; the implementation added `clipboard-manager:allow-read-image` for the Wayland clipboard fallback.
+- The CSP already permitted `asset:` and `http://asset.localhost` in `img-src`.
+- The implementation enabled Tauri's `protocol-asset` feature and `assetProtocol` configuration with an empty static scope and exact-file runtime authorization.
 - Search remains literal and Markdown remains authoritative; attachments should not require a new search backend or index.
 - `NotePreviewContent` intentionally suppresses images and should remain safe, bounded, and alt-text-only.
 
 ## Product and Markdown policy
 
-### First release
+### Implemented release
 
 Support:
 
@@ -392,7 +394,7 @@ Use real `EditorView` instances to test:
 - dropped files and insertion coordinates at different display scales;
 - Linux, Windows, and macOS clipboard/image decoding behavior.
 
-## Implementation phases
+## Completed implementation phases
 
 1. **Contract and shared helpers**
    - finalize formats, limits, path semantics, and failure UI;

@@ -29,6 +29,6 @@ The command tests cover plain, fully formatted, and partially formatted selectio
 
 ## Deliberate boundaries
 
-The commands do not provide a rich-text document model, hidden storage markup, or a separate fenced-code formatting command. Wiki links and backlinks are implemented separately in the internal-linking phase and are documented in [ADR 0002](adr/0002-internal-links-and-navigation.md). The editor keeps the document as plain Markdown and disables browser spellcheck on the CodeMirror surface.
+The commands do not provide a rich-text document model, hidden storage markup, or a separate fenced-code formatting command. Wiki links, backlinks, and unlinked mentions are implemented separately and are documented in [ADR 0002](adr/0002-internal-links-and-navigation.md). The editor keeps the document as plain Markdown. Native spellcheck is enabled for prose by default and can be disabled from the Note actions menu; code and link destinations remain excluded where the webview supports those attributes.
 
 Sources: [CommonMark blocks and inlines](https://spec.commonmark.org/0.31.2/#commonmark), [CommonMark delimiter runs](https://spec.commonmark.org/0.31.2/#emphasis-and-strong-emphasis), [CommonMark code spans](https://spec.commonmark.org/0.31.2/#code-spans), [CommonMark links](https://spec.commonmark.org/0.31.2/#links), [GFM strikethrough](https://github.github.com/gfm/#strikethrough-extension-), and [CodeMirror `changeByRange`](https://codemirror.net/docs/ref/#state.EditorState.changeByRange).

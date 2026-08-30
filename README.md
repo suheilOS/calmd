@@ -10,11 +10,13 @@ Calmd is a Tauri 2 desktop application backed by a portable Markdown vault. It i
 - Literal match highlighting in result titles and excerpts
 - Exact-title handling that opens an existing note instead of creating a duplicate
 - Rust-owned create, read, save, and coordinated rename commands with conflict-safe Markdown writes
-- A rebuildable schema-version-2 SQLite/FTS5 trigram index with concise excerpts and derived backlinks
-- A minimal full-page CodeMirror Markdown editor with automatic saving
+- A rebuildable schema-version-4 SQLite/FTS5 trigram index with concise excerpts, derived backlinks, and title-based unlinked mentions
+- A minimal full-page CodeMirror Markdown editor with automatic saving, configurable spellcheck, and in-memory cursor and scroll restoration
 - `[[target]]` and `[[target|display text]]` links with modifier-click open-or-create navigation
 - Application-owned Back, Forward, and Home navigation gated by successful saves
-- An on-demand backlinks popover
+- An on-demand links popover containing backlinks and unlinked mentions
+- Portable local PNG, JPEG, GIF, and WebP images imported by paste or a native picker
+- Conflict-safe permanent note deletion that preserves links and attachments
 - Optional Substack export with a per-user publication URL stored in application settings
 - Responsive light and dark styling
 

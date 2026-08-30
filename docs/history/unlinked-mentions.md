@@ -1,5 +1,7 @@
 # Unlinked mentions
 
+Status: implemented. This file is retained as the historical implementation plan; the current behavior is documented in [the implementation brief](../implementation-brief.md), [derived index research](../derived-search-index-research.md), and [internal links and navigation research](../internal-links-navigation-research.md).
+
 ## Goal
 
 Add a read-only **Unlinked mentions** section to the existing on-demand backlinks popover. It should show notes containing a plain-text occurrence of the current note's visible title. Selecting a result should open the source note through Calmd's existing save-gated navigation flow.
@@ -96,4 +98,4 @@ Add search tests covering:
 
 ## Documentation cleanup
 
-After implementation is accepted, update `docs/implementation-brief.md` and the relevant internal-linking documentation with the supported title-only unlinked-mention behavior and its deliberate boundaries. Remove this in-progress plan after those permanent documentation updates are complete.
+Completed. Permanent documentation now records title-only unlinked mentions, code and wiki-link exclusion, ambiguity handling, bounded excerpts, on-demand loading, and save-gated navigation.

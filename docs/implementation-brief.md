@@ -1,8 +1,8 @@
 # Product implementation brief
 
-## Current phase: literal retrieval, Markdown editing, and internal linking
+## Current phase: literal retrieval and focused Markdown writing
 
-The interface reads and writes top-level Markdown notes in one user-selected vault through dedicated Rust commands. Markdown is the sole source of truth. A disposable schema-version-2 SQLite/FTS5 database in Tauri app data provides ranked literal retrieval and derived backlinks without placing system metadata in the vault.
+The interface reads and writes top-level Markdown notes in one user-selected vault through dedicated Rust commands. Markdown is the sole source of truth. A disposable schema-version-4 SQLite/FTS5 database in Tauri app data provides ranked literal retrieval, title suggestions, derived backlinks, and title-based unlinked mentions without placing system metadata in the vault.
 
 ### Completed
 
@@ -29,7 +29,13 @@ The interface reads and writes top-level Markdown notes in one user-selected vau
 - Application-owned Back, Forward, and Home navigation with save-gated transitions
 - Focused random-note rediscovery from the reconciled index, with current-note exclusion when possible
 - On-demand backlinks derived from unambiguous normalized filename identity
-- Responsive light and dark presentation using a restrained three-level type scale
+- On-demand title-based unlinked mentions that exclude supported links and Markdown code
+- Conflict-safe permanent deletion with confirmation, navigation-history cleanup, and best-effort index removal
+- Portable local PNG, JPEG, GIF, and WebP images with validated atomic imports, paste and native-picker insertion, scoped asset serving, and Live Preview rendering
+- Configurable native spellcheck persisted in application settings
+- In-memory cursor, selection, and scroll restoration for up to 100 opened notes, including rename and deletion handling
+- Optional Substack export that copies the saved note as HTML and opens the configured publication editor
+- Responsive light and dark presentation with independent RTL boundaries and Arabic-aware editor typography
 
 ### Storage behavior
 
@@ -39,14 +45,15 @@ Renames stage and sync the complete new file in the vault, verify the original r
 
 A filesystem cannot provide one portable atomic operation that simultaneously replaces file content and changes its name. There is therefore a brief interval between unlinking the original path and installing the new path. Calmd restores the original after ordinary errors, but a process or machine failure in that interval can leave the complete original in a `.calmd-backup-*.tmp` file. The strategy also requires same-filesystem hard-link support inside the vault. As with atomic save replacement, an external process can still race the final revision check. Cleanup failures are logged rather than reported as failed saves after the new note has already been committed.
 
-The search database stores note keys, normalized filename identities, titles, bodies, revisions, filesystem modification times, and outgoing links under Tauri app data. Schema version 2 derives backlinks while FTS5 indexes titles and bodies with title-weighted BM25 ranking and trigram substring matching. Non-exact results use match-specific FTS5 snippets with a 96-token context window. Rust removes visible `[[...]]` brackets and bounds every excerpt at 240 Unicode characters before Tauri IPC. Exact-title results bypass FTS, read at most 480 body characters, and return one result with a bounded leading excerpt. Random rediscovery chooses a uniform row offset from the reconciled indexed notes, optionally excluding the active key, then reads the selected Markdown source before returning it. Launch and focus scans reconcile the complete top-level Markdown snapshot transactionally. Missing, incompatible, and corrupt databases are discarded and rebuilt. Index failures never roll back a successful Markdown write.
+The search database stores note keys, normalized filename identities, folded search keys, titles, folded search titles and bodies, original bodies, revisions, filesystem modification times, and outgoing links under Tauri app data. Schema version 4 derives backlinks and unlinked mentions while FTS5 indexes folded title and body text with title-weighted BM25 ranking and trigram substring matching. Folding removes Arabic harakat, Quranic annotation marks, and tatweel for retrieval while preserving original text in results. Non-exact results use match-specific FTS5 snippets with a 96-token context window. Rust removes visible `[[...]]` brackets and bounds every excerpt at 240 Unicode characters before Tauri IPC. Exact-title results bypass FTS, read at most 480 body characters, and return one result with a bounded leading excerpt. Random rediscovery chooses a uniform row offset from the reconciled indexed notes, optionally excluding the active key, then reads the selected Markdown source before returning it. Launch and focus scans reconcile the complete top-level Markdown snapshot transactionally. Missing, incompatible, and corrupt databases are discarded and rebuilt. Index failures never roll back a successful Markdown write.
 
 ### Remaining limitations and deferred work
 
 - Paths, headings, blocks, embeds, multiline wiki links, and wiki links inside code
 - Ambiguous case-insensitive filename identities resolve to neither note
-- Filesystem watching, deletion, nested folders, and multiple vaults
-- Operating-system/browser history integration, persisted history, and cursor or scroll restoration
+- Filesystem watching, nested folders, and multiple vaults
+- Trash or restore, attachment cleanup, attachment browsing, OS image drag-and-drop, and reference-style images
+- Operating-system/browser history integration and persisted navigation or editor-view history
 
 ## Current experience
 
@@ -54,7 +61,7 @@ The app opens to a single composer. As the user types, it searches existing note
 
 ## Current navigation
 
-Knowledge is accessed through literal retrieval, inline `[[links]]`, backlinks, random rediscovery, and application-owned back and forward navigation. While Calmd is focused, `Alt+H` returns Home through the same save-gated navigation flow as the title-bar control, and `Cmd/Ctrl+Alt+R` opens a random indexed note through the same save-gated note transition. The random action prefers a different note from the current one and leaves a one-note editor unchanged. The full collection is never shown by default.
+Knowledge is accessed through literal retrieval, inline `[[links]]`, backlinks, title-based unlinked mentions, random rediscovery, and application-owned back and forward navigation. While Calmd is focused, `Alt+H` returns Home through the same save-gated navigation flow as the title-bar control, and `Cmd/Ctrl+Alt+R` opens a random indexed note through the same save-gated note transition. The random action prefers a different note from the current one and leaves a one-note editor unchanged. The full collection is never shown by default.
 
 ## Current note storage
 
@@ -75,7 +82,10 @@ Literal retrieval uses SQLite FTS5 trigram matching for title and body text, tit
 - Automatic saving with conflict detection and reload recovery
 - Live Preview treatment for supported wiki links
 - Minimal formatting controls
-- Backlinks hidden until requested
+- Backlinks and unlinked mentions hidden until requested
+- Portable local image Live Preview and paste or native-picker insertion
+- Configurable native spellcheck
+- In-memory cursor, selection, and scroll restoration during the app run
 - No permanent secondary panels
 
 ## Current technology
@@ -96,8 +106,12 @@ Literal retrieval uses SQLite FTS5 trigram matching for title and body text, tit
 4. **Superseded:** Prototype in-memory note creation and saving
 5. **Completed:** On-demand backlinks, internal wiki links, and conflict-safe navigation
 6. **Completed:** Tauri Markdown vault integration with atomic, conflict-safe saving and coordinated rename rewriting
-7. **Completed:** Rebuildable schema-version-2 SQLite/FTS5 literal search, ranked excerpts, and backlink index
+7. **Completed:** Rebuildable schema-version-4 SQLite/FTS5 literal search, ranked excerpts, title suggestions, backlink index, and unlinked mentions
 8. **Completed:** Save-gated random-note rediscovery with a focused-window `Cmd/Ctrl+Alt+R` shortcut
+9. **Completed:** Portable local image import and Live Preview
+10. **Completed:** Conflict-safe permanent note deletion
+11. **Completed:** Configurable spellcheck and in-memory editor-view restoration
+12. **Completed:** Optional Substack export
 
 Semantic retrieval and embeddings were considered during planning, but current literal retrieval is effective, predictable, and lightweight for the intended workflow and better aligned with Calmd's minimal product philosophy. They are outside Calmd's current product direction and are not planned unless usage evidence shows repeated retrieval failures caused by differences in wording.
 
