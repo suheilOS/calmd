@@ -299,6 +299,28 @@ describe('NoteWorkspaceRuntime', () => {
     workspace.dispose()
   })
 
+  test('flushes the current note before opening a wiki link from a preview', async () => {
+    const target = note('Target.md')
+    const events: string[] = []
+    const workspace = runtime(adapter({
+      openLink: async () => {
+        events.push('open-link')
+        return { note: target, canonicalTarget: 'Target' }
+      },
+      rename: async (_key, draft) => {
+        events.push('rename')
+        return { ...original, key: 'Renamed.md', ...draft, revision: 'saved' }
+      },
+    }))
+    await workspace.open(original.key)
+    workspace.updateDraft({ title: 'Renamed', body: 'Changed' })
+
+    expect(await workspace.openWikiLink('Target')).toBe(true)
+    expect(events).toEqual(['rename', 'open-link'])
+    expect(workspace.current().note?.key).toBe(target.key)
+    workspace.dispose()
+  })
+
   test('canonicalizes an Internal link before opening its destination', async () => {
     const target = note('Target.md')
     const workspace = runtime(adapter({

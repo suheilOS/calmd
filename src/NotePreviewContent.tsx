@@ -1,15 +1,44 @@
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { supportedExternalUrl } from './markdown-editor/externalLinks'
+import { remarkPreviewWikiLinks } from './previewWikiLinks'
 
 type NotePreviewContentProps = {
   excerpt: string
+  onOpenExternalLink: (url: string) => void
+  onOpenWikiLink: (target: string) => void
 }
 
-export default function NotePreviewContent({ excerpt }: NotePreviewContentProps) {
+export default function NotePreviewContent({
+  excerpt,
+  onOpenExternalLink,
+  onOpenWikiLink,
+}: NotePreviewContentProps) {
   return (
     <ReactMarkdown
       components={{
-        a: ({ children }) => <bdi className="note-preview-link" dir="auto">{children}</bdi>,
+        a: ({ children, href, node }) => {
+          const wikiTargetProperty = node?.properties.dataWikiTarget
+          const wikiTarget = typeof wikiTargetProperty === 'string' ? wikiTargetProperty : null
+          const externalUrl = href ? supportedExternalUrl(href) : null
+          if (!wikiTarget && !externalUrl) {
+            return <bdi className="note-preview-link" dir="auto">{children}</bdi>
+          }
+          return (
+            <a
+              className="note-preview-link"
+              dir="auto"
+              href={externalUrl ?? href}
+              onClick={(event) => {
+                event.preventDefault()
+                if (wikiTarget) onOpenWikiLink(wikiTarget)
+                else if (externalUrl) onOpenExternalLink(externalUrl)
+              }}
+            >
+              {children}
+            </a>
+          )
+        },
         blockquote: ({ children }) => <blockquote dir="auto">{children}</blockquote>,
         code: ({ children, className }) => <code className={className} dir="ltr">{children}</code>,
         h1: ({ children }) => <h1 dir="auto">{children}</h1>,
@@ -27,7 +56,7 @@ export default function NotePreviewContent({ excerpt }: NotePreviewContentProps)
         th: ({ children }) => <th dir="auto">{children}</th>,
         ul: ({ children }) => <ul dir="auto">{children}</ul>,
       }}
-      remarkPlugins={[remarkGfm]}
+      remarkPlugins={[remarkGfm, remarkPreviewWikiLinks]}
       skipHtml
     >
       {excerpt}

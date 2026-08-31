@@ -404,14 +404,16 @@ describe('MarkdownEditor Live Preview', () => {
     const editor = container.querySelector<HTMLElement>('.cm-editor')
     if (!content || !editor) throw new Error('CodeMirror content was not mounted')
 
-    editor.dispatchEvent(new PointerEvent('pointerdown', {
-      bubbles: true,
-      button: 0,
-      pointerId: 1,
-    }))
     const view = EditorView.findFromDOM(content)
-    view.contentDOM.blur()
-    await act(async () => view.dispatch({ selection: { anchor: 0 } }))
+    await act(async () => {
+      editor.dispatchEvent(new PointerEvent('pointerdown', {
+        bubbles: true,
+        button: 0,
+        pointerId: 1,
+      }))
+      view.contentDOM.blur()
+      view.dispatch({ selection: { anchor: 0 } })
+    })
     expect(content.textContent).toBe('first and second tail')
 
     await act(async () => {

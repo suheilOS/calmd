@@ -1,4 +1,5 @@
 import { Button } from '@base-ui/react/button'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { BacklinksPopover } from '../BacklinksPopover'
 import type { MarkdownEditorCommands } from '../markdown-editor/contracts'
@@ -148,6 +149,8 @@ export function NoteEditor() {
         controller={previewController}
         currentDraft={draft}
         currentNoteKey={noteKey}
+        onOpenExternalLink={(url) => void openUrl(url).catch(actions.reportError)}
+        onOpenWikiLink={(target) => void actions.openWikiLink(target)}
       />
 
       {saveMessage ? (

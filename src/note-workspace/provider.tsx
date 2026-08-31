@@ -26,6 +26,7 @@ export type NoteWorkspaceActions = {
   home: () => Promise<boolean>
   open: (key: string) => Promise<boolean>
   openRandom: NoteWorkspaceRuntime['openRandom']
+  openWikiLink: (target: string) => Promise<boolean>
   reload: () => Promise<boolean>
   reportError: (error: unknown) => void
   setBacklinksOpen: (open: boolean) => void
@@ -87,6 +88,7 @@ export function NoteWorkspaceProvider({
     home: runtime.home,
     open: runtime.open,
     openRandom: runtime.openRandom,
+    openWikiLink: runtime.openWikiLink,
     reload: runtime.reload,
     reportError: runtime.reportError,
     setBacklinksOpen: runtime.setBacklinksOpen,

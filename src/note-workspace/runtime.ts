@@ -283,10 +283,34 @@ export class NoteWorkspaceRuntime {
     }
   }
 
+  openWikiLink = async (target: string) => {
+    if (!this.note) return false
+    const generation = this.navigation.startTransition()
+    if (generation === null) return false
+    try {
+      const flushed = await this.flush()
+      if (!flushed || !this.navigation.isCurrent(generation)) return false
+
+      const resolved = await this.adapter.openLink(target)
+      if (!this.navigation.isCurrent(generation)) return false
+      if (resolved.note.key !== flushed.key) this.beginEditing(resolved.note)
+      return true
+    } catch (error) {
+      await this.handleVaultError(error)
+      return false
+    } finally {
+      this.navigation.finishTransition()
+    }
+  }
+
   activateWikiLink = async (activation: WikiLinkActivation) => {
     const activatedKey = this.note?.key
+    if (!activatedKey) {
+      activation.finish()
+      return false
+    }
     const generation = this.navigation.startTransition()
-    if (generation === null || !activatedKey) {
+    if (generation === null) {
       activation.finish()
       return false
     }

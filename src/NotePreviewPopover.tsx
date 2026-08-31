@@ -13,12 +13,16 @@ type NotePreviewPopoverProps = {
   controller: NotePreviewController
   currentDraft: NoteDraft
   currentNoteKey: string
+  onOpenExternalLink: (url: string) => void
+  onOpenWikiLink: (target: string) => void
 }
 
 export function NotePreviewPopover({
   controller,
   currentDraft,
   currentNoteKey,
+  onOpenExternalLink,
+  onOpenWikiLink,
 }: NotePreviewPopoverProps) {
   const state = useSyncExternalStore(
     controller.subscribe,
@@ -104,7 +108,17 @@ export function NotePreviewPopover({
                   <div className="note-preview-content mt-3 text-small text-secondary">
                     {preview.excerpt.trim() ? (
                       <Suspense fallback={<p>Loading…</p>}>
-                        <NotePreviewContent excerpt={preview.excerpt} />
+                        <NotePreviewContent
+                          excerpt={preview.excerpt}
+                          onOpenExternalLink={(url) => {
+                            controller.dismiss()
+                            onOpenExternalLink(url)
+                          }}
+                          onOpenWikiLink={(target) => {
+                            controller.dismiss()
+                            onOpenWikiLink(target)
+                          }}
+                        />
                       </Suspense>
                     ) : <p className="italic text-faint">Empty note</p>}
                   </div>
