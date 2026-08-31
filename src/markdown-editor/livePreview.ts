@@ -1,6 +1,7 @@
 import { forceParsing, syntaxTree, syntaxTreeAvailable } from '@codemirror/language'
-import { StateEffect, type Range } from '@codemirror/state'
+import { StateEffect, StateField, type EditorState, type Range } from '@codemirror/state'
 import type { SyntaxNode } from '@lezer/common'
+import { marked } from 'marked'
 import {
   Decoration,
   type DecorationSet,
@@ -15,6 +16,7 @@ import {
   selectionTouchesSourceRange,
   wikiLinkHiddenSyntaxRanges,
 } from '../wikiLinks'
+import { tableLiveEditor } from './tableLiveEditor'
 
 type SourceRange = { from: number; to: number }
 
@@ -64,6 +66,146 @@ class ListMarkerWidget extends WidgetType {
 
   eq(other: ListMarkerWidget) {
     return this.label === other.label
+  }
+}
+
+function appendSanitizedCalloutHtml(target: HTMLElement, html: string, document: Document) {
+  const template = document.createElement('template')
+  template.innerHTML = html
+
+  const inlineFragments = (nodes: NodeListOf<ChildNode> | readonly Node[]): Node[][] => {
+    const lines: Node[][] = [[]]
+    const appendFragments = (fragments: Node[][]) => {
+      lines[lines.length - 1]?.push(...(fragments[0] ?? []))
+      for (const fragment of fragments.slice(1)) lines.push([...fragment])
+    }
+
+    for (const node of nodes) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        lines[lines.length - 1]?.push(document.createTextNode(node.textContent ?? ''))
+        continue
+      }
+      if (!(node instanceof Element)) continue
+      const tag = node.tagName.toLowerCase()
+      if (tag === 'br') {
+        lines.push([])
+        continue
+      }
+      const safeTag = tag === 'strong' || tag === 'em' || tag === 'del' || tag === 'code'
+        ? tag
+        : tag === 'a' ? 'span' : null
+      if (!safeTag) {
+        lines[lines.length - 1]?.push(document.createTextNode(node.textContent ?? ''))
+        continue
+      }
+      const fragments = inlineFragments(node.childNodes).map((children) => {
+        const safe = document.createElement(safeTag)
+        if (tag === 'a') safe.className = 'cm-callout-link'
+        safe.append(...children)
+        return [safe]
+      })
+      appendFragments(fragments)
+    }
+    return lines
+  }
+
+  const appendNode = (parent: Node, node: Node): void => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      parent.appendChild(document.createTextNode(node.textContent ?? ''))
+      return
+    }
+    if (!(node instanceof Element)) return
+
+    const tag = node.tagName.toLowerCase()
+    if (tag === 'p' && node.querySelector('br')) {
+      for (const fragment of inlineFragments(node.childNodes)) {
+        const line = document.createElement('div')
+        line.className = 'cm-callout-body-line'
+        line.dir = 'auto'
+        line.append(...fragment)
+        parent.appendChild(line)
+      }
+      return
+    }
+    const allowed = tag === 'p'
+      || tag === 'ul'
+      || tag === 'ol'
+      || tag === 'li'
+      || tag === 'strong'
+      || tag === 'em'
+      || tag === 'del'
+      || tag === 'code'
+      || tag === 'pre'
+      || tag === 'br'
+      || tag === 'blockquote'
+    if (allowed) {
+      const safe = document.createElement(tag)
+      if (tag === 'p' || tag === 'li' || tag === 'pre' || tag === 'blockquote') safe.dir = 'auto'
+      for (const child of node.childNodes) appendNode(safe, child)
+      parent.appendChild(safe)
+      return
+    }
+    if (tag === 'a') {
+      const label = document.createElement('span')
+      label.className = 'cm-callout-link'
+      for (const child of node.childNodes) appendNode(label, child)
+      parent.appendChild(label)
+      return
+    }
+    parent.appendChild(document.createTextNode(node.textContent ?? ''))
+  }
+
+  for (const node of template.content.childNodes) {
+    if (node.nodeType === Node.TEXT_NODE && !node.textContent?.trim()) continue
+    appendNode(target, node)
+  }
+}
+
+function appendCalloutMarkdown(target: HTMLElement, source: string, document: Document) {
+  appendSanitizedCalloutHtml(
+    target,
+    marked.parse(source, { async: false, breaks: true }),
+    document,
+  )
+}
+
+class CalloutPreviewWidget extends WidgetType {
+  private readonly body: string
+  private readonly from: number
+  private readonly title: string
+
+  constructor(from: number, title: string, body: string) {
+    super()
+    this.body = body
+    this.from = from
+    this.title = title
+  }
+
+  toDOM(view: EditorView) {
+    const callout = view.dom.ownerDocument.createElement('aside')
+    callout.className = 'cm-callout-preview'
+    callout.dir = 'auto'
+    callout.addEventListener('mousedown', (event) => {
+      event.preventDefault()
+      view.dispatch({ selection: { anchor: this.from } })
+      view.focus()
+    })
+    const title = view.dom.ownerDocument.createElement('div')
+    title.className = 'cm-callout-title'
+    title.dir = 'auto'
+    title.textContent = this.title
+    callout.append(title)
+    if (this.body) {
+      const body = view.dom.ownerDocument.createElement('div')
+      body.className = 'cm-callout-body'
+      appendCalloutMarkdown(body, this.body, view.dom.ownerDocument)
+      callout.append(body)
+    }
+    return callout
+  }
+
+  eq(other: CalloutPreviewWidget) {
+    return this.from === other.from && this.title === other.title && this.body === other.body
   }
 }
 
@@ -142,6 +284,54 @@ function childRanges(node: { node: SyntaxNode }) {
   }
   return children
 }
+
+function calloutContent(state: EditorState, blockquote: SyntaxNode) {
+  const lines = state.sliceDoc(blockquote.from, blockquote.to).split('\n')
+  const first = lines[0]?.match(/^\s*>\s*\[!([\w-]+)\][+-]?(?:\s+(.*))?$/u)
+  if (!first) return null
+  const type = first[1]
+  const title = first[2]?.trim() || `${type[0]?.toUpperCase() ?? ''}${type.slice(1)}`
+  const body = lines.slice(1)
+    .map((line) => line.replace(/^\s*>\s?/u, ''))
+    .join('\n')
+    .trim()
+  return { body, title }
+}
+
+function blockPreviewDecorations(state: EditorState) {
+  const decorations: Range<Decoration>[] = []
+  syntaxTree(state).iterate({
+    enter(node) {
+      const active = state.selection.ranges.some((selection) =>
+        selectionTouchesSourceRange(selection, node),
+      )
+      if (active) return
+
+      if (node.name === 'Blockquote') {
+        const callout = calloutContent(state, node.node)
+        if (callout) {
+          decorations.push(Decoration.replace({
+            block: true,
+            widget: new CalloutPreviewWidget(node.from, callout.title, callout.body),
+          }).range(node.from, node.to))
+          return false
+        }
+      }
+    },
+  })
+  return Decoration.set(decorations, true)
+}
+
+const blockPreviewField = StateField.define<DecorationSet>({
+  create: blockPreviewDecorations,
+  update(decorations, transaction) {
+    const treeChanged = syntaxTree(transaction.startState) !== syntaxTree(transaction.state)
+    return transaction.docChanged || transaction.selection || treeChanged
+      ? blockPreviewDecorations(transaction.state)
+      : decorations
+  },
+  provide: (field) => EditorView.decorations.from(field),
+})
 
 function headingLevel(name: string) {
   const match = name.match(/^ATXHeading([1-6])$/)
@@ -613,6 +803,8 @@ export function livePreview(
   })
 
   return [
+    tableLiveEditor,
+    blockPreviewField,
     plugin,
     EditorView.bidiIsolatedRanges.of((view) =>
       view.plugin(plugin)?.bidiIsolates ?? Decoration.none,

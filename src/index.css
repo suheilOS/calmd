@@ -53,6 +53,7 @@
   --color-selection-ink: oklch(0.990 0.016 95.219);
   --color-highlight: oklch(0.914 0.087 93.228);
   --color-accent: oklch(0.554 0.086 186.744);
+  --color-callout-surface: color-mix(in oklab, var(--color-accent) 12%, var(--color-canvas));
   --color-code-normal: oklch(0.365 0.004 67.689);
   --color-code-comment: oklch(0.538 0.008 97.449);
   --color-code-function: oklch(0.482 0.131 254.789);
@@ -164,4 +165,16 @@ body {
 ::selection {
   background: var(--color-selection);
   color: var(--color-selection-ink);
+}
+
+@media (hover: hover) {
+  .cm-tooltip-autocomplete > ul:hover > li[aria-selected]:not(:hover) {
+    background: transparent;
+    color: var(--color-ink);
+  }
+
+  .cm-tooltip-autocomplete > ul > li:hover {
+    background: var(--color-hover);
+    color: var(--color-ink);
+  }
 }
