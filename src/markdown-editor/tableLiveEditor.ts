@@ -14,6 +14,7 @@ import {
 } from '@codemirror/view'
 import type { SyntaxNode } from '@lezer/common'
 import { marked } from 'marked'
+import { parseWikiLinkText } from '../wikiLinks'
 
 export type TableAlignment = 'default' | 'left' | 'center' | 'right'
 
@@ -41,22 +42,43 @@ function isEscaped(source: string, index: number) {
   return slashCount % 2 === 1
 }
 
-function splitTableRow(line: string) {
-  let source = line.trim()
-  if (source.startsWith('|')) source = source.slice(1)
-  if (source.endsWith('|') && !isEscaped(source, source.length - 1)) {
-    source = source.slice(0, -1)
-  }
+type TableCellSource = { source: string; from: number; to: number }
 
-  const cells: string[] = []
-  let start = 0
-  for (let index = 0; index < source.length; index += 1) {
-    if (source[index] !== '|' || isEscaped(source, index)) continue
-    cells.push(source.slice(start, index).trim())
+function isWikiLinkPipe(source: string, index: number) {
+  const start = source.lastIndexOf('[[', index)
+  if (start < 0) return false
+  const end = source.indexOf(']]', index)
+  return end >= 0 && parseWikiLinkText(source.slice(start, end + 2)) !== null
+}
+
+function splitTableRowWithRanges(line: string, lineFrom = 0): TableCellSource[] {
+  let contentFrom = line.search(/\S/u)
+  if (contentFrom < 0) return [{ source: '', from: lineFrom, to: lineFrom }]
+  let contentTo = line.length
+  while (contentTo > contentFrom && /\s/u.test(line[contentTo - 1] ?? '')) contentTo -= 1
+  if (line[contentFrom] === '|') contentFrom += 1
+  if (line[contentTo - 1] === '|' && !isEscaped(line, contentTo - 1)) contentTo -= 1
+
+  const cells: TableCellSource[] = []
+  let start = contentFrom
+  const appendCell = (end: number) => {
+    let from = start
+    let to = end
+    while (from < to && /\s/u.test(line[from] ?? '')) from += 1
+    while (to > from && /\s/u.test(line[to - 1] ?? '')) to -= 1
+    cells.push({ source: line.slice(from, to), from: lineFrom + from, to: lineFrom + to })
+  }
+  for (let index = contentFrom; index < contentTo; index += 1) {
+    if (line[index] !== '|' || isEscaped(line, index) || isWikiLinkPipe(line, index)) continue
+    appendCell(index)
     start = index + 1
   }
-  cells.push(source.slice(start).trim())
+  appendCell(contentTo)
   return cells
+}
+
+function splitTableRow(line: string) {
+  return splitTableRowWithRanges(line).map((cell) => cell.source)
 }
 
 function parseAlignment(source: string): TableAlignment | null {
@@ -123,7 +145,11 @@ function escapeCellPipes(source: string) {
   let result = ''
   for (let index = 0; index < source.length; index += 1) {
     const character = source[index]
-    if (character === '|' && !isEscaped(source, index)) result += '\\'
+    if (
+      character === '|'
+      && !isEscaped(source, index)
+      && !isWikiLinkPipe(source, index)
+    ) result += '\\'
     result += character
   }
   return result
@@ -202,13 +228,42 @@ function findTableRange(state: EditorState, approximateFrom: number): TableRange
   return null
 }
 
+function insideCodeSpan(source: string, index: number) {
+  let cursor = 0
+  while (cursor < index) {
+    const opening = source.indexOf('`', cursor)
+    if (opening < 0 || opening >= index) return false
+    let fenceLength = 1
+    while (source[opening + fenceLength] === '`') fenceLength += 1
+    const fence = '`'.repeat(fenceLength)
+    const closing = source.indexOf(fence, opening + fenceLength)
+    if (closing < 0) return false
+    if (index < closing + fenceLength) return true
+    cursor = closing + fenceLength
+  }
+  return false
+}
+
 function appendSanitizedInline(
   target: HTMLElement,
   source: string,
+  sourceFrom: number,
   document: Document,
 ) {
+  const wikiLinks: { from: number; label: string; to: number }[] = []
+  const sourceWithWikiLinks = source.replace(/\[\[[^\]\r\n]+\]\]/gu, (original, offset: number) => {
+    if (isEscaped(source, offset) || insideCodeSpan(source, offset)) return original
+    const parsed = parseWikiLinkText(original)
+    if (!parsed) return original
+    const index = wikiLinks.push({
+      from: sourceFrom + offset,
+      label: parsed.display ?? parsed.target,
+      to: sourceFrom + offset + original.length,
+    }) - 1
+    return `<calmd-wiki-link data-index="${index}"></calmd-wiki-link>`
+  })
   const template = document.createElement('template')
-  template.innerHTML = marked.parseInline(source, { async: false })
+  template.innerHTML = marked.parseInline(sourceWithWikiLinks, { async: false })
 
   const appendNode = (parent: Node, node: Node): void => {
     if (node.nodeType === Node.TEXT_NODE) {
@@ -227,6 +282,18 @@ function appendSanitizedInline(
       const safe = document.createElement(tag)
       for (const child of node.childNodes) appendNode(safe, child)
       parent.appendChild(safe)
+      return
+    }
+    if (tag === 'calmd-wiki-link') {
+      const index = Number(node.getAttribute('data-index'))
+      const wikiLink = Number.isInteger(index) ? wikiLinks[index] : undefined
+      if (!wikiLink) return
+      const label = document.createElement('span')
+      label.className = 'cm-wiki-link'
+      label.dataset.wikiFrom = String(wikiLink.from)
+      label.dataset.wikiTo = String(wikiLink.to)
+      label.textContent = wikiLink.label
+      parent.appendChild(label)
       return
     }
     if (tag === 'a') {
@@ -276,6 +343,7 @@ class TableController {
   sync(range: TableRange, model: MarkdownTable) {
     this.range = range
     this.model = model
+    this.clampActive()
     if (!this.root) return
 
     const cells = this.root.querySelectorAll<HTMLElement>('[data-table-cell]')
@@ -304,7 +372,12 @@ class TableController {
       const content = cell.querySelector<HTMLElement>('.cm-table-cell-content')
       if (content) {
         content.replaceChildren()
-        appendSanitizedInline(content, source, this.view.dom.ownerDocument)
+        appendSanitizedInline(
+          content,
+          source,
+          this.cellSourceRange(position)?.from ?? this.range.from,
+          this.view.dom.ownerDocument,
+        )
       }
     }
   }
@@ -410,7 +483,12 @@ class TableController {
 
     const content = this.view.dom.ownerDocument.createElement('div')
     content.className = 'cm-table-cell-content'
-    appendSanitizedInline(content, this.cellSource(position), this.view.dom.ownerDocument)
+    appendSanitizedInline(
+      content,
+      this.cellSource(position),
+      this.cellSourceRange(position)?.from ?? this.range.from,
+      this.view.dom.ownerDocument,
+    )
     cell.append(content)
     cell.addEventListener('mousedown', (event) => {
       if (event.button !== 0) return
@@ -428,6 +506,14 @@ class TableController {
     this.active = position
     this.render()
     this.focusActive()
+  }
+
+  private clampActive() {
+    if (!this.active) return
+    this.active = {
+      row: Math.min(this.active.row, this.model.rows.length),
+      column: Math.min(this.active.column, tableWidth(this.model) - 1),
+    }
   }
 
   private focusActive() {
@@ -501,6 +587,19 @@ class TableController {
     return position.row === 0
       ? this.model.header[position.column] ?? ''
       : this.model.rows[position.row - 1]?.[position.column] ?? ''
+  }
+
+  private cellSourceRange(position: CellPosition) {
+    const tableSource = this.view.state.sliceDoc(this.range.from, this.range.to)
+    const lines = tableSource.split('\n')
+    const lineIndex = position.row === 0 ? 0 : position.row + 1
+    const line = lines[lineIndex]
+    if (line === undefined) return null
+    let lineFrom = this.range.from
+    for (let index = 0; index < lineIndex; index += 1) {
+      lineFrom += (lines[index]?.length ?? 0) + 1
+    }
+    return splitTableRowWithRanges(line, lineFrom)[position.column] ?? null
   }
 
   private positionFromCell(cell: HTMLElement): CellPosition | null {
@@ -612,6 +711,21 @@ function tableDecorations(state: EditorState, revealedFrom: number | null) {
   return Decoration.set(decorations, true)
 }
 
+function selectedTableFrom(state: EditorState) {
+  let selectedFrom: number | null = null
+  syntaxTree(state).iterate({
+    enter(node) {
+      if (node.name !== 'Table') return
+      const selected = state.selection.ranges.some((selection) => (
+        !selection.empty && selection.from < node.to && selection.to > node.from
+      ))
+      if (selected) selectedFrom = node.from
+      return selected ? false : undefined
+    },
+  })
+  return selectedFrom
+}
+
 function selectionInsideRevealedTable(state: EditorState, revealedFrom: number) {
   const range = findTableRange(state, revealedFrom)
   if (!range) return false
@@ -630,6 +744,9 @@ const tableField = StateField.define<TableFieldValue>({
       : value.revealedFrom
     for (const effect of transaction.effects) {
       if (effect.is(revealTableSource)) revealedFrom = effect.value
+    }
+    if (revealedFrom === null && transaction.selection) {
+      revealedFrom = selectedTableFrom(transaction.state)
     }
     if (
       revealedFrom !== null

@@ -134,6 +134,21 @@ describe('slashCommandCompletion', () => {
     expect(view.state.doc.toString()).toEndWith('|  |  |\n\nFollowing paragraph')
   })
 
+  test('replaces an otherwise empty Markdown structural prefix', () => {
+    for (const doc of ['- /rule', '> /rule', '# /rule']) {
+      const host = document.createElement('div')
+      document.body.append(host)
+      const view = new EditorView({ doc, extensions: [markdown()], parent: host })
+      views.push(view)
+      const result = completionResult(doc)
+      if (!result) throw new Error(`Expected slash completions for ${doc}`)
+
+      applyCompletion(view, result, option(result, 'Insert horizontal rule'))
+
+      expect(view.state.doc.toString()).toBe('---\n\n')
+    }
+  })
+
   test('replaces indentation so an inserted block does not become indented code', () => {
     const host = document.createElement('div')
     document.body.append(host)

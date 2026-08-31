@@ -7,6 +7,7 @@ import { GFM } from '@lezer/markdown'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import type { DisplayImage } from '../images'
+import type { WikiLinkActivation } from './contracts'
 import { MarkdownEditor } from './MarkdownEditor'
 import { activateExternalLink } from './externalLinks'
 
@@ -53,6 +54,7 @@ async function renderEditor(
   noteKey = `test-note-${++noteSequence}.md`,
   resolveWikiLink = async () => null,
   resolveImage?: (destination: string) => Promise<DisplayImage>,
+  onWikiLinkActivate: (activation: WikiLinkActivation) => void = () => {},
 ) {
   const container = document.createElement('div')
   const scrollContainer = document.createElement('div')
@@ -65,6 +67,7 @@ async function renderEditor(
     root.render(
       <MarkdownEditor
         {...editorProps(value, editorSessionId, onChange, noteKey)}
+        onWikiLinkActivate={onWikiLinkActivate}
         resolveImage={resolveImage}
         resolveWikiLink={resolveWikiLink}
         value={value}
@@ -375,6 +378,32 @@ describe('MarkdownEditor Live Preview', () => {
     ])
   })
 
+  test('renders Markdown inside inactive callout bodies', async () => {
+    const source = [
+      '> [!note] Remember',
+      '> **Important',
+      '> across lines** and `literal`.',
+      '>',
+      '> - First',
+      '>   - Nested',
+      '>',
+      '> ```ts',
+      '> const calm = true',
+      '> ```',
+      '',
+      'Tail',
+    ].join('\n')
+    const { container } = await renderEditor(source, 1)
+
+    const callout = container.querySelector<HTMLElement>('aside.cm-callout-preview')
+    expect(callout?.querySelector('strong')?.textContent).toBe('Important')
+    expect(callout?.querySelectorAll('strong')).toHaveLength(2)
+    expect(callout?.querySelector('code')?.textContent).toBe('literal')
+    expect(callout?.querySelector('pre code')?.textContent).toBe('const calm = true\n')
+    expect(callout?.querySelectorAll('li')).toHaveLength(2)
+    expect(callout?.textContent).not.toContain('**')
+  })
+
   test('keeps tables rendered during contact and retains callout source reveal', async () => {
     const source = [
       '| Name | Value |',
@@ -559,7 +588,82 @@ describe('MarkdownEditor Live Preview', () => {
     )
   })
 
-  test('reveals table Markdown only through the source control', async () => {
+  test('keeps the active cell valid when undo removes a newly added row', async () => {
+    const source = '| A | B |\n| --- | --- |\n| C | D |'
+    const { container } = await renderEditor(source, 1)
+    const addRow = container.querySelector<HTMLButtonElement>('[aria-label="Add table row"]')
+    if (!addRow) throw new Error('Add-row control was not rendered')
+
+    await act(async () => addRow.click())
+    const addedInput = container.querySelector<HTMLInputElement>('.cm-table-cell-input')
+    expect(addedInput?.getAttribute('aria-label')).toBe('Table row 2, column 1')
+
+    await act(async () => addedInput?.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      ctrlKey: true,
+      key: 'z',
+    })))
+
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(1)
+    expect(container.querySelector<HTMLInputElement>('.cm-table-cell-input')
+      ?.getAttribute('aria-label')).toBe('Table row 1, column 1')
+  })
+
+  test('reveals a table source selection made by in-note search', async () => {
+    const source = '| A | B |\n| --- | --- |\n| Find me | D |'
+    const { container } = await renderEditor(source, 1)
+    const content = container.querySelector<HTMLElement>('.cm-content')
+    if (!content) throw new Error('CodeMirror content was not mounted')
+    const view = EditorView.findFromDOM(content)
+    const from = source.indexOf('Find me')
+    view.contentDOM.blur()
+
+    await act(async () => view.dispatch({
+      selection: EditorSelection.range(from, from + 'Find me'.length),
+    }))
+
+    expect(container.querySelector('.cm-table-preview')).toBeNull()
+    expect(view.state.sliceDoc(
+      view.state.selection.main.from,
+      view.state.selection.main.to,
+    )).toBe('Find me')
+  })
+
+  test('preserves modifier navigation for wiki links inside table cells', async () => {
+    const activations: WikiLinkActivation[] = []
+    const source = [
+      '| Link | Code | Escaped |',
+      '| --- | --- | --- |',
+      '| [[Target|Label]] | `[[Code]]` | \\[[Escaped]] |',
+    ].join('\n')
+    const { container } = await renderEditor(
+      source,
+      1,
+      () => {},
+      `table-link-${++noteSequence}.md`,
+      async () => true,
+      undefined,
+      (activation) => activations.push(activation),
+    )
+    const links = container.querySelectorAll<HTMLElement>('[data-wiki-from]')
+    const link = links[0]
+    expect(links).toHaveLength(1)
+    expect(link?.textContent).toBe('Label')
+    expect(container.querySelector('.cm-table-preview')?.textContent).toContain('[[Code]]')
+    expect(container.querySelector('.cm-table-preview')?.textContent).toContain('[[Escaped]]')
+
+    await act(async () => link?.dispatchEvent(new MouseEvent('mousedown', {
+      bubbles: true,
+      button: 0,
+      cancelable: true,
+      ctrlKey: true,
+    })))
+
+    expect(activations.map((activation) => activation.target)).toEqual(['Target'])
+  })
+
+  test('reveals table Markdown through the source control', async () => {
     const source = '| A | B |\n| --- | --- |\n| C | D |'
     const { container } = await renderEditor(source, 1)
     const sourceButton = container.querySelector<HTMLButtonElement>(

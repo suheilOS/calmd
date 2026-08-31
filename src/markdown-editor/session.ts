@@ -371,6 +371,22 @@ const editorTheme = EditorView.theme({
   },
 })
 
+function eventElement(event: Event) {
+  return event.target instanceof Element
+    ? event.target
+    : event.target instanceof Node
+      ? event.target.parentElement
+      : null
+}
+
+function tableWikiLinkRange(element: Element | null) {
+  const wikiLink = element?.closest<HTMLElement>('.cm-wiki-link[data-wiki-from]')
+  if (!wikiLink) return null
+  const from = Number(wikiLink.dataset.wikiFrom)
+  const to = Number(wikiLink.dataset.wikiTo)
+  return Number.isInteger(from) && Number.isInteger(to) && from < to ? { from, to } : null
+}
+
 function linkInteraction(
   onActivate: (activation: WikiLinkActivation) => void,
   onPreviewCandidateEnter: (candidate: NotePreviewCandidate) => void,
@@ -380,6 +396,24 @@ function linkInteraction(
 ) {
   return ViewPlugin.fromClass(class {
     active = new Set<{ from: number; to: number; original: string; target: string }>()
+    private readonly view: EditorView
+
+    constructor(view: EditorView) {
+      this.view = view
+      view.dom.addEventListener('mousedown', this.activateTableWikiLink, true)
+    }
+
+    destroy() {
+      this.view.dom.removeEventListener('mousedown', this.activateTableWikiLink, true)
+    }
+
+    private readonly activateTableWikiLink = (event: Event) => {
+      if (
+        event instanceof MouseEvent
+        && tableWikiLinkRange(eventElement(event))
+        && this.activateWikiLink(this.view, event)
+      ) event.stopPropagation()
+    }
     hoveredCandidateId: string | null = null
     hoveredAnchor: Element | null = null
 
@@ -404,35 +438,38 @@ function linkInteraction(
 
     pointerMove(view: EditorView, event: PointerEvent) {
       if (event.pointerType !== 'mouse') return false
-      const eventElement = event.target instanceof Element
-        ? event.target
-        : event.target instanceof Node
-          ? event.target.parentElement
-          : null
-      const hoveredElement = eventElement?.closest('.cm-wiki-link') ?? null
+      const targetElement = eventElement(event)
+      const hoveredElement = targetElement?.closest('.cm-wiki-link') ?? null
       if (!hoveredElement || !view.dom.contains(hoveredElement)) {
         this.clearHoveredCandidate()
         return false
       }
-      const position = view.posAtCoords({ x: event.clientX, y: event.clientY })
+      const tableRange = tableWikiLinkRange(targetElement)
+      const position = tableRange
+        ? tableRange.from
+        : view.posAtCoords({ x: event.clientX, y: event.clientY })
       if (position === null) {
         this.clearHoveredCandidate()
         return false
       }
-      let node = syntaxTree(view.state).resolveInner(position, -1)
-      while (node.name !== 'WikiLink' && node.parent) node = node.parent
-      if (node.name !== 'WikiLink') {
-        this.clearHoveredCandidate()
-        return false
+      let range = tableRange
+      if (!range) {
+        let node = syntaxTree(view.state).resolveInner(position, -1)
+        while (node.name !== 'WikiLink' && node.parent) node = node.parent
+        if (node.name !== 'WikiLink') {
+          this.clearHoveredCandidate()
+          return false
+        }
+        range = { from: node.from, to: node.to }
       }
-      const original = view.state.sliceDoc(node.from, node.to)
+      const original = view.state.sliceDoc(range.from, range.to)
       const parsed = parseWikiLinkText(original)
       if (!parsed) {
         this.clearHoveredCandidate()
         return false
       }
 
-      const id = `wiki-link:${node.from}:${node.to}:${original}`
+      const id = `wiki-link:${range.from}:${range.to}:${original}`
       if (this.hoveredCandidateId === id && this.hoveredAnchor === hoveredElement) return false
       this.hoveredCandidateId = id
       this.hoveredAnchor = hoveredElement
@@ -465,20 +502,31 @@ function linkInteraction(
 
     activateWikiLink(view: EditorView, event: MouseEvent) {
       if (!isPrimaryNavigationClick(navigationPlatform(), event)) return false
-      const position = view.posAtDOM(event.target as Node)
-      let node = syntaxTree(view.state).resolveInner(position, -1)
-      while (node.name !== 'WikiLink' && node.parent) node = node.parent
-      if (node.name !== 'WikiLink') return false
-      const original = view.state.sliceDoc(node.from, node.to)
+      const targetElement = eventElement(event)
+      const tableRange = tableWikiLinkRange(targetElement)
+      let range = tableRange
+      if (!range) {
+        if (!(event.target instanceof Node)) return false
+        const position = view.posAtDOM(event.target)
+        let node = syntaxTree(view.state).resolveInner(position, -1)
+        while (node.name !== 'WikiLink' && node.parent) node = node.parent
+        if (node.name !== 'WikiLink') return false
+        range = { from: node.from, to: node.to }
+      }
+      const original = view.state.sliceDoc(range.from, range.to)
       const parsed = parseWikiLinkText(original)
       if (!parsed) return false
       onPreviewDismiss()
       event.preventDefault()
-      const occurrence = { from: node.from, to: node.to, original, target: parsed.target }
+      const occurrence = { from: range.from, to: range.to, original, target: parsed.target }
       this.active.add(occurrence)
       const validateCurrentOccurrence = (authoritativeBody: string) => (
         this.active.has(occurrence)
-        && validateWikiLinkOccurrence(view.state, occurrence, authoritativeBody)
+        && (tableRange
+          ? view.state.doc.toString() === authoritativeBody
+            && parseWikiLinkText(view.state.sliceDoc(occurrence.from, occurrence.to))?.target
+              === occurrence.target
+          : validateWikiLinkOccurrence(view.state, occurrence, authoritativeBody))
       )
       onActivate({
         target: parsed.target,

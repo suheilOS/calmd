@@ -22,6 +22,14 @@ describe('Markdown table model', () => {
     })
   })
 
+  test('keeps wiki-link display separators inside their cell', () => {
+    const source = '| Link | Value |\n| --- | --- |\n| [[Target|Label]] | D |'
+    const parsed = parseMarkdownTable(source)
+
+    expect(parsed?.rows).toEqual([['[[Target|Label]]', 'D']])
+    expect(parsed && serializeMarkdownTable(parsed)).toBe(source)
+  })
+
   test('does not split escaped pipes', () => {
     expect(parseMarkdownTable(
       '| Name | Value |\n| --- | --- |\n| A \\| B | `x` |',

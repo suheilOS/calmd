@@ -1,6 +1,7 @@
 import { forceParsing, syntaxTree, syntaxTreeAvailable } from '@codemirror/language'
 import { StateEffect, StateField, type EditorState, type Range } from '@codemirror/state'
 import type { SyntaxNode } from '@lezer/common'
+import { marked } from 'marked'
 import {
   Decoration,
   type DecorationSet,
@@ -68,6 +69,106 @@ class ListMarkerWidget extends WidgetType {
   }
 }
 
+function appendSanitizedCalloutHtml(target: HTMLElement, html: string, document: Document) {
+  const template = document.createElement('template')
+  template.innerHTML = html
+
+  const inlineFragments = (nodes: NodeListOf<ChildNode> | readonly Node[]): Node[][] => {
+    const lines: Node[][] = [[]]
+    const appendFragments = (fragments: Node[][]) => {
+      lines[lines.length - 1]?.push(...(fragments[0] ?? []))
+      for (const fragment of fragments.slice(1)) lines.push([...fragment])
+    }
+
+    for (const node of nodes) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        lines[lines.length - 1]?.push(document.createTextNode(node.textContent ?? ''))
+        continue
+      }
+      if (!(node instanceof Element)) continue
+      const tag = node.tagName.toLowerCase()
+      if (tag === 'br') {
+        lines.push([])
+        continue
+      }
+      const safeTag = tag === 'strong' || tag === 'em' || tag === 'del' || tag === 'code'
+        ? tag
+        : tag === 'a' ? 'span' : null
+      if (!safeTag) {
+        lines[lines.length - 1]?.push(document.createTextNode(node.textContent ?? ''))
+        continue
+      }
+      const fragments = inlineFragments(node.childNodes).map((children) => {
+        const safe = document.createElement(safeTag)
+        if (tag === 'a') safe.className = 'cm-callout-link'
+        safe.append(...children)
+        return [safe]
+      })
+      appendFragments(fragments)
+    }
+    return lines
+  }
+
+  const appendNode = (parent: Node, node: Node): void => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      parent.appendChild(document.createTextNode(node.textContent ?? ''))
+      return
+    }
+    if (!(node instanceof Element)) return
+
+    const tag = node.tagName.toLowerCase()
+    if (tag === 'p' && node.querySelector('br')) {
+      for (const fragment of inlineFragments(node.childNodes)) {
+        const line = document.createElement('div')
+        line.className = 'cm-callout-body-line'
+        line.dir = 'auto'
+        line.append(...fragment)
+        parent.appendChild(line)
+      }
+      return
+    }
+    const allowed = tag === 'p'
+      || tag === 'ul'
+      || tag === 'ol'
+      || tag === 'li'
+      || tag === 'strong'
+      || tag === 'em'
+      || tag === 'del'
+      || tag === 'code'
+      || tag === 'pre'
+      || tag === 'br'
+      || tag === 'blockquote'
+    if (allowed) {
+      const safe = document.createElement(tag)
+      if (tag === 'p' || tag === 'li' || tag === 'pre' || tag === 'blockquote') safe.dir = 'auto'
+      for (const child of node.childNodes) appendNode(safe, child)
+      parent.appendChild(safe)
+      return
+    }
+    if (tag === 'a') {
+      const label = document.createElement('span')
+      label.className = 'cm-callout-link'
+      for (const child of node.childNodes) appendNode(label, child)
+      parent.appendChild(label)
+      return
+    }
+    parent.appendChild(document.createTextNode(node.textContent ?? ''))
+  }
+
+  for (const node of template.content.childNodes) {
+    if (node.nodeType === Node.TEXT_NODE && !node.textContent?.trim()) continue
+    appendNode(target, node)
+  }
+}
+
+function appendCalloutMarkdown(target: HTMLElement, source: string, document: Document) {
+  appendSanitizedCalloutHtml(
+    target,
+    marked.parse(source, { async: false, breaks: true }),
+    document,
+  )
+}
+
 class CalloutPreviewWidget extends WidgetType {
   private readonly body: string
   private readonly from: number
@@ -97,13 +198,7 @@ class CalloutPreviewWidget extends WidgetType {
     if (this.body) {
       const body = view.dom.ownerDocument.createElement('div')
       body.className = 'cm-callout-body'
-      for (const text of this.body.split('\n')) {
-        const line = view.dom.ownerDocument.createElement('div')
-        line.className = 'cm-callout-body-line'
-        line.dir = 'auto'
-        line.textContent = text
-        body.append(line)
-      }
+      appendCalloutMarkdown(body, this.body, view.dom.ownerDocument)
       callout.append(body)
     }
     return callout

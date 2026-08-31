@@ -11,6 +11,7 @@ import type { SlashCommandIcon } from './slashCommandIcons'
 
 const slashQuery = /(?:^|\s)\/[^\s/]*$/u
 const horizontalWhitespace = /[\t ]/u
+const structuralPrefixOnly = /^\s*(?:(?:>\s*)+)?(?:(?:#{1,6}|[-+*]|\d+[.)])\s*)?$/u
 
 type InsertionSelection =
   | { kind: 'cursor-after' }
@@ -99,7 +100,9 @@ function insertionOption(insertion: SlashInsertion): Completion {
     apply: (view, completion, from, to) => {
       const slashFrom = from - 1
       const line = view.state.doc.lineAt(slashFrom)
-      const contentBeforeSlash = view.state.sliceDoc(line.from, slashFrom).trim().length > 0
+      const beforeSlash = view.state.sliceDoc(line.from, slashFrom)
+      const contentBeforeSlash = beforeSlash.trim().length > 0
+        && !structuralPrefixOnly.test(beforeSlash)
       let replaceFrom = contentBeforeSlash ? slashFrom : line.from
       while (
         contentBeforeSlash
