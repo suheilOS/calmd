@@ -348,6 +348,204 @@ describe('MarkdownEditor external links', () => {
 })
 
 describe('MarkdownEditor Live Preview', () => {
+  test('keeps tables rendered during contact and retains callout source reveal', async () => {
+    const source = [
+      '| Name | Value |',
+      '| --- | --- |',
+      '| Calm | Notes |',
+      '',
+      '> [!note] Remember',
+      '> Keep this nearby.',
+      '',
+      'Tail',
+    ].join('\n')
+    const { container } = await renderEditor(source, 1)
+    const content = container.querySelector<HTMLElement>('.cm-content')
+    if (!content) throw new Error('CodeMirror content was not mounted')
+
+    const table = content.querySelector('table.cm-table-preview')
+    const callout = content.querySelector('aside.cm-callout-preview')
+    expect(table?.textContent).toContain('Calm')
+    expect(callout?.textContent).toBe('RememberKeep this nearby.')
+
+    const calmCell = [...content.querySelectorAll<HTMLElement>('[data-table-cell]')]
+      .find((cell) => cell.textContent === 'Calm')
+    if (!calmCell) throw new Error('Calm table cell was not rendered')
+    await act(async () => calmCell.dispatchEvent(new MouseEvent('mousedown', {
+      bubbles: true,
+      button: 0,
+    })))
+    expect(content.querySelector('table.cm-table-preview')).not.toBeNull()
+    expect(content.querySelector('.cm-table-cell-input')).not.toBeNull()
+    expect(content.textContent).not.toContain('| Name | Value |')
+
+    const view = EditorView.findFromDOM(content)
+    await act(async () => view.dispatch({ selection: { anchor: source.indexOf('Remember') } }))
+    expect(content.querySelector('aside.cm-callout-preview')).toBeNull()
+    expect(content.textContent).toContain('> [!note] Remember')
+  })
+
+  test('edits table cells without exposing the table source', async () => {
+    const changes: string[] = []
+    const source = '| Name | Value |\n| :--- | ---: |\n| Calm | Notes |'
+    const { container } = await renderEditor(source, 1, (value) => changes.push(value))
+    expect(container.querySelector('[data-table-cell="0:0"]')
+      ?.getAttribute('data-alignment')).toBe('left')
+    expect(container.querySelector('[data-table-cell="0:1"]')
+      ?.getAttribute('data-alignment')).toBe('right')
+    const calmCell = [...container.querySelectorAll<HTMLElement>('[data-table-cell]')]
+      .find((cell) => cell.textContent === 'Calm')
+    if (!calmCell) throw new Error('Calm table cell was not rendered')
+
+    await act(async () => calmCell.dispatchEvent(new MouseEvent('mousedown', {
+      bubbles: true,
+      button: 0,
+    })))
+    const input = container.querySelector<HTMLInputElement>('.cm-table-cell-input')
+    if (!input) throw new Error('Table cell editor was not mounted')
+    expect(input.getAttribute('aria-label')).toBe('Table row 1, column 1')
+
+    await act(async () => {
+      input.value = 'Quiet'
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+
+    expect(changes.at(-1)).toBe('| Name | Value |\n| :--- | ---: |\n| Quiet | Notes |')
+    expect(container.querySelector('.cm-table-preview')).not.toBeNull()
+    expect(container.querySelector('.cm-content')?.textContent).not.toContain('| Quiet |')
+  })
+
+  test('commits IME input only after composition ends', async () => {
+    const changes: string[] = []
+    const source = '| A | B |\n| --- | --- |\n| C | D |'
+    const { container } = await renderEditor(source, 1, (value) => changes.push(value))
+    const cell = container.querySelector<HTMLElement>('[data-table-cell="1:0"]')
+    if (!cell) throw new Error('Table cell was not rendered')
+    await act(async () => cell.dispatchEvent(new MouseEvent('mousedown', {
+      bubbles: true,
+      button: 0,
+    })))
+    const input = container.querySelector<HTMLInputElement>('.cm-table-cell-input')
+    if (!input) throw new Error('Table cell editor was not mounted')
+
+    await act(async () => {
+      input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }))
+      input.value = 'ملاحظة'
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    expect(changes).toEqual([])
+
+    await act(async () => input.dispatchEvent(new CompositionEvent('compositionend', {
+      bubbles: true,
+      data: 'ملاحظة',
+    })))
+    expect(changes.at(-1)).toBe('| A | B |\n| --- | --- |\n| ملاحظة | D |')
+  })
+
+  test('navigates table cells with Tab and appends a row from the final cell', async () => {
+    const changes: string[] = []
+    const source = '| A | B |\n| --- | --- |\n|  |  |'
+    const { container } = await renderEditor(source, 1, (value) => changes.push(value))
+    expect(container.querySelectorAll('tbody td')).toHaveLength(2)
+
+    const firstBodyCell = container.querySelector<HTMLElement>('[data-table-cell="1:0"]')
+    if (!firstBodyCell) throw new Error('First body cell was not rendered')
+    await act(async () => firstBodyCell.dispatchEvent(new MouseEvent('mousedown', {
+      bubbles: true,
+      button: 0,
+    })))
+
+    let input = container.querySelector<HTMLInputElement>('.cm-table-cell-input')
+    if (!input) throw new Error('Table cell editor was not mounted')
+    await act(async () => input.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'Tab',
+    })))
+    input = container.querySelector<HTMLInputElement>('.cm-table-cell-input')
+    expect(input?.getAttribute('aria-label')).toBe('Table row 1, column 2')
+
+    await act(async () => input?.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'Tab',
+    })))
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(2)
+    expect(container.querySelector<HTMLInputElement>('.cm-table-cell-input')
+      ?.getAttribute('aria-label')).toBe('Table row 2, column 1')
+    expect(changes.at(-1)).toBe('| A | B |\n| --- | --- |\n|  |  |\n|  |  |')
+  })
+
+  test('undoes a cell edit through the outer editor history', async () => {
+    const changes: string[] = []
+    const source = '| A | B |\n| --- | --- |\n| C | D |'
+    const { container } = await renderEditor(source, 1, (value) => changes.push(value))
+    const cell = container.querySelector<HTMLElement>('[data-table-cell="1:0"]')
+    if (!cell) throw new Error('Table cell was not rendered')
+    await act(async () => cell.dispatchEvent(new MouseEvent('mousedown', {
+      bubbles: true,
+      button: 0,
+    })))
+    const input = container.querySelector<HTMLInputElement>('.cm-table-cell-input')
+    if (!input) throw new Error('Table cell editor was not mounted')
+
+    await act(async () => {
+      input.value = 'Changed'
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => input.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      ctrlKey: true,
+      key: 'z',
+    })))
+
+    expect(changes.at(-1)).toBe(source)
+    expect(container.querySelector<HTMLInputElement>('.cm-table-cell-input')?.value).toBe('C')
+  })
+
+  test('edits the mapped table range after text is inserted before it', async () => {
+    const changes: string[] = []
+    const source = 'intro\n\n| A | B |\n| --- | --- |\n| C | D |'
+    const { container } = await renderEditor(source, 1, (value) => changes.push(value))
+    const content = container.querySelector<HTMLElement>('.cm-content')
+    if (!content) throw new Error('CodeMirror content was not mounted')
+    const view = EditorView.findFromDOM(content)
+    view.contentDOM.blur()
+    await act(async () => view.dispatch({ changes: { from: 0, insert: 'prefix\n' } }))
+
+    const cell = container.querySelector<HTMLElement>('[data-table-cell="1:1"]')
+    if (!cell) throw new Error('Table cell was not rendered')
+    await act(async () => cell.dispatchEvent(new MouseEvent('mousedown', {
+      bubbles: true,
+      button: 0,
+    })))
+    const input = container.querySelector<HTMLInputElement>('.cm-table-cell-input')
+    if (!input) throw new Error('Table cell editor was not mounted')
+    await act(async () => {
+      input.value = 'Mapped'
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+
+    expect(changes.at(-1)).toBe(
+      'prefix\nintro\n\n| A | B |\n| --- | --- |\n| C | Mapped |',
+    )
+  })
+
+  test('reveals table Markdown only through the source control', async () => {
+    const source = '| A | B |\n| --- | --- |\n| C | D |'
+    const { container } = await renderEditor(source, 1)
+    const sourceButton = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Edit table Markdown"]',
+    )
+    if (!sourceButton) throw new Error('Table source control was not rendered')
+
+    await act(async () => sourceButton.click())
+
+    expect(container.querySelector('.cm-table-preview')).toBeNull()
+    expect(container.querySelector('.cm-content')?.textContent).toContain('| A | B |')
+  })
+
   test('reveals only the formatted span touched by the caret', async () => {
     const { container } = await renderEditor('**first** and **second** tail', 1)
     const content = container.querySelector<HTMLElement>('.cm-content')
@@ -622,7 +820,13 @@ describe('MarkdownEditor Live Preview', () => {
       { length: 1_500 },
       (_, index) => `paragraph ${index}`,
     ).join('\n\n')
-    const { container } = await renderEditor(`${paragraphs}\n\n**target** tail`, 1)
+    const distantContent = [
+      paragraphs,
+      '**target** tail',
+      '| Name | Value |\n| --- | --- |\n| Calm | Notes |',
+      'final paragraph',
+    ].join('\n\n')
+    const { container } = await renderEditor(distantContent, 1)
     const editor = container.querySelector<HTMLElement>('.cm-editor')
     if (!editor) throw new Error('CodeMirror was not mounted')
 
@@ -636,10 +840,16 @@ describe('MarkdownEditor Live Preview', () => {
       })
     }
 
-    const visibleText = container.querySelector('.cm-content')?.textContent
+    const content = container.querySelector<HTMLElement>('.cm-content')
+    if (!content) throw new Error('CodeMirror content was not mounted')
+    const view = EditorView.findFromDOM(content)
+    await act(async () => view.dispatch({
+      effects: EditorView.scrollIntoView(distantContent.indexOf('| Name'), { y: 'center' }),
+    }))
+    await waitForEditorState(() => container.querySelector('.cm-table-preview') !== null)
+
     expect(editor.classList.contains('cm-live-preview-pending')).toBe(false)
-    expect(visibleText).toContain('target tail')
-    expect(visibleText).not.toContain('**target**')
+    expect(container.querySelector('.cm-table-preview')?.textContent).toContain('Calm')
   })
 
   test('renders resolved local images and reveals their source on contact', async () => {

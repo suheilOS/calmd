@@ -39,8 +39,8 @@ export function MarkdownEditor({ ref, ...input }: MarkdownEditorProps) {
     dispatchFormattingToolbar({ type: 'snapshot', snapshot })
   }, [])
 
-  const requestToolbarFocus = useCallback(() => {
-    dispatchFormattingToolbar({ type: 'request-focus' })
+  const requestToolbarFocus = useCallback((snapshot: FormattingToolbarSnapshot) => {
+    dispatchFormattingToolbar({ type: 'request-focus', snapshot })
   }, [])
 
   useLayoutEffect(() => {

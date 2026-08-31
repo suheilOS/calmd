@@ -22,12 +22,9 @@ function snapshot(selectionRevision: number): FormattingToolbarSnapshot {
 }
 
 describe('formatting toolbar state', () => {
-  test('focuses the toolbar when its snapshot arrives after the keyboard request', () => {
-    const pending = reduceFormattingToolbarState(initialFormattingToolbarState, {
+  test('opens and focuses the requested toolbar snapshot atomically', () => {
+    expect(reduceFormattingToolbarState(initialFormattingToolbarState, {
       type: 'request-focus',
-    })
-    expect(reduceFormattingToolbarState(pending, {
-      type: 'snapshot',
       snapshot: snapshot(1),
     })).toEqual({
       kind: 'visible',
@@ -69,10 +66,14 @@ describe('formatting toolbar state', () => {
     })
     const dismissed = reduceFormattingToolbarState(visible, { type: 'dismiss' })
 
-    expect(reduceFormattingToolbarState(dismissed, { type: 'request-focus' })).toEqual({
+    const movedSnapshot = { ...snapshot(5), anchor: { height: 20, width: 0, x: 80, y: 90 } }
+    expect(reduceFormattingToolbarState(dismissed, {
+      type: 'request-focus',
+      snapshot: movedSnapshot,
+    })).toEqual({
       kind: 'visible',
       focusRequested: true,
-      snapshot: snapshot(4),
+      snapshot: movedSnapshot,
     })
   })
 })

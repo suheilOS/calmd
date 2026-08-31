@@ -2,7 +2,6 @@ import type { FormattingToolbarSnapshot } from './contracts'
 
 export type FormattingToolbarState =
   | { kind: 'hidden' }
-  | { kind: 'focus-pending' }
   | { kind: 'dismissed'; snapshot: FormattingToolbarSnapshot }
   | {
     kind: 'visible'
@@ -12,7 +11,7 @@ export type FormattingToolbarState =
 
 export type FormattingToolbarAction =
   | { type: 'snapshot'; snapshot: FormattingToolbarSnapshot | null }
-  | { type: 'request-focus' }
+  | { type: 'request-focus'; snapshot: FormattingToolbarSnapshot }
   | { type: 'focus-handled' }
   | { type: 'dismiss' }
 
@@ -33,17 +32,12 @@ export function reduceFormattingToolbarState(
       ) return state
       return {
         kind: 'visible',
-        focusRequested: state.kind === 'focus-pending'
-          || (state.kind === 'visible' && state.focusRequested),
+        focusRequested: state.kind === 'visible' && state.focusRequested,
         snapshot: action.snapshot,
       }
     }
     case 'request-focus':
-      if (state.kind === 'dismissed') {
-        return { kind: 'visible', focusRequested: true, snapshot: state.snapshot }
-      }
-      if (state.kind !== 'visible') return { kind: 'focus-pending' }
-      return { ...state, focusRequested: true }
+      return { kind: 'visible', focusRequested: true, snapshot: action.snapshot }
     case 'focus-handled':
       if (state.kind !== 'visible' || !state.focusRequested) return state
       return { ...state, focusRequested: false }

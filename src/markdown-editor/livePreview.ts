@@ -1,5 +1,5 @@
 import { forceParsing, syntaxTree, syntaxTreeAvailable } from '@codemirror/language'
-import { StateEffect, type Range } from '@codemirror/state'
+import { StateEffect, StateField, type EditorState, type Range } from '@codemirror/state'
 import type { SyntaxNode } from '@lezer/common'
 import {
   Decoration,
@@ -15,6 +15,7 @@ import {
   selectionTouchesSourceRange,
   wikiLinkHiddenSyntaxRanges,
 } from '../wikiLinks'
+import { tableLiveEditor } from './tableLiveEditor'
 
 type SourceRange = { from: number; to: number }
 
@@ -64,6 +65,45 @@ class ListMarkerWidget extends WidgetType {
 
   eq(other: ListMarkerWidget) {
     return this.label === other.label
+  }
+}
+
+class CalloutPreviewWidget extends WidgetType {
+  private readonly body: string
+  private readonly from: number
+  private readonly title: string
+
+  constructor(from: number, title: string, body: string) {
+    super()
+    this.body = body
+    this.from = from
+    this.title = title
+  }
+
+  toDOM(view: EditorView) {
+    const callout = view.dom.ownerDocument.createElement('aside')
+    callout.className = 'cm-callout-preview'
+    callout.dir = 'auto'
+    callout.addEventListener('mousedown', (event) => {
+      event.preventDefault()
+      view.dispatch({ selection: { anchor: this.from } })
+      view.focus()
+    })
+    const title = view.dom.ownerDocument.createElement('div')
+    title.className = 'cm-callout-title'
+    title.textContent = this.title
+    callout.append(title)
+    if (this.body) {
+      const body = view.dom.ownerDocument.createElement('div')
+      body.className = 'cm-callout-body'
+      body.textContent = this.body
+      callout.append(body)
+    }
+    return callout
+  }
+
+  eq(other: CalloutPreviewWidget) {
+    return this.from === other.from && this.title === other.title && this.body === other.body
   }
 }
 
@@ -142,6 +182,54 @@ function childRanges(node: { node: SyntaxNode }) {
   }
   return children
 }
+
+function calloutContent(state: EditorState, blockquote: SyntaxNode) {
+  const lines = state.sliceDoc(blockquote.from, blockquote.to).split('\n')
+  const first = lines[0]?.match(/^\s*>\s*\[!([\w-]+)\][+-]?(?:\s+(.*))?$/u)
+  if (!first) return null
+  const type = first[1]
+  const title = first[2]?.trim() || `${type[0]?.toUpperCase() ?? ''}${type.slice(1)}`
+  const body = lines.slice(1)
+    .map((line) => line.replace(/^\s*>\s?/u, ''))
+    .join('\n')
+    .trim()
+  return { body, title }
+}
+
+function blockPreviewDecorations(state: EditorState) {
+  const decorations: Range<Decoration>[] = []
+  syntaxTree(state).iterate({
+    enter(node) {
+      const active = state.selection.ranges.some((selection) =>
+        selectionTouchesSourceRange(selection, node),
+      )
+      if (active) return
+
+      if (node.name === 'Blockquote') {
+        const callout = calloutContent(state, node.node)
+        if (callout) {
+          decorations.push(Decoration.replace({
+            block: true,
+            widget: new CalloutPreviewWidget(node.from, callout.title, callout.body),
+          }).range(node.from, node.to))
+          return false
+        }
+      }
+    },
+  })
+  return Decoration.set(decorations, true)
+}
+
+const blockPreviewField = StateField.define<DecorationSet>({
+  create: blockPreviewDecorations,
+  update(decorations, transaction) {
+    const treeChanged = syntaxTree(transaction.startState) !== syntaxTree(transaction.state)
+    return transaction.docChanged || transaction.selection || treeChanged
+      ? blockPreviewDecorations(transaction.state)
+      : decorations
+  },
+  provide: (field) => EditorView.decorations.from(field),
+})
 
 function headingLevel(name: string) {
   const match = name.match(/^ATXHeading([1-6])$/)
@@ -613,6 +701,8 @@ export function livePreview(
   })
 
   return [
+    tableLiveEditor,
+    blockPreviewField,
     plugin,
     EditorView.bidiIsolatedRanges.of((view) =>
       view.plugin(plugin)?.bidiIsolates ?? Decoration.none,

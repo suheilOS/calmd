@@ -6,11 +6,13 @@ import { markdownFormatStates } from './markdownCommands'
 
 type SelectionToolbarCallbacks = {
   onChange: (snapshot: FormattingToolbarSnapshot | null) => void
-  onFocusRequest: () => void
+  onFocusRequest: (snapshot: FormattingToolbarSnapshot) => void
 }
 
-function selectedRange(selection: EditorSelection) {
-  if (!selection.main.empty) return selection.main
+type FormattingToolbarTarget = 'selection' | 'caret'
+
+function selectedRange(selection: EditorSelection, target: FormattingToolbarTarget = 'selection') {
+  if (!selection.main.empty || target === 'caret') return selection.main
   return selection.ranges.find((range) => !range.empty) ?? null
 }
 
@@ -19,8 +21,9 @@ type FormattingToolbarSemantics = Omit<FormattingToolbarSnapshot, 'anchor'>
 export function selectionToolbarSemantics(
   view: EditorView,
   selectionRevision: number,
+  target: FormattingToolbarTarget = 'selection',
 ): FormattingToolbarSemantics | null {
-  if (!selectedRange(view.state.selection)) return null
+  if (!selectedRange(view.state.selection, target)) return null
   return {
     blockKind: selectedMarkdownBlockKind(view.state),
     formats: markdownFormatStates(view.state),
@@ -30,8 +33,9 @@ export function selectionToolbarSemantics(
 
 function selectionToolbarAnchor(
   view: EditorView,
+  target: FormattingToolbarTarget = 'selection',
 ) {
-  const range = selectedRange(view.state.selection)
+  const range = selectedRange(view.state.selection, target)
   if (!range) return null
 
   const pointsBackward = range.head < range.anchor
@@ -50,9 +54,10 @@ function selectionToolbarAnchor(
 export function selectionToolbarSnapshot(
   view: EditorView,
   selectionRevision = 0,
+  target: FormattingToolbarTarget = 'selection',
 ): FormattingToolbarSnapshot | null {
-  const semantics = selectionToolbarSemantics(view, selectionRevision)
-  const anchor = selectionToolbarAnchor(view)
+  const semantics = selectionToolbarSemantics(view, selectionRevision, target)
+  const anchor = selectionToolbarAnchor(view, target)
   return semantics && anchor ? { ...semantics, anchor } : null
 }
 
@@ -122,6 +127,27 @@ export function selectionToolbar({ onChange, onFocusRequest }: SelectionToolbarC
       this.requestPublish()
     }
 
+    keydown(event: KeyboardEvent) {
+      if (
+        event.key !== 'F10'
+        || !event.altKey
+        || event.ctrlKey
+        || event.metaKey
+        || event.shiftKey
+      ) return false
+
+      const snapshot = selectionToolbarSnapshot(
+        this.view,
+        this.selectionRevision,
+        'caret',
+      )
+      if (!snapshot) return false
+
+      event.preventDefault()
+      onFocusRequest(snapshot)
+      return true
+    }
+
     private readonly requestPublish = () => {
       if (this.dragging || this.measurePending) return
       this.measurePending = true
@@ -136,24 +162,13 @@ export function selectionToolbar({ onChange, onFocusRequest }: SelectionToolbarC
         },
       })
     }
-  })
-
-  const focusKeymap = EditorView.domEventHandlers({
-    keydown(event, view) {
-      if (
-        event.key !== 'F10'
-        || !event.altKey
-        || event.ctrlKey
-        || event.metaKey
-        || event.shiftKey
-        || !selectedRange(view.state.selection)
-      ) return false
-
-      event.preventDefault()
-      onFocusRequest()
-      return true
+  }, {
+    eventHandlers: {
+      keydown(event) {
+        return this.keydown(event)
+      },
     },
   })
 
-  return [plugin, focusKeymap]
+  return plugin
 }

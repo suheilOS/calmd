@@ -89,6 +89,8 @@ import { livePreview } from './livePreview'
 import { activateExternalLink as activateExternalUrl } from './externalLinks'
 import { wikiLinkCompletion } from './wikiLinkCompletion'
 import { selectionToolbar } from './selectionToolbar'
+import { slashCommandCompletion } from './slashCommandCompletion'
+import { renderSlashCommandIcon } from './slashCommandIcons'
 
 const externalSync = Annotation.define<boolean>()
 
@@ -207,6 +209,162 @@ const editorTheme = EditorView.theme({
     border: '0.5px solid var(--color-border)',
     borderRadius: '0.625rem',
     color: 'var(--color-ink)',
+  },
+  '.cm-tooltip.cm-tooltip-autocomplete': {
+    backgroundColor: 'var(--color-surface)',
+    border: 'none',
+    borderRadius: '0.875rem',
+    boxShadow: '0 8px 20px rgb(0 0 0 / 0.20)',
+    color: 'var(--color-ink)',
+    overflow: 'hidden',
+    padding: '0.375rem',
+  },
+  '.cm-tooltip.cm-tooltip-autocomplete > ul': {
+    fontFamily: 'inherit',
+    maxHeight: '20rem',
+    minWidth: '14rem',
+    padding: '0',
+  },
+  '.cm-tooltip.cm-tooltip-autocomplete > ul > li': {
+    alignItems: 'center',
+    borderRadius: '0.5rem',
+    color: 'var(--color-ink)',
+    display: 'flex',
+    fontSize: 'var(--text-base)',
+    minHeight: '2.5rem',
+    padding: '0 0.75rem',
+  },
+  '.cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected]': {
+    backgroundColor: 'var(--color-hover)',
+    color: 'var(--color-ink)',
+  },
+  '.cm-completionMatchedText': {
+    fontWeight: '600',
+    textDecoration: 'none',
+  },
+  '.cm-slash-command-icon': {
+    flex: 'none',
+    height: '1.25rem',
+    marginInlineEnd: '0.625rem',
+    width: '1.25rem',
+  },
+  '.cm-completionLabel': {
+    lineHeight: '1',
+    transform: 'translateY(2px)',
+  },
+  '.cm-table-editor': {
+    marginBlock: '0.75rem',
+    maxWidth: '100%',
+    position: 'relative',
+  },
+  '.cm-table-editor:focus': {
+    outline: 'none',
+  },
+  '.cm-table-editor:focus-visible': {
+    borderRadius: '0.375rem',
+    outline: '2px solid var(--color-ink)',
+    outlineOffset: '2px',
+  },
+  '.cm-table-editor-scroller': {
+    maxWidth: '100%',
+    overflowX: 'auto',
+    overscrollBehaviorInline: 'contain',
+  },
+  '.cm-table-preview': {
+    borderCollapse: 'separate',
+    borderSpacing: '0',
+    margin: '0',
+    minWidth: '100%',
+    tableLayout: 'fixed',
+    width: 'max-content',
+  },
+  '.cm-table-preview th, .cm-table-preview td': {
+    borderBlockEnd: '0.5px solid var(--color-divider)',
+    borderInlineEnd: '0.5px solid var(--color-divider)',
+    minWidth: '9rem',
+    padding: '0',
+    textAlign: 'start',
+    verticalAlign: 'top',
+  },
+  '.cm-table-preview th': {
+    backgroundColor: 'var(--color-hover)',
+    fontWeight: '600',
+  },
+  '.cm-table-preview th:first-child, .cm-table-preview td:first-child': {
+    borderInlineStart: '0.5px solid var(--color-divider)',
+  },
+  '.cm-table-preview tr:first-child th': {
+    borderBlockStart: '0.5px solid var(--color-divider)',
+  },
+  '.cm-table-preview [data-alignment="left"]': { textAlign: 'left' },
+  '.cm-table-preview [data-alignment="center"]': { textAlign: 'center' },
+  '.cm-table-preview [data-alignment="right"]': { textAlign: 'right' },
+  '.cm-table-cell-content, .cm-table-cell-input': {
+    boxSizing: 'border-box',
+    minHeight: '2.625rem',
+    padding: '0.5rem 0.75rem',
+    width: '100%',
+  },
+  '.cm-table-cell-content': {
+    overflowWrap: 'anywhere',
+  },
+  '.cm-table-cell-link': {
+    color: 'var(--color-ink)',
+    textDecoration: 'underline',
+    textUnderlineOffset: '0.15em',
+  },
+  '.cm-table-cell-input': {
+    appearance: 'none',
+    background: 'var(--color-canvas)',
+    border: '0',
+    borderRadius: '0',
+    color: 'var(--color-ink)',
+    font: 'inherit',
+    outline: '2px solid var(--color-ink)',
+    outlineOffset: '-2px',
+  },
+  '.cm-table-editor-controls': {
+    display: 'flex',
+    gap: '0.25rem',
+    marginBlockStart: '0.375rem',
+    opacity: '0',
+    pointerEvents: 'none',
+  },
+  '.cm-table-editor:hover .cm-table-editor-controls, .cm-table-editor:focus-within .cm-table-editor-controls': {
+    opacity: '1',
+    pointerEvents: 'auto',
+  },
+  '.cm-table-editor-control': {
+    background: 'transparent',
+    border: '0.5px solid var(--color-divider)',
+    borderRadius: '0.375rem',
+    color: 'var(--color-muted)',
+    font: 'inherit',
+    fontSize: '0.75rem',
+    minHeight: '1.75rem',
+    paddingInline: '0.5rem',
+  },
+  '.cm-table-editor-control:hover': {
+    backgroundColor: 'var(--color-hover)',
+    color: 'var(--color-ink)',
+  },
+  '.cm-table-editor-control:focus-visible': {
+    outline: '2px solid var(--color-ink)',
+    outlineOffset: '2px',
+  },
+  '.cm-callout-preview': {
+    backgroundColor: 'var(--color-callout-surface)',
+    borderRadius: '0.5rem',
+    marginBlock: '0.75rem',
+    padding: '0.75rem 1rem',
+  },
+  '.cm-callout-title': {
+    color: 'var(--color-ink)',
+    fontWeight: '600',
+  },
+  '.cm-callout-body': {
+    marginBlockStart: '0.375rem',
+    whiteSpace: 'pre-wrap',
   },
 })
 
@@ -485,7 +643,7 @@ export type MarkdownEditorSession = {
 
 export type MarkdownEditorSessionInput = MarkdownEditorInput & {
   onFormattingToolbarChange?: (snapshot: FormattingToolbarSnapshot | null) => void
-  onFormattingToolbarFocusRequest?: () => void
+  onFormattingToolbarFocusRequest?: (snapshot: FormattingToolbarSnapshot) => void
 }
 
 class CodeMirrorDocumentSession implements MarkdownEditorSession {
@@ -562,9 +720,17 @@ class CodeMirrorDocumentSession implements MarkdownEditorSession {
         this.livePreviewCompartment.of(this.livePreview()),
         autocompletion({
           activateOnTyping: true,
+          addToOptions: [{
+            position: 20,
+            render: (completion, _state, view) =>
+              renderSlashCommandIcon(completion, view.dom.ownerDocument),
+          }],
           icons: false,
           maxRenderedOptions: 8,
-          override: [wikiLinkCompletion((query) => this.input.suggestWikiLinks(query))],
+          override: [
+            slashCommandCompletion,
+            wikiLinkCompletion((query) => this.input.suggestWikiLinks(query)),
+          ],
         }),
         linkInteraction(
           (activation) => this.input.onWikiLinkActivate(activation),
