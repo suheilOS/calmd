@@ -364,6 +364,9 @@ const editorTheme = EditorView.theme({
   },
   '.cm-callout-body': {
     marginBlockStart: '0.375rem',
+  },
+  '.cm-callout-body-line': {
+    minHeight: '1lh',
     whiteSpace: 'pre-wrap',
   },
 })

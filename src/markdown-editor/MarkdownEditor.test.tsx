@@ -348,6 +348,33 @@ describe('MarkdownEditor external links', () => {
 })
 
 describe('MarkdownEditor Live Preview', () => {
+  test('resolves callout title and body direction independently per line', async () => {
+    const source = [
+      '> [!note] عنوان عربي',
+      '> English body.',
+      '> سطر عربي.',
+      '',
+      'Tail',
+    ].join('\n')
+    const { container } = await renderEditor(source, 1)
+    const content = container.querySelector<HTMLElement>('.cm-content')
+    if (!content) throw new Error('CodeMirror content was not mounted')
+    const view = EditorView.findFromDOM(content)
+    await act(async () => view.dispatch({ selection: { anchor: source.indexOf('Tail') } }))
+
+    const callout = content.querySelector<HTMLElement>('aside.cm-callout-preview')
+    const title = callout?.querySelector<HTMLElement>('.cm-callout-title')
+    const bodyLines = [...callout?.querySelectorAll<HTMLElement>('.cm-callout-body-line') ?? []]
+
+    expect(callout?.dir).toBe('auto')
+    expect(title?.dir).toBe('auto')
+    expect(title?.textContent).toBe('عنوان عربي')
+    expect(bodyLines.map((line) => ({ dir: line.dir, text: line.textContent }))).toEqual([
+      { dir: 'auto', text: 'English body.' },
+      { dir: 'auto', text: 'سطر عربي.' },
+    ])
+  })
+
   test('keeps tables rendered during contact and retains callout source reveal', async () => {
     const source = [
       '| Name | Value |',

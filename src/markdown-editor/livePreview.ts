@@ -91,12 +91,19 @@ class CalloutPreviewWidget extends WidgetType {
     })
     const title = view.dom.ownerDocument.createElement('div')
     title.className = 'cm-callout-title'
+    title.dir = 'auto'
     title.textContent = this.title
     callout.append(title)
     if (this.body) {
       const body = view.dom.ownerDocument.createElement('div')
       body.className = 'cm-callout-body'
-      body.textContent = this.body
+      for (const text of this.body.split('\n')) {
+        const line = view.dom.ownerDocument.createElement('div')
+        line.className = 'cm-callout-body-line'
+        line.dir = 'auto'
+        line.textContent = text
+        body.append(line)
+      }
       callout.append(body)
     }
     return callout
